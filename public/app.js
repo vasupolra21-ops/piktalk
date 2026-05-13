@@ -324,10 +324,12 @@ function appendMessage(data, isSentByMe) {
     let content = `<div class="bubble">${data.message}</div>`;
     if (data.image) content = `<div class="bubble"><img src="${data.image}" class="message-image"></div>`;
     
+    const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    
     msgDiv.innerHTML = `
         <div class="message-info">
             <span class="user-name" style="color: ${color}">${isSentByMe ? 'You' : data.nickname}</span>
-            <span class="timestamp">${data.timestamp || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+            <span class="timestamp">${timeStr}</span>
         </div>
         <div class="message-content">
             ${avatar}

@@ -83,8 +83,7 @@ io.on('connection', (socket) => {
                 nickname: data.nickname || user.nickname,
                 message: data.message,
                 image: data.image,
-                profilePic: data.profilePic || user.profilePic,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                profilePic: data.profilePic || user.profilePic
             };
             io.to(user.roomID).emit('receive-message', messageData);
         }
