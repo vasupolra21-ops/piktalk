@@ -1,6 +1,8 @@
-# LinkChat - Modern Real-time Anonymous Chat
+# PikTalk 💬 - Modern Real-time Anonymous Chat
 
-LinkChat is a sleek, private, and anonymous real-time chatting platform. Generate a unique room link, share it with a friend, and start chatting instantly with no registration and no logs.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vasupolra21-ops/piktalk)
+
+PikTalk is a sleek, private, and anonymous real-time chatting platform. Generate a unique room link, share it with a friend, and start chatting instantly with no registration and no logs.
 
 ## Features
 - **Modern UI**: Dark theme with Glassmorphism, smooth animations, and responsive design.
