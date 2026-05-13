@@ -329,7 +329,7 @@ function appendMessage(data, isSentByMe) {
     msgDiv.innerHTML = `
         <div class="message-info">
             <span class="user-name" style="color: ${color}">${isSentByMe ? 'You' : data.nickname}</span>
-            <span class="timestamp">${timeStr}</span>
+            <span class="timestamp">[L] ${timeStr}</span>
         </div>
         <div class="message-content">
             ${avatar}
