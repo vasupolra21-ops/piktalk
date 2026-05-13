@@ -8,7 +8,7 @@ const os = require('os');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 1e7 // 10 MB
+    maxHttpBufferSize: 1e8 // 100 MB limit for large photos
 });
 
 const PORT = process.env.PORT || 3000;
