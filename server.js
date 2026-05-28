@@ -83,6 +83,8 @@ io.on('connection', (socket) => {
                 nickname: data.nickname || user.nickname,
                 message: data.message,
                 image: data.image,
+                audio: data.audio,
+                audioDuration: data.audioDuration,
                 profilePic: data.profilePic || user.profilePic
             };
             io.to(user.roomID).emit('receive-message', messageData);

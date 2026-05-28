@@ -505,49 +505,97 @@ function appendMessage(data, isSentByMe) {
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);
     const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
-    let content;
+    let contentEl;
+
     if (data.audio) {
-        // Voice message bubble
-        const bubbleId = 'vb-' + Date.now() + Math.random().toString(36).slice(2, 6);
+        // Store src in map — never embed base64 in HTML attribute
+        const bubbleId = 'vb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5);
+        _voiceData[bubbleId] = data.audio;
         const durLabel = data.audioDuration ? formatSeconds(data.audioDuration) : '0:00';
-        content = `
-            <div class="voice-bubble" id="${bubbleId}">
-                <button class="voice-bubble-play" onclick="toggleVoiceBubble('${bubbleId}', '${data.audio}')">
-                    <i class="fas fa-play"></i>
-                </button>
-                <div class="voice-bubble-progress" onclick="seekVoiceBubble(event, '${bubbleId}', '${data.audio}')">
-                    <div class="voice-bubble-bar" id="bar-${bubbleId}"></div>
-                </div>
-                <span class="voice-bubble-duration" id="dur-${bubbleId}">${durLabel}</span>
-            </div>`;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'voice-bubble';
+        bubble.id = bubbleId;
+
+        const playBtn = document.createElement('button');
+        playBtn.className = 'voice-bubble-play';
+        playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        playBtn.addEventListener('click', () => toggleVoiceBubble(bubbleId));
+
+        const progressWrap = document.createElement('div');
+        progressWrap.className = 'voice-bubble-progress';
+        progressWrap.addEventListener('click', (e) => seekVoiceBubble(e, bubbleId));
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'voice-bubble-bar';
+        progressBar.id = 'bar-' + bubbleId;
+        progressWrap.appendChild(progressBar);
+
+        const durSpan = document.createElement('span');
+        durSpan.className = 'voice-bubble-duration';
+        durSpan.id = 'dur-' + bubbleId;
+        durSpan.textContent = durLabel;
+
+        bubble.appendChild(playBtn);
+        bubble.appendChild(progressWrap);
+        bubble.appendChild(durSpan);
+        contentEl = bubble;
+
     } else if (data.image) {
-        content = `<div class="bubble"><img src="${data.image}" class="message-image"></div>`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        const img = document.createElement('img');
+        img.src = data.image;
+        img.className = 'message-image';
+        bubble.appendChild(img);
+        contentEl = bubble;
+
     } else {
-        content = `<div class="bubble">${data.message}</div>`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = data.message;
+        contentEl = bubble;
     }
 
-    msgDiv.innerHTML = `
-        <div class="message-info">
-            <span class="user-name" style="color: ${color}">${isSentByMe ? 'You' : data.nickname}</span>
-            <span class="timestamp">${timeStr}</span>
-        </div>
-        <div class="message-content">
-            ${avatar}
-            ${content}
-        </div>
-    `;
+    // Build message DOM directly (no innerHTML with user data)
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'message-info';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'user-name';
+    nameSpan.style.color = color;
+    nameSpan.textContent = isSentByMe ? 'You' : data.nickname;
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'timestamp';
+    timeSpan.textContent = timeStr;
+
+    infoDiv.appendChild(nameSpan);
+    infoDiv.appendChild(timeSpan);
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    if (avatar) contentDiv.innerHTML = avatar; // avatar is safe HTML we generate
+    contentDiv.appendChild(contentEl);
+
+    msgDiv.appendChild(infoDiv);
+    msgDiv.appendChild(contentDiv);
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 // ── Voice Bubble Playback ──
+const _voiceData   = {};   // bubbleId → audio src (base64)
 const _voiceAudios = {};   // bubbleId → Audio instance
 
-function toggleVoiceBubble(bubbleId, src) {
+function toggleVoiceBubble(bubbleId) {
+    const src = _voiceData[bubbleId];
+    if (!src) return;
+
     let audio = _voiceAudios[bubbleId];
-    const playBtn = document.querySelector(`#${bubbleId} .voice-bubble-play i`);
-    const bar     = document.getElementById('bar-' + bubbleId);
-    const dur     = document.getElementById('dur-' + bubbleId);
+    const playBtnI = document.querySelector('#' + bubbleId + ' .voice-bubble-play i');
+    const bar      = document.getElementById('bar-' + bubbleId);
+    const dur      = document.getElementById('dur-' + bubbleId);
 
     if (!audio) {
         audio = new Audio(src);
@@ -559,35 +607,37 @@ function toggleVoiceBubble(bubbleId, src) {
             if (dur) dur.textContent = formatSeconds(Math.floor(audio.currentTime));
         };
         audio.onended = () => {
-            if (playBtn) playBtn.className = 'fas fa-play';
+            if (playBtnI) playBtnI.className = 'fas fa-play';
             if (bar) bar.style.width = '0%';
         };
     }
 
     if (audio.paused) {
-        // Pause any other playing voice bubbles
+        // Pause all others
         Object.entries(_voiceAudios).forEach(([id, a]) => {
             if (id !== bubbleId && !a.paused) {
                 a.pause();
-                const otherBtn = document.querySelector(`#${id} .voice-bubble-play i`);
-                if (otherBtn) otherBtn.className = 'fas fa-play';
+                const otherI = document.querySelector('#' + id + ' .voice-bubble-play i');
+                if (otherI) otherI.className = 'fas fa-play';
             }
         });
-        audio.play();
-        if (playBtn) playBtn.className = 'fas fa-pause';
+        audio.play().catch(() => {});
+        if (playBtnI) playBtnI.className = 'fas fa-pause';
     } else {
         audio.pause();
-        if (playBtn) playBtn.className = 'fas fa-play';
+        if (playBtnI) playBtnI.className = 'fas fa-play';
     }
 }
 
-function seekVoiceBubble(event, bubbleId, src) {
-    let audio = _voiceAudios[bubbleId];
-    if (!audio) { toggleVoiceBubble(bubbleId, src); audio = _voiceAudios[bubbleId]; }
+function seekVoiceBubble(event, bubbleId) {
+    if (!_voiceData[bubbleId]) return;
+    if (!_voiceAudios[bubbleId]) toggleVoiceBubble(bubbleId);
+    const audio = _voiceAudios[bubbleId];
     if (!audio || !audio.duration) return;
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect  = event.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
     audio.currentTime = ratio * audio.duration;
+
 }
 
 function appendSystemMessage(text) {
