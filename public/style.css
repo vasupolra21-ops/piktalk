@@ -616,7 +616,7 @@ body.light-mode .btn-icon {
     display: block;
 }
 
-.sender-name {
+.user-name, .sender-name {
     font-weight: 700;
 }
 
@@ -1043,7 +1043,7 @@ body.light-mode .btn-icon {
 
     .logo {
         gap: 10px;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
     }
 
     .logo h1 {
@@ -1055,24 +1055,24 @@ body.light-mode .btn-icon {
     }
 
     .main-hero h2 {
-        font-size: 1.5rem;
-        margin-bottom: 0.75rem;
+        font-size: 1.4rem;
+        margin-bottom: 0.5rem;
     }
 
     .main-hero p {
-        font-size: 0.9rem;
-        margin-bottom: 1.5rem;
-        line-height: 1.5;
+        font-size: 0.85rem;
+        margin-bottom: 1rem;
+        line-height: 1.4;
     }
 
     .btn-large {
-        padding: 14px 28px;
-        font-size: 1.05rem;
+        padding: 12px 24px;
+        font-size: 1rem;
         border-radius: 12px;
     }
 
     .divider {
-        margin: 1.2rem 0;
+        margin: 0.8rem 0;
     }
 
     .join-existing {
