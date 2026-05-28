@@ -475,7 +475,7 @@ function sendMessage() {
                 profilePic: myProfilePic
             });
             messageInput.value = '';
-            messageInput.style.height = '40px'; // Reset textarea height
+            messageInput.style.height = '38px'; // Reset textarea height
         } else {
             alert("Not connected to server. Message could not be sent.");
         }
