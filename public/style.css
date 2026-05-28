@@ -642,6 +642,7 @@ body.light-mode .btn-icon {
     font-size: 0.95rem;
     color: var(--text-main);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-align: left;
 }
 
 .bubble.big-emoji {
