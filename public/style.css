@@ -1005,6 +1005,14 @@ body.light-mode .btn-icon {
         padding: 1.5rem;
     }
     
+    .btn-large {
+        padding: 12px 20px;
+        font-size: 1rem;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 280px;
+    }
+    
     .chat-container {
         height: 100vh;
         border-radius: 0;
