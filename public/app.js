@@ -246,9 +246,12 @@ function setupEventListeners() {
     });
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
-    if (messageInput) messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
+    if (messageInput) {
+        messageInput.addEventListener('input', () => {
+            messageInput.style.height = 'auto';
+            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+        });
+    }
 
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
     if (imgInput) imgInput.addEventListener('change', () => {
@@ -472,6 +475,7 @@ function sendMessage() {
                 profilePic: myProfilePic
             });
             messageInput.value = '';
+            messageInput.style.height = '40px'; // Reset textarea height
         } else {
             alert("Not connected to server. Message could not be sent.");
         }
