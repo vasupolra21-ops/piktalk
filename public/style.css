@@ -1220,9 +1220,9 @@ body.light-mode .btn-icon {
 }
 
 .voice-bubble-play {
-    background: rgba(255,255,255,0.2);
+    background: rgba(99, 102, 241, 0.15); /* Soft indigo tint */
     border: none;
-    color: inherit;
+    color: var(--primary); /* Indigo icon */
     width: 32px; height: 32px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -1232,21 +1232,32 @@ body.light-mode .btn-icon {
     transition: all 0.2s;
 }
 
-.voice-bubble-play:hover { background: rgba(255,255,255,0.35); transform: scale(1.1); }
+body.light-mode .voice-bubble-play {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.voice-bubble-play:hover {
+    background: rgba(99, 102, 241, 0.25);
+    transform: scale(1.1);
+}
 
 .voice-bubble-progress {
     flex: 1;
-    height: 3px;
-    background: rgba(255,255,255,0.25);
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 3px;
     overflow: hidden;
     cursor: pointer;
 }
 
+body.light-mode .voice-bubble-progress {
+    background: rgba(0, 0, 0, 0.08);
+}
+
 .voice-bubble-bar {
     height: 100%;
     width: 0%;
-    background: rgba(255,255,255,0.8);
+    background: var(--primary); /* Indigo progress bar */
     border-radius: 3px;
     transition: width 0.1s linear;
 }
@@ -1254,9 +1265,31 @@ body.light-mode .btn-icon {
 .voice-bubble-duration {
     font-size: 0.73rem;
     font-weight: 700;
-    color: rgba(255,255,255,0.75);
+    color: var(--text-muted); /* Proper theme-aware text color */
     min-width: 30px;
     font-variant-numeric: tabular-nums;
+}
+
+/* Overrides for Sent voice bubble elements */
+.message.sent .voice-bubble-play {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.message.sent .voice-bubble-play:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.message.sent .voice-bubble-progress {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.message.sent .voice-bubble-bar {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.message.sent .voice-bubble-duration {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* Mobile Responsiveness */
