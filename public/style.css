@@ -1015,20 +1015,17 @@ body.light-mode .btn-icon {
     }
 
     #home-view.container {
-        padding: 24px 16px;
+        padding: 40px 16px 24px 16px;
         height: auto;
         min-height: 100vh;
         min-height: 100dvh;
         overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
-        align-items: center;
+        display: block; /* Use block layout on mobile to prevent Safari vertical scroll negative-overflow cutoff */
         -webkit-overflow-scrolling: touch;
     }
 
     #home-view.container .main-hero {
-        margin: auto 0; /* Centers content vertically if space permits, scrolls if larger */
+        margin: 0 auto; /* Horizontal center only, flows naturally from top */
     }
 
     #chat-view.container {
@@ -1088,20 +1085,22 @@ body.light-mode .btn-icon {
     }
 
     .features-grid {
-        grid-template-columns: 1fr; /* Stack vertically to prevent squishing on narrow devices */
-        gap: 12px;
-        margin-top: 2rem;
+        display: flex; /* Maintain horizontal layout but smaller to save massive vertical space */
+        justify-content: space-between;
+        gap: 8px;
+        margin-top: 1.5rem;
         width: 100%;
     }
 
     .feature-item {
-        flex-direction: row;
-        justify-content: center;
-        gap: 12px;
-        background: rgba(255, 255, 255, 0.03);
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid var(--glass-border);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        padding: 0;
+        border: none;
     }
 
     .feature-item i {
@@ -1297,7 +1296,7 @@ body.light-mode .btn-icon {
         padding: 1.75rem 1.25rem;
         width: 92%;
         border-radius: 20px;
-        margin: auto; /* Vertically and horizontally centers when space permits, scrollable when overflowing */
+        margin: 24px auto; /* Force vertical margin instead of auto to guarantee no top cutoff on overflow */
     }
 
     .modal-content h3 {
