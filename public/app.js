@@ -211,17 +211,20 @@ function setupEventListeners() {
 
     if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file && file.size < 2000000) {
+        if (file && file.size < 10000000) { // Support up to 10MB raw photos before compression
             const reader = new FileReader();
             reader.onload = (event) => {
-                myProfilePic = event.target.result;
-                avatarPreviewImg.src = myProfilePic;
-                avatarPreviewImg.classList.remove('hidden');
-                avatarPreviewImg.style.objectFit = 'cover';
-                if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                // Compress avatar to small size (120x120) for fast room joins
+                compressImage(event.target.result, 120, 120, 0.8, (compressedBase64) => {
+                    myProfilePic = compressedBase64;
+                    avatarPreviewImg.src = myProfilePic;
+                    avatarPreviewImg.classList.remove('hidden');
+                    avatarPreviewImg.style.objectFit = 'cover';
+                    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                });
             };
             reader.readAsDataURL(file);
-        } else if (file) alert('Image too large (Max 2MB)');
+        } else if (file) alert('Profile picture too large (Max 10MB before compression)');
     });
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
@@ -232,19 +235,22 @@ function setupEventListeners() {
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
     if (imgInput) imgInput.addEventListener('change', () => {
         const file = imgInput.files[0];
-        if (file && file.size < 5000000) {
+        if (file && file.size < 50000000) { // Support up to 50MB photos
             const reader = new FileReader();
             reader.onload = (e) => {
-                socket.emit('send-message', {
-                    roomID: currentRoomID,
-                    message: '',
-                    image: e.target.result,
-                    nickname: myNickname,
-                    profilePic: myProfilePic
+                // Compress image to max 1600px width/height at 75% quality
+                compressImage(e.target.result, 1600, 1600, 0.75, (compressedBase64) => {
+                    socket.emit('send-message', {
+                        roomID: currentRoomID,
+                        message: '',
+                        image: compressedBase64,
+                        nickname: myNickname,
+                        profilePic: myProfilePic
+                    });
                 });
             };
             reader.readAsDataURL(file);
-        } else if (file) alert('Image too large (Max 5MB)');
+        } else if (file) alert('Image too large (Max 50MB)');
     });
 }
 
@@ -360,4 +366,39 @@ function getAvatar(name, profilePic) {
     if (profilePic) return `<div class="avatar"><img src="${profilePic}"></div>`;
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return `<div class="avatar" style="background: ${getNicknameColor(name)}">${initial}</div>`;
+}
+
+function compressImage(base64Str, maxWidth, maxHeight, quality, callback) {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+            if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+            }
+        } else {
+            if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+            }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        callback(compressedBase64);
+    };
+    img.onerror = (err) => {
+        console.error("Image loading failed for compression:", err);
+        callback(base64Str);
+    };
 }
