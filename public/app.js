@@ -174,7 +174,17 @@ function setupEventListeners() {
         if (nick) {
             myNickname = nick;
             showChat();
-            socket.emit('join-room', { roomID: currentRoomID, nickname: myNickname, profilePic: myProfilePic });
+            if (socket) {
+                socket.emit('join-room', { roomID: currentRoomID, nickname: myNickname, profilePic: myProfilePic });
+            } else {
+                console.warn("Socket not initialized. Attempting fallback join...");
+            }
+        }
+    });
+
+    if (nicknameInput) nicknameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            joinChatBtn.click();
         }
     });
 
@@ -240,13 +250,17 @@ function setupEventListeners() {
             reader.onload = (e) => {
                 // Compress image to max 1600px width/height at 75% quality
                 compressImage(e.target.result, 1600, 1600, 0.75, (compressedBase64) => {
-                    socket.emit('send-message', {
-                        roomID: currentRoomID,
-                        message: '',
-                        image: compressedBase64,
-                        nickname: myNickname,
-                        profilePic: myProfilePic
-                    });
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: compressedBase64,
+                            nickname: myNickname,
+                            profilePic: myProfilePic
+                        });
+                    } else {
+                        alert("Not connected to server. Image could not be sent.");
+                    }
                 });
             };
             reader.readAsDataURL(file);
@@ -291,13 +305,17 @@ function showNicknameModal() {
 function sendMessage() {
     const text = messageInput.value.trim();
     if (text && currentRoomID) {
-        socket.emit('send-message', {
-            roomID: currentRoomID,
-            message: text,
-            nickname: myNickname,
-            profilePic: myProfilePic
-        });
-        messageInput.value = '';
+        if (socket) {
+            socket.emit('send-message', {
+                roomID: currentRoomID,
+                message: text,
+                nickname: myNickname,
+                profilePic: myProfilePic
+            });
+            messageInput.value = '';
+        } else {
+            alert("Not connected to server. Message could not be sent.");
+        }
     }
 }
 
