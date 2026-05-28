@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PikTalk | Private Anonymous Messaging</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
-    <link rel="stylesheet" href="/style.css?v=12">
+    <link rel="stylesheet" href="/style.css?v=13">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -105,12 +105,16 @@
             </div>
 
             <div class="chat-input-area">
+                <div id="emoji-picker" class="emoji-picker hidden"></div>
                 <div class="input-wrapper-chat">
                     <button id="attach-btn" class="btn-icon-small left">
                         <i class="fas fa-paperclip"></i>
                     </button>
                     <input type="file" id="image-input" accept="image/*" hidden>
                     <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                    <button id="emoji-btn" class="btn-icon-small right">
+                        <i class="far fa-smile"></i>
+                    </button>
                 </div>
                 <button id="send-btn" class="btn btn-send">
                     <i class="fas fa-paper-plane"></i>
@@ -140,6 +144,6 @@
     <audio id="msg-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3" preload="auto"></audio>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=6"></script>
+    <script src="/app.js?v=7"></script>
 </body>
 </html>
