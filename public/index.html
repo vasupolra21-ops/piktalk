@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PikTalk | Private Anonymous Messaging</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
-    <link rel="stylesheet" href="/style.css?v=16">
+    <link rel="stylesheet" href="/style.css?v=17">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
@@ -106,6 +106,38 @@
 
             <div class="chat-input-area">
                 <div id="emoji-picker" class="emoji-picker hidden"></div>
+
+                <!-- Voice Recording Overlay -->
+                <div id="voice-recording-bar" class="voice-recording-bar hidden">
+                    <button id="cancel-recording-btn" class="voice-cancel-btn" title="Cancel">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <div class="voice-waveform">
+                        <span></span><span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <span id="recording-timer" class="recording-timer">0:00</span>
+                    <div class="recording-dot"></div>
+                    <span class="recording-label">Recording…</span>
+                </div>
+
+                <!-- Audio Preview Bar -->
+                <div id="audio-preview-bar" class="audio-preview-bar hidden">
+                    <button id="discard-audio-btn" class="voice-cancel-btn" title="Discard">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button id="play-preview-btn" class="voice-play-btn" title="Play preview">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="audio-progress-wrap">
+                        <div id="audio-progress-bar" class="audio-progress-bar"></div>
+                    </div>
+                    <span id="audio-preview-duration" class="audio-preview-duration">0:00</span>
+                    <button id="send-audio-btn" class="btn btn-send" title="Send voice message" style="flex-shrink:0;">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+
                 <div class="input-wrapper-chat">
                     <button id="attach-btn" class="btn-icon-small left">
                         <i class="fas fa-paperclip"></i>
@@ -116,6 +148,9 @@
                         <i class="far fa-smile"></i>
                     </button>
                 </div>
+                <button id="mic-btn" class="btn btn-mic" title="Hold to record voice">
+                    <i class="fas fa-microphone"></i>
+                </button>
                 <button id="send-btn" class="btn btn-send">
                     <i class="fas fa-paper-plane"></i>
                 </button>
@@ -144,6 +179,6 @@
     <audio id="msg-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3" preload="auto"></audio>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=7"></script>
+    <script src="/app.js?v=8"></script>
 </body>
 </html>

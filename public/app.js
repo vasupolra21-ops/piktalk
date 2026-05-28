@@ -11,6 +11,7 @@ try {
 
 // DOM Elements
 let homeView, chatView, createRoomBtn, nicknameModal, nicknameInput, joinChatBtn, roomDisplayId, onlineStatus, messagesContainer, messageInput, sendBtn, inviteBtn, shareSection, roomLinkInput, copyBtn, leaveBtn, msgSound, emojiBtn, themeToggle, homeThemeToggle, attachBtn, imgInput, joinRoomInput, joinRoomBtn, emojiPicker, profilePicInput, avatarPreviewContainer, avatarPreviewImg, avatarPreviewIcon;
+let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPreviewBar, discardAudioBtn, playPreviewBtn, audioProgressBar, audioPreviewDuration, sendAudioBtn;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -42,6 +43,16 @@ function initDOMElements() {
     avatarPreviewContainer = document.getElementById('avatar-preview-container');
     avatarPreviewImg = document.getElementById('avatar-preview-img');
     avatarPreviewIcon = avatarPreviewContainer ? avatarPreviewContainer.querySelector('i') : null;
+    micBtn = document.getElementById('mic-btn');
+    voiceRecordingBar = document.getElementById('voice-recording-bar');
+    cancelRecordingBtn = document.getElementById('cancel-recording-btn');
+    recordingTimerEl = document.getElementById('recording-timer');
+    audioPreviewBar = document.getElementById('audio-preview-bar');
+    discardAudioBtn = document.getElementById('discard-audio-btn');
+    playPreviewBtn = document.getElementById('play-preview-btn');
+    audioProgressBar = document.getElementById('audio-progress-bar');
+    audioPreviewDuration = document.getElementById('audio-preview-duration');
+    sendAudioBtn = document.getElementById('send-audio-btn');
 }
 
 // State
@@ -50,6 +61,15 @@ let myNickname = null;
 let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
+
+// Voice recording state
+let mediaRecorder = null;
+let audioChunks = [];
+let recordingTimerInterval = null;
+let recordingSeconds = 0;
+let recordedAudioBlob = null;
+let previewAudio = null;
+let previewPlaying = false;
 
 const EMOJI_CATEGORIES = {
     "Smileys": ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃'],
@@ -233,10 +253,9 @@ function setupEventListeners() {
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
     if (imgInput) imgInput.addEventListener('change', () => {
         const file = imgInput.files[0];
-        if (file && file.size < 50000000) { // Support up to 50MB photos
+        if (file && file.size < 50000000) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                // Compress image to max 1600px width/height at 75% quality
                 compressImage(e.target.result, 1600, 1600, 0.75, (compressedBase64) => {
                     if (socket) {
                         socket.emit('send-message', {
@@ -254,6 +273,158 @@ function setupEventListeners() {
             reader.readAsDataURL(file);
         } else if (file) alert('Image too large (Max 50MB)');
     });
+
+    // ── Voice message listeners ──
+    if (micBtn) {
+        // Desktop: mousedown / mouseup
+        micBtn.addEventListener('mousedown', startRecording);
+        micBtn.addEventListener('mouseup',   stopRecording);
+        micBtn.addEventListener('mouseleave', () => { if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording(); });
+
+        // Mobile: touchstart / touchend
+        micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, { passive: false });
+        micBtn.addEventListener('touchend',   (e) => { e.preventDefault(); stopRecording(); },  { passive: false });
+    }
+
+    if (cancelRecordingBtn) cancelRecordingBtn.addEventListener('click', cancelRecording);
+    if (discardAudioBtn)    discardAudioBtn.addEventListener('click',   discardPreview);
+    if (playPreviewBtn)     playPreviewBtn.addEventListener('click',    togglePreviewPlayback);
+    if (sendAudioBtn)       sendAudioBtn.addEventListener('click',      sendVoiceMessage);
+}
+
+// ── Voice Recording Functions ──
+
+function formatSeconds(s) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+}
+
+function startRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') return;
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Your browser does not support voice recording.');
+        return;
+    }
+
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+            audioChunks = [];
+            recordingSeconds = 0;
+
+            // Prefer webm/opus; fall back to first supported type
+            const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg',''].find(t => !t || MediaRecorder.isTypeSupported(t));
+            mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+
+            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                recordedAudioBlob = blob;
+                showAudioPreview(blob, recordingSeconds);
+            };
+
+            mediaRecorder.start(100);
+            micBtn.classList.add('recording');
+            voiceRecordingBar.classList.remove('hidden');
+
+            recordingTimerInterval = setInterval(() => {
+                recordingSeconds++;
+                recordingTimerEl.textContent = formatSeconds(recordingSeconds);
+                // Auto-stop at 3 minutes
+                if (recordingSeconds >= 180) stopRecording();
+            }, 1000);
+        })
+        .catch(err => {
+            console.error('Mic permission denied:', err);
+            alert('Microphone access denied. Please allow microphone access to record voice messages.');
+        });
+}
+
+function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+    clearInterval(recordingTimerInterval);
+    mediaRecorder.stop();
+    micBtn.classList.remove('recording');
+    voiceRecordingBar.classList.add('hidden');
+    recordingTimerEl.textContent = '0:00';
+}
+
+function cancelRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.ondataavailable = null; // discard chunks
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+        if (mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    }
+    clearInterval(recordingTimerInterval);
+    micBtn.classList.remove('recording');
+    voiceRecordingBar.classList.add('hidden');
+    recordingTimerEl.textContent = '0:00';
+    audioChunks = [];
+    recordedAudioBlob = null;
+}
+
+function showAudioPreview(blob, durationSec) {
+    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+    previewAudio = new Audio(URL.createObjectURL(blob));
+    previewAudio.ontimeupdate = () => {
+        const pct = previewAudio.duration ? (previewAudio.currentTime / previewAudio.duration) * 100 : 0;
+        audioProgressBar.style.width = pct + '%';
+        audioPreviewDuration.textContent = formatSeconds(Math.floor(previewAudio.currentTime));
+    };
+    previewAudio.onended = () => {
+        previewPlaying = false;
+        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
+        audioProgressBar.style.width = '0%';
+        audioPreviewDuration.textContent = formatSeconds(durationSec);
+    };
+    audioPreviewDuration.textContent = formatSeconds(durationSec);
+    audioProgressBar.style.width = '0%';
+    audioPreviewBar.classList.remove('hidden');
+}
+
+function togglePreviewPlayback() {
+    if (!previewAudio) return;
+    if (previewPlaying) {
+        previewAudio.pause();
+        previewPlaying = false;
+        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
+    } else {
+        previewAudio.play();
+        previewPlaying = true;
+        playPreviewBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    }
+}
+
+function discardPreview() {
+    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+    previewPlaying = false;
+    audioPreviewBar.classList.add('hidden');
+    audioProgressBar.style.width = '0%';
+    recordedAudioBlob = null;
+}
+
+function sendVoiceMessage() {
+    if (!recordedAudioBlob) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        if (socket) {
+            socket.emit('send-message', {
+                roomID: currentRoomID,
+                message: '',
+                audio: e.target.result,
+                audioDuration: recordingSeconds,
+                nickname: myNickname,
+                profilePic: myProfilePic
+            });
+            discardPreview();
+        } else {
+            alert("Not connected to server. Voice message could not be sent.");
+        }
+    };
+    reader.readAsDataURL(recordedAudioBlob);
 }
 
 function toggleTheme() {
@@ -329,15 +500,32 @@ function appendMessage(data, isSentByMe) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
-    
+
     const color = isSentByMe ? '#fff' : getNicknameColor(data.nickname);
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);
-    
-    let content = `<div class="bubble">${data.message}</div>`;
-    if (data.image) content = `<div class="bubble"><img src="${data.image}" class="message-image"></div>`;
-    
     const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    
+
+    let content;
+    if (data.audio) {
+        // Voice message bubble
+        const bubbleId = 'vb-' + Date.now() + Math.random().toString(36).slice(2, 6);
+        const durLabel = data.audioDuration ? formatSeconds(data.audioDuration) : '0:00';
+        content = `
+            <div class="voice-bubble" id="${bubbleId}">
+                <button class="voice-bubble-play" onclick="toggleVoiceBubble('${bubbleId}', '${data.audio}')">
+                    <i class="fas fa-play"></i>
+                </button>
+                <div class="voice-bubble-progress" onclick="seekVoiceBubble(event, '${bubbleId}', '${data.audio}')">
+                    <div class="voice-bubble-bar" id="bar-${bubbleId}"></div>
+                </div>
+                <span class="voice-bubble-duration" id="dur-${bubbleId}">${durLabel}</span>
+            </div>`;
+    } else if (data.image) {
+        content = `<div class="bubble"><img src="${data.image}" class="message-image"></div>`;
+    } else {
+        content = `<div class="bubble">${data.message}</div>`;
+    }
+
     msgDiv.innerHTML = `
         <div class="message-info">
             <span class="user-name" style="color: ${color}">${isSentByMe ? 'You' : data.nickname}</span>
@@ -350,6 +538,56 @@ function appendMessage(data, isSentByMe) {
     `;
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ── Voice Bubble Playback ──
+const _voiceAudios = {};   // bubbleId → Audio instance
+
+function toggleVoiceBubble(bubbleId, src) {
+    let audio = _voiceAudios[bubbleId];
+    const playBtn = document.querySelector(`#${bubbleId} .voice-bubble-play i`);
+    const bar     = document.getElementById('bar-' + bubbleId);
+    const dur     = document.getElementById('dur-' + bubbleId);
+
+    if (!audio) {
+        audio = new Audio(src);
+        _voiceAudios[bubbleId] = audio;
+
+        audio.ontimeupdate = () => {
+            const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+            if (bar) bar.style.width = pct + '%';
+            if (dur) dur.textContent = formatSeconds(Math.floor(audio.currentTime));
+        };
+        audio.onended = () => {
+            if (playBtn) playBtn.className = 'fas fa-play';
+            if (bar) bar.style.width = '0%';
+        };
+    }
+
+    if (audio.paused) {
+        // Pause any other playing voice bubbles
+        Object.entries(_voiceAudios).forEach(([id, a]) => {
+            if (id !== bubbleId && !a.paused) {
+                a.pause();
+                const otherBtn = document.querySelector(`#${id} .voice-bubble-play i`);
+                if (otherBtn) otherBtn.className = 'fas fa-play';
+            }
+        });
+        audio.play();
+        if (playBtn) playBtn.className = 'fas fa-pause';
+    } else {
+        audio.pause();
+        if (playBtn) playBtn.className = 'fas fa-play';
+    }
+}
+
+function seekVoiceBubble(event, bubbleId, src) {
+    let audio = _voiceAudios[bubbleId];
+    if (!audio) { toggleVoiceBubble(bubbleId, src); audio = _voiceAudios[bubbleId]; }
+    if (!audio || !audio.duration) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
 }
 
 function appendSystemMessage(text) {
