@@ -18,13 +18,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=32" as="style">
+    <link rel="preload" href="/style.css?v=33" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=32" as="script">
+    <link rel="preload" href="/app.js?v=33" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=32">
+    <link rel="stylesheet" href="/style.css?v=33">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -118,7 +118,12 @@
             </div>
 
             <div id="typing-indicator" class="typing-indicator">
-                <span id="typing-text"></span>
+                <div class="typing-bubble">
+                    <span class="typing-name" id="typing-text"></span>
+                    <div class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
             </div>
 
             <div class="chat-input-area">
@@ -196,6 +201,6 @@
     <audio id="msg-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3" preload="none"></audio>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=32"></script>
+    <script src="/app.js?v=33"></script>
 </body>
 </html>

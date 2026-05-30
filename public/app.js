@@ -71,6 +71,9 @@ let recordedAudioBlob = null;
 let previewAudio = null;
 let previewPlaying = false;
 
+// Typing indicator state
+let typingTimeout = null;
+
 const EMOJI_CATEGORIES = {
     "Smileys": ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃'],
     "Love": ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '💋', '💌', '❤️‍🔥', '❤️‍🩹'],
@@ -250,6 +253,25 @@ function setupEventListeners() {
         messageInput.addEventListener('input', () => {
             messageInput.style.height = 'auto';
             messageInput.style.height = (messageInput.scrollHeight) + 'px';
+
+            // Emit typing event
+            if (socket && currentRoomID && myNickname) {
+                socket.emit('typing', { nickname: myNickname });
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('stop-typing');
+                }, 2000);
+            }
+        });
+
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // Stop typing indicator immediately on send
+                clearTimeout(typingTimeout);
+                if (socket) socket.emit('stop-typing');
+                sendMessage();
+            }
         });
     }
 
@@ -485,6 +507,7 @@ function sendMessage() {
 // Socket Events
 if (socket) {
     socket.on('receive-message', (data) => {
+        hideTyping(); // hide typing bubble when message arrives
         appendMessage(data, data.id === socket.id);
         if (msgSound) msgSound.play().catch(() => {});
     });
@@ -497,6 +520,30 @@ if (socket) {
         serverIP = data.ip;
         serverPort = data.port;
     });
+
+    socket.on('user-typing', (data) => {
+        showTyping(data.nickname);
+    });
+
+    socket.on('user-stop-typing', () => {
+        hideTyping();
+    });
+}
+
+function showTyping(name) {
+    const indicator = document.getElementById('typing-indicator');
+    const typingText = document.getElementById('typing-text');
+    if (!indicator || !typingText) return;
+    typingText.textContent = name + ' is typing…';
+    indicator.classList.add('visible');
+    const container = document.getElementById('messages-container');
+    if (container) container.scrollTop = container.scrollHeight;
+}
+
+function hideTyping() {
+    const indicator = document.getElementById('typing-indicator');
+    if (!indicator) return;
+    indicator.classList.remove('visible');
 }
 
 function appendMessage(data, isSentByMe) {
