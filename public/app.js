@@ -522,7 +522,7 @@ if (socket) {
     });
 
     socket.on('user-typing', (data) => {
-        showTyping(data.nickname);
+        showTyping(data.nickname, data.profilePic);
     });
 
     socket.on('user-stop-typing', () => {
@@ -530,11 +530,29 @@ if (socket) {
     });
 }
 
-function showTyping(name) {
+function showTyping(name, profilePic) {
     const indicator = document.getElementById('typing-indicator');
     const typingText = document.getElementById('typing-text');
+    const avatarEl   = document.getElementById('typing-avatar');
     if (!indicator || !typingText) return;
-    typingText.textContent = name + ' is typing…';
+
+    // Render avatar
+    if (avatarEl) {
+        avatarEl.innerHTML = '';
+        if (profilePic) {
+            const img = document.createElement('img');
+            img.src = profilePic;
+            img.alt = name;
+            avatarEl.appendChild(img);
+            avatarEl.style.background = 'transparent';
+        } else {
+            const initial = name ? name.charAt(0).toUpperCase() : '?';
+            avatarEl.textContent = initial;
+            avatarEl.style.background = getNicknameColor(name);
+        }
+    }
+
+    typingText.textContent = name + ' is typing\u2026';
     indicator.classList.add('visible');
     const container = document.getElementById('messages-container');
     if (container) container.scrollTop = container.scrollHeight;

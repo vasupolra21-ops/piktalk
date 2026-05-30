@@ -117,7 +117,7 @@ io.on('connection', (socket) => {
     socket.on('typing', (data) => {
         const user = users[socket.id];
         if (user) {
-            socket.to(user.roomID).emit('user-typing', { nickname: user.nickname });
+            socket.to(user.roomID).emit('user-typing', { nickname: user.nickname, profilePic: user.profilePic });
         }
     });
 
