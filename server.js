@@ -13,42 +13,8 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-const CANONICAL_DOMAIN = 'piktalk.chat';
-const OLD_DOMAIN = 'piktalk.onrender.com';
-
-// 301 Redirect: old Render domain → new custom domain
-app.use((req, res, next) => {
-    const host = req.hostname;
-    if (host === OLD_DOMAIN || host.endsWith('.' + OLD_DOMAIN)) {
-        return res.redirect(301, `https://${CANONICAL_DOMAIN}${req.originalUrl}`);
-    }
-    next();
-});
-
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
-
-// robots.txt - allow all crawlers, reference sitemap
-app.get('/robots.txt', (req, res) => {
-    res.type('text/plain');
-    res.send(`User-agent: *
-Allow: /
-Sitemap: https://${CANONICAL_DOMAIN}/sitemap.xml
-`);
-});
-
-// sitemap.xml - canonical URLs for SEO
-app.get('/sitemap.xml', (req, res) => {
-    res.type('application/xml');
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://${CANONICAL_DOMAIN}/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>`);
-});
 
 // Route for homepage
 app.get('/', (req, res) => {
