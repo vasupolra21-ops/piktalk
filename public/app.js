@@ -449,9 +449,16 @@ function showChat() {
     if (chatView) chatView.classList.add('active');
     if (roomDisplayId) roomDisplayId.textContent = `Room: ${currentRoomID}`;
     
-    let shareUrl = window.location.href;
-    if (window.location.hostname === 'localhost' && serverIP) {
-        shareUrl = `http://${serverIP}:${serverPort}/chat/${currentRoomID}`;
+    let shareUrl;
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        // Local dev: use network IP so other devices on LAN can join
+        shareUrl = serverIP
+            ? `http://${serverIP}:${serverPort}/chat/${currentRoomID}`
+            : `${window.location.origin}/chat/${currentRoomID}`;
+    } else {
+        // Production: always use canonical domain
+        shareUrl = `https://piktalk.chat/chat/${currentRoomID}`;
     }
     if (roomLinkInput) roomLinkInput.value = shareUrl;
     if (onlineStatus) {
