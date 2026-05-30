@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const os = require('os');
+const compression = require('compression');
 
 const app = express();
 const server = http.createServer(app);
@@ -13,8 +14,29 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Enable gzip compression for faster load times
+app.use(compression());
+
+// Health check endpoint for keep-alive and monitoring
+app.get('/ping', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
+// Serve static files with robust caching headers
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1d', // Cache static assets for 1 day
+    setHeaders: (res, filePath) => {
+        // Do not cache HTML files to ensure users always get the latest version
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+        } else {
+            // Cache other assets (CSS, JS, Fonts, Images) aggressively
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+    }
+}));
 
 // Route for homepage
 app.get('/', (req, res) => {
@@ -124,4 +146,31 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 PikTalk is running!`);
     console.log(`🏠 Local: http://localhost:${PORT}`);
     console.log(`📱 Network: http://${networkIP}:${PORT}\n`);
+    
+    // Set up self-ping keep-alive to prevent Render free-tier from sleeping
+    const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://piktalk.chat';
+    if (pingUrl) {
+        console.log(`[Keep-Alive] Initializing self-ping interval for: ${pingUrl}/ping`);
+        
+        // Initial ping after 30 seconds
+        setTimeout(() => {
+            sendKeepAlivePing(pingUrl);
+        }, 30000);
+        
+        // Periodic ping every 5 minutes (Render sleep threshold is 15 minutes)
+        setInterval(() => {
+            sendKeepAlivePing(pingUrl);
+        }, 5 * 60 * 1000);
+    }
 });
+
+function sendKeepAlivePing(url) {
+    const pingEndpoint = `${url.replace(/\/$/, '')}/ping`;
+    const client = pingEndpoint.startsWith('https') ? require('https') : require('http');
+    
+    client.get(pingEndpoint, (res) => {
+        console.log(`[Keep-Alive] Self-ping status: ${res.statusCode} (${pingEndpoint})`);
+    }).on('error', (err) => {
+        console.error(`[Keep-Alive] Self-ping failed for ${pingEndpoint}:`, err.message);
+    });
+}

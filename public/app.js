@@ -62,11 +62,6 @@ let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
 
-// Typing indicator state
-let isTyping = false;
-let typingTimeout = null;
-let hideTypingTimeout = null;
-
 // Voice recording state
 let mediaRecorder = null;
 let audioChunks = [];
@@ -255,19 +250,6 @@ function setupEventListeners() {
         messageInput.addEventListener('input', () => {
             messageInput.style.height = 'auto';
             messageInput.style.height = (messageInput.scrollHeight) + 'px';
-
-            // Emit typing event
-            if (socket && currentRoomID) {
-                if (!isTyping) {
-                    isTyping = true;
-                    socket.emit('typing', { nickname: myNickname });
-                }
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    isTyping = false;
-                    socket.emit('stop-typing');
-                }, 2000);
-            }
         });
     }
 
@@ -503,7 +485,6 @@ function sendMessage() {
 // Socket Events
 if (socket) {
     socket.on('receive-message', (data) => {
-        hideTypingIndicator();
         appendMessage(data, data.id === socket.id);
         if (msgSound) msgSound.play().catch(() => {});
     });
@@ -516,34 +497,6 @@ if (socket) {
         serverIP = data.ip;
         serverPort = data.port;
     });
-
-    socket.on('user-typing', (data) => {
-        showTypingIndicator(data.nickname);
-    });
-
-    socket.on('user-stop-typing', () => {
-        hideTypingIndicator();
-    });
-}
-
-function showTypingIndicator(nickname) {
-    const indicator = document.getElementById('typing-indicator');
-    const label = document.getElementById('typing-text');
-    if (!indicator || !label) return;
-    label.textContent = `${nickname} typing...`;
-    indicator.classList.remove('hidden');
-    // Auto-hide after 4s in case stop-typing is missed
-    clearTimeout(hideTypingTimeout);
-    hideTypingTimeout = setTimeout(hideTypingIndicator, 4000);
-    // Scroll chat to bottom so indicator is visible
-    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function hideTypingIndicator() {
-    const indicator = document.getElementById('typing-indicator');
-    if (!indicator) return;
-    indicator.classList.add('hidden');
-    clearTimeout(hideTypingTimeout);
 }
 
 function appendMessage(data, isSentByMe) {
