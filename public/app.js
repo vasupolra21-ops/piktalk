@@ -354,6 +354,11 @@ function startRecording() {
             micBtn.classList.add('recording');
             voiceRecordingBar.classList.remove('hidden');
 
+            // Notify others that we are recording
+            if (socket && currentRoomID && myNickname) {
+                socket.emit('voice-recording-start', { nickname: myNickname, profilePic: myProfilePic });
+            }
+
             recordingTimerInterval = setInterval(() => {
                 recordingSeconds++;
                 recordingTimerEl.textContent = formatSeconds(recordingSeconds);
@@ -374,6 +379,7 @@ function stopRecording() {
     micBtn.classList.remove('recording');
     voiceRecordingBar.classList.add('hidden');
     recordingTimerEl.textContent = '0:00';
+    if (socket) socket.emit('voice-recording-stop');
 }
 
 function cancelRecording() {
@@ -389,6 +395,7 @@ function cancelRecording() {
     recordingTimerEl.textContent = '0:00';
     audioChunks = [];
     recordedAudioBlob = null;
+    if (socket) socket.emit('voice-recording-stop');
 }
 
 function showAudioPreview(blob, durationSec) {
@@ -436,6 +443,7 @@ function sendVoiceMessage() {
     const reader = new FileReader();
     reader.onload = (e) => {
         if (socket) {
+            socket.emit('voice-recording-stop'); // clear indicator before send
             socket.emit('send-message', {
                 roomID: currentRoomID,
                 message: '',
@@ -528,9 +536,17 @@ if (socket) {
     socket.on('user-stop-typing', () => {
         hideTyping();
     });
+
+    socket.on('user-voice-recording', (data) => {
+        showTyping(data.nickname, data.profilePic, 'voice');
+    });
+
+    socket.on('user-voice-stop-recording', () => {
+        hideTyping();
+    });
 }
 
-function showTyping(name, profilePic) {
+function showTyping(name, profilePic, mode) {
     const indicator = document.getElementById('typing-indicator');
     const typingText = document.getElementById('typing-text');
     const avatarEl   = document.getElementById('typing-avatar');
@@ -552,7 +568,13 @@ function showTyping(name, profilePic) {
         }
     }
 
-    typingText.textContent = name + ' is typing\u2026';
+    // Label differs for voice vs text
+    if (mode === 'voice') {
+        typingText.textContent = name + ' \uD83C\uDFA4 recording\u2026';
+    } else {
+        typingText.textContent = name + ' is typing\u2026';
+    }
+
     indicator.classList.add('visible');
     const container = document.getElementById('messages-container');
     if (container) container.scrollTop = container.scrollHeight;

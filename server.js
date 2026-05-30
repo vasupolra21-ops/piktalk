@@ -128,6 +128,20 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('voice-recording-start', (data) => {
+        const user = users[socket.id];
+        if (user) {
+            socket.to(user.roomID).emit('user-voice-recording', { nickname: user.nickname, profilePic: user.profilePic });
+        }
+    });
+
+    socket.on('voice-recording-stop', () => {
+        const user = users[socket.id];
+        if (user) {
+            socket.to(user.roomID).emit('user-voice-stop-recording');
+        }
+    });
+
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
