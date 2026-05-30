@@ -148,7 +148,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`📱 Network: http://${networkIP}:${PORT}\n`);
     
     // Set up self-ping keep-alive to prevent Render free-tier from sleeping
-    const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://piktalk.chat';
+    const pingUrl = process.env.RENDER_EXTERNAL_URL || 'https://piktalk.onrender.com';
     if (pingUrl) {
         console.log(`[Keep-Alive] Initializing self-ping interval for: ${pingUrl}/ping`);
         
