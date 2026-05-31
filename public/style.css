@@ -1392,6 +1392,16 @@ body.light-mode .waveform-bar {
     color: rgba(255, 255, 255, 0.85);
 }
 
+.author-name {
+    font-weight: 700;
+    margin-left: 6px;
+    background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    display: inline-block;
+    opacity: 1;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     body {
