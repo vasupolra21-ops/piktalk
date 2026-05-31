@@ -80,6 +80,13 @@ function updateNetworkIP() {
 // Initial IP detection
 updateNetworkIP();
 
+function sendRoomUsers(roomID) {
+    const roomUsers = Object.values(users)
+        .filter(u => u.roomID === roomID)
+        .map(u => ({ nickname: u.nickname, profilePic: u.profilePic }));
+    io.to(roomID).emit('room-users', roomUsers);
+}
+
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
     
@@ -96,6 +103,9 @@ io.on('connection', (socket) => {
         socket.to(cleanRoomID).emit('system-message', {
             message: `${nickname} has joined the chat`
         });
+
+        // Send updated users list to all users in the room
+        sendRoomUsers(cleanRoomID);
     });
 
     socket.on('send-message', (data) => {
@@ -146,13 +156,15 @@ io.on('connection', (socket) => {
         const user = users[socket.id];
         if (user) {
             console.log(`${user.nickname} left room: ${user.roomID}`);
+            const roomID = user.roomID;
             
             // Notify others in the room
-            io.to(user.roomID).emit('system-message', {
+            io.to(roomID).emit('system-message', {
                 message: `${user.nickname} has left the chat`
             });
             
             delete users[socket.id];
+            sendRoomUsers(roomID);
         }
     });
 });

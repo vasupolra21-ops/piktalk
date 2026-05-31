@@ -115,6 +115,7 @@ window.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     initLightbox();
     initCropModal();
+    initMembersModal();
 });
 
 function initLightbox() {
@@ -574,6 +575,10 @@ if (socket) {
 
     socket.on('user-voice-stop-recording', () => {
         hideTyping();
+    });
+
+    socket.on('room-users', (usersList) => {
+        updateMembersList(usersList);
     });
 }
 
@@ -1073,4 +1078,67 @@ function clampCrop() {
     const minY = cy + r - ih;
     _cropX = Math.min(maxX, Math.max(minX, _cropX));
     _cropY = Math.min(maxY, Math.max(minY, _cropY));
+}
+
+/* ══════════════════════════════════════
+   Chat Members Modal Logic
+   ══════════════════════════════════════ */
+function initMembersModal() {
+    const btn = document.getElementById('members-btn');
+    const modal = document.getElementById('members-modal');
+    const closeBtn = document.getElementById('members-close-btn');
+
+    if (btn && modal) {
+        btn.addEventListener('click', () => {
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        });
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+        });
+    }
+}
+
+function updateMembersList(usersList) {
+    const listWrap = document.getElementById('members-list-wrap');
+    const badge = document.getElementById('members-badge');
+    if (!listWrap) return;
+
+    // Update badge count
+    if (badge) {
+        badge.textContent = usersList.length;
+        badge.style.display = usersList.length > 0 ? 'flex' : 'none';
+    }
+
+    listWrap.innerHTML = '';
+    usersList.forEach(u => {
+        const isMe = (u.nickname === myNickname && u.profilePic === myProfilePic);
+        const item = document.createElement('div');
+        item.className = 'member-item';
+
+        let avatarHtml = '';
+        if (u.profilePic) {
+            avatarHtml = `<div class="member-avatar-wrap"><img src="${u.profilePic}"></div>`;
+        } else {
+            const initial = u.nickname ? u.nickname.charAt(0).toUpperCase() : '?';
+            avatarHtml = `<div class="member-avatar-wrap" style="background: ${getNicknameColor(u.nickname)}">${initial}</div>`;
+        }
+
+        item.innerHTML = `
+            ${avatarHtml}
+            <span class="member-name">${u.nickname || 'Anonymous'}</span>
+            ${isMe ? '<span class="member-you-badge">You</span>' : ''}
+        `;
+        listWrap.appendChild(item);
+    });
 }

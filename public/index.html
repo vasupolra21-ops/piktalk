@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=46" as="style">
+    <link rel="preload" href="/style.css?v=47" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=46" as="script">
+    <link rel="preload" href="/app.js?v=47" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=46">
+    <link rel="stylesheet" href="/style.css?v=47">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -101,6 +101,10 @@
                 <div class="header-actions">
                     <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
                         <i class="fas fa-sun"></i>
+                    </button>
+                    <button id="members-btn" class="btn-icon" title="Chat Members">
+                        <i class="fas fa-users"></i>
+                        <span id="members-badge" class="badge-count" style="display: none;">0</span>
                     </button>
                     <button id="invite-btn" class="btn-icon" title="Invite Friend">
                         <i class="fas fa-user-plus"></i>
@@ -231,6 +235,19 @@
         </div>
     </div>
 
+    <!-- Chat Members Modal -->
+    <div id="members-modal" class="members-modal-overlay" role="dialog" aria-modal="true" aria-label="Chat Members">
+        <div class="members-modal-box">
+            <div class="members-modal-header">
+                <span class="members-modal-title">Chat Members</span>
+                <button class="members-cancel-btn" id="members-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="members-list-wrap" id="members-list-wrap">
+                <!-- Dynamically populated in JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Image Lightbox -->
     <div class="img-lightbox" id="img-lightbox" role="dialog" aria-modal="true">
         <button class="img-lightbox-close" id="img-lightbox-close" aria-label="Close">&times;</button>
@@ -238,6 +255,6 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=46"></script>
+    <script src="/app.js?v=47"></script>
 </body>
 </html>
