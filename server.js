@@ -51,6 +51,7 @@ app.get('/chat/:roomID', (req, res) => {
 
 // Store users and their rooms
 const users = {};
+const rooms = {}; // roomID -> { adminSocketId }
 let networkIP = '0.0.0.0';
 
 function updateNetworkIP() {
@@ -81,9 +82,14 @@ function updateNetworkIP() {
 updateNetworkIP();
 
 function sendRoomUsers(roomID) {
-    const roomUsers = Object.values(users)
-        .filter(u => u.roomID === roomID)
-        .map(u => ({ nickname: u.nickname, profilePic: u.profilePic }));
+    const roomUsers = Object.entries(users)
+        .filter(([id, u]) => u.roomID === roomID)
+        .map(([id, u]) => ({
+            id: id,
+            nickname: u.nickname,
+            profilePic: u.profilePic,
+            isAdmin: rooms[roomID] && rooms[roomID].adminSocketId === id
+        }));
     io.to(roomID).emit('room-users', roomUsers);
 }
 
@@ -99,6 +105,12 @@ io.on('connection', (socket) => {
         users[socket.id] = { roomID: cleanRoomID, nickname, profilePic };
         console.log(`${nickname} joined room: ${cleanRoomID}`);
         
+        // Designate admin if room has no admin yet
+        if (!rooms[cleanRoomID] || !rooms[cleanRoomID].adminSocketId) {
+            rooms[cleanRoomID] = { adminSocketId: socket.id };
+            console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
+        }
+
         // Notify others in the room
         socket.to(cleanRoomID).emit('system-message', {
             message: `${nickname} has joined the chat`
@@ -152,6 +164,40 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('kick-user', ({ targetSocketId }) => {
+        const user = users[socket.id];
+        if (user) {
+            const roomID = user.roomID;
+            // Verify if the sender is actually the admin of the room
+            if (rooms[roomID] && rooms[roomID].adminSocketId === socket.id) {
+                const targetUser = users[targetSocketId];
+                if (targetUser && targetUser.roomID === roomID) {
+                    console.log(`Admin ${user.nickname} removed ${targetUser.nickname} from room ${roomID}`);
+                    
+                    // Notify the room
+                    io.to(roomID).emit('system-message', {
+                        message: `${targetUser.nickname} was removed from the chat by the admin`
+                    });
+
+                    // Emit kicked event to the target user
+                    io.to(targetSocketId).emit('kicked');
+
+                    // Force target socket to leave the socket.io room
+                    const targetSocket = io.sockets.sockets.get(targetSocketId);
+                    if (targetSocket) {
+                        targetSocket.leave(roomID);
+                    }
+
+                    // Remove target user from our users registry
+                    delete users[targetSocketId];
+
+                    // Broadcast the updated users list
+                    sendRoomUsers(roomID);
+                }
+            }
+        }
+    });
+
     socket.on('disconnect', () => {
         const user = users[socket.id];
         if (user) {
@@ -164,6 +210,23 @@ io.on('connection', (socket) => {
             });
             
             delete users[socket.id];
+
+            // If the disconnected user was the admin, transfer the admin role!
+            if (rooms[roomID] && rooms[roomID].adminSocketId === socket.id) {
+                const remainingSockets = Object.keys(users).filter(id => users[id].roomID === roomID);
+                if (remainingSockets.length > 0) {
+                    rooms[roomID].adminSocketId = remainingSockets[0];
+                    const nextAdmin = users[remainingSockets[0]];
+                    console.log(`Admin transferred for room ${roomID} to: ${nextAdmin.nickname}`);
+                    
+                    io.to(roomID).emit('system-message', {
+                        message: `${nextAdmin.nickname} is now the room admin`
+                    });
+                } else {
+                    delete rooms[roomID];
+                }
+            }
+
             sendRoomUsers(roomID);
         }
     });

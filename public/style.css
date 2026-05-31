@@ -1899,16 +1899,52 @@ body.light-mode .member-item:hover {
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-main);
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .member-you-badge {
-    margin-left: auto;
     font-size: 0.75rem;
     font-weight: 600;
     color: var(--primary);
     background: rgba(99, 102, 241, 0.15);
     padding: 2px 8px;
     border-radius: 20px;
+    flex-shrink: 0;
 }
 body.light-mode .member-you-badge {
     background: rgba(99, 102, 241, 0.1);
+}
+.member-admin-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #f59e0b; /* Gold/Orange */
+    background: rgba(245, 158, 11, 0.15);
+    padding: 2px 8px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+body.light-mode .member-admin-badge {
+    background: rgba(245, 158, 11, 0.1);
+}
+.member-remove-btn {
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    color: #ef4444;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+.member-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    transform: translateY(-0.5px);
 }

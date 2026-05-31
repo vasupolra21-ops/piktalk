@@ -580,6 +580,11 @@ if (socket) {
     socket.on('room-users', (usersList) => {
         updateMembersList(usersList);
     });
+
+    socket.on('kicked', () => {
+        alert('You have been removed from the chat by the admin.');
+        window.location.href = '/';
+    });
 }
 
 function showTyping(name, profilePic, mode) {
@@ -1121,8 +1126,14 @@ function updateMembersList(usersList) {
     }
 
     listWrap.innerHTML = '';
+    
+    // Find the admin user to check if current socket is the admin
+    const adminMember = usersList.find(u => u.isAdmin);
+    const adminSocketId = adminMember ? adminMember.id : null;
+    const amIAdmin = (socket && socket.id === adminSocketId);
+
     usersList.forEach(u => {
-        const isMe = (u.nickname === myNickname && u.profilePic === myProfilePic);
+        const isMe = (socket && u.id === socket.id);
         const item = document.createElement('div');
         item.className = 'member-item';
 
@@ -1134,11 +1145,44 @@ function updateMembersList(usersList) {
             avatarHtml = `<div class="member-avatar-wrap" style="background: ${getNicknameColor(u.nickname)}">${initial}</div>`;
         }
 
+        let badgesHtml = '';
+        if (isMe) {
+            badgesHtml += '<span class="member-you-badge">You</span>';
+        }
+        if (u.isAdmin) {
+            badgesHtml += '<span class="member-admin-badge">Admin</span>';
+        }
+
+        let kickBtnHtml = '';
+        if (amIAdmin && !isMe) {
+            kickBtnHtml = `
+                <button class="member-remove-btn" data-socket-id="${u.id}" title="Remove Member">
+                    <i class="fas fa-user-minus"></i> Remove
+                </button>
+            `;
+        }
+
         item.innerHTML = `
             ${avatarHtml}
             <span class="member-name">${u.nickname || 'Anonymous'}</span>
-            ${isMe ? '<span class="member-you-badge">You</span>' : ''}
+            ${badgesHtml}
+            ${kickBtnHtml}
         `;
+
+        // Wire up kick button click
+        const kickBtn = item.querySelector('.member-remove-btn');
+        if (kickBtn) {
+            kickBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetId = kickBtn.dataset.socketId;
+                if (confirm(`Are you sure you want to remove ${u.nickname} from the chat?`)) {
+                    if (socket) {
+                        socket.emit('kick-user', { targetSocketId: targetId });
+                    }
+                }
+            });
+        }
+
         listWrap.appendChild(item);
     });
 }
