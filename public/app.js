@@ -113,7 +113,40 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     setupEventListeners();
+    initLightbox();
 });
+
+function initLightbox() {
+    const lb = document.getElementById('img-lightbox');
+    const lbImg = document.getElementById('img-lightbox-img');
+    const lbClose = document.getElementById('img-lightbox-close');
+    if (!lb || !lbImg || !lbClose) return;
+
+    lbClose.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeLightbox();
+    });
+    lb.addEventListener('click', () => closeLightbox());
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeLightbox();
+    });
+}
+
+function openLightbox(src) {
+    const lb = document.getElementById('img-lightbox');
+    const lbImg = document.getElementById('img-lightbox-img');
+    if (!lb || !lbImg) return;
+    lbImg.src = src;
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+    const lb = document.getElementById('img-lightbox');
+    if (!lb) return;
+    lb.classList.remove('open');
+    document.body.style.overflow = '';
+}
 
 function renderEmojiPicker() {
     if (!emojiPicker) return;
@@ -285,7 +318,7 @@ function setupEventListeners() {
         if (file && file.size < 50000000) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                compressImage(e.target.result, 1600, 1600, 0.75, (compressedBase64) => {
+                compressImage(e.target.result, 1920, 1920, 0.95, (compressedBase64) => {
                     if (socket) {
                         socket.emit('send-message', {
                             roomID: currentRoomID,
@@ -650,10 +683,12 @@ function appendMessage(data, isSentByMe) {
 
     } else if (data.image) {
         const bubble = document.createElement('div');
-        bubble.className = 'bubble';
+        bubble.className = 'bubble bubble-image';
         const img = document.createElement('img');
         img.src = data.image;
+        img.alt = 'Sent image';
         img.className = 'message-image';
+        img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
         contentEl = bubble;
 
@@ -807,7 +842,7 @@ function compressImage(base64Str, maxWidth, maxHeight, quality, callback) {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality); // Full HD quality
         callback(compressedBase64);
     };
     img.onerror = (err) => {

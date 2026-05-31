@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>PikTalk | Private Anonymous Messaging</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>≡ƒÆ¼</text></svg>">
     
     <!-- DNS Prefetch & Preconnect for External Resources -->
     <link rel="dns-prefetch" href="https://fonts.googleapis.com">
@@ -18,13 +18,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=43" as="style">
+    <link rel="preload" href="/style.css?v=44" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=43" as="script">
+    <link rel="preload" href="/app.js?v=44" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=43">
+    <link rel="stylesheet" href="/style.css?v=44">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -141,7 +141,7 @@
                     </div>
                     <span id="recording-timer" class="recording-timer">0:00</span>
                     <div class="recording-dot"></div>
-                    <span class="recording-label">Recording…</span>
+                    <span class="recording-label">RecordingΓÇª</span>
                 </div>
 
                 <!-- Audio Preview Bar -->
@@ -201,7 +201,13 @@
     <!-- Sound Effects -->
     <audio id="msg-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3" preload="none"></audio>
 
+    <!-- Image Lightbox -->
+    <div class="img-lightbox" id="img-lightbox" role="dialog" aria-modal="true">
+        <button class="img-lightbox-close" id="img-lightbox-close" aria-label="Close">&times;</button>
+        <img id="img-lightbox-img" src="" alt="Full size image">
+    </div>
+
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=35"></script>
+    <script src="/app.js?v=44"></script>
 </body>
 </html>

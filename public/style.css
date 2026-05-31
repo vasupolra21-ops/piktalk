@@ -674,18 +674,85 @@ body.light-mode .btn-icon {
     flex-direction: row-reverse;
 }
 
+/* ── WhatsApp-style image bubble ── */
+.bubble-image {
+    padding: 3px !important;
+    background: var(--input-bg) !important;
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+    border-radius: 14px !important;
+    max-width: 280px !important;
+    min-width: unset !important;
+    width: fit-content !important;
+    display: inline-block !important;
+    overflow: hidden;
+    position: relative;
+}
+
+.message.sent .bubble-image {
+    background: var(--primary) !important;
+    border-color: transparent !important;
+}
+
 .message-image {
-    max-width: 100%;
-    border-radius: 12px;
-    margin-top: 8px;
     display: block;
+    width: 100%;
+    max-width: 280px;
+    max-height: 250px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 11px;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: filter 0.2s ease;
+    vertical-align: bottom;
 }
 
 .message-image:hover {
-    transform: scale(1.02);
+    filter: brightness(0.88);
 }
+
+/* ── Fullscreen lightbox ── */
+.img-lightbox {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0,0,0,0.92);
+    align-items: center;
+    justify-content: center;
+    cursor: zoom-out;
+    animation: lbFadeIn 0.18s ease;
+}
+.img-lightbox.open { display: flex; }
+.img-lightbox img {
+    max-width: 95vw;
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 10px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    pointer-events: none;
+    user-select: none;
+}
+.img-lightbox-close {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    font-size: 1.7rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    backdrop-filter: blur(6px);
+}
+.img-lightbox-close:hover { background: rgba(255,255,255,0.28); }
+@keyframes lbFadeIn { from { opacity:0; } to { opacity:1; } }
 
 .system-message {
     align-self: center;
