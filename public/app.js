@@ -707,7 +707,7 @@ function appendMessage(data, isSentByMe) {
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
 
-    const color = isSentByMe ? '#fff' : getNicknameColor(data.nickname);
+    const color = isSentByMe ? 'var(--text-muted)' : getNicknameColor(data.nickname);
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);
     const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
 
@@ -782,7 +782,7 @@ function appendMessage(data, isSentByMe) {
     infoDiv.className = 'message-info';
 
     const nameSpan = document.createElement('span');
-    nameSpan.className = 'user-name';
+    nameSpan.className = 'sender-name';
     nameSpan.style.color = color;
     nameSpan.textContent = isSentByMe ? 'You' : data.nickname;
 
