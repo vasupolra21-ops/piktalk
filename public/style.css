@@ -90,10 +90,10 @@ body {
     transform: translateY(0);
 }
 
-.theme-toggle-fixed {
-    position: fixed;
-    top: 20px;
-    right: 20px;
+.theme-toggle-card {
+    position: absolute;
+    top: 15px;
+    right: 15px;
     z-index: 100;
 }
 
@@ -131,6 +131,7 @@ body.light-mode .bg-moon {
 
 /* Homepage Styles */
 .main-hero {
+    position: relative; /* Enabled relative positioning for the theme toggle card button */
     padding: 3rem;
     max-width: 600px;
     text-align: center;
