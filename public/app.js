@@ -379,9 +379,7 @@ function setupEventListeners() {
                 socket.emit('send-message', {
                     roomID: currentRoomID,
                     message: '',
-                    image: e.target.result, // raw base64, original quality
-                    nickname: myNickname,
-                    profilePic: myProfilePic
+                    image: e.target.result // raw base64, original quality
                 });
             } else {
                 alert("Not connected to server. Image could not be sent.");
@@ -540,9 +538,7 @@ function sendVoiceMessage() {
                 roomID: currentRoomID,
                 message: '',
                 audio: e.target.result,
-                audioDuration: recordingSeconds,
-                nickname: myNickname,
-                profilePic: myProfilePic
+                audioDuration: recordingSeconds
             });
             discardPreview();
         } else {
@@ -596,9 +592,7 @@ function sendMessage() {
         if (socket) {
             socket.emit('send-message', {
                 roomID: currentRoomID,
-                message: text,
-                nickname: myNickname,
-                profilePic: myProfilePic
+                message: text
             });
             messageInput.value = '';
             messageInput.style.height = '38px'; // Reset textarea height
