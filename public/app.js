@@ -1007,11 +1007,15 @@ function openCropModal(src) {
 
     _cropImg = new Image();
     _cropImg.onload = () => {
-        // Size canvas to wrap (with sensible fallback if 0)
+        const dpr = window.devicePixelRatio || 1;
         _cropCanvasW = wrap.clientWidth || 400;
         _cropCanvasH = wrap.clientHeight || 340;
-        canvas.width  = _cropCanvasW;
-        canvas.height = _cropCanvasH;
+
+        // Size canvas with device pixel ratio scaling for high DPI (Retina) displays
+        canvas.width  = _cropCanvasW * dpr;
+        canvas.height = _cropCanvasH * dpr;
+        canvas.style.width  = _cropCanvasW + 'px';
+        canvas.style.height = _cropCanvasH + 'px';
 
         _cropCircleR = Math.min(_cropCanvasW, _cropCanvasH) * 0.42;
 
@@ -1042,8 +1046,14 @@ function renderCrop() {
     const canvas = document.getElementById('crop-canvas');
     if (!canvas || !_cropImg) return;
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, _cropCanvasW, _cropCanvasH);
+    const dpr = window.devicePixelRatio || 1;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.save();
+    ctx.scale(dpr, dpr); // scale context to support high-DPI preview sharpness
     ctx.drawImage(_cropImg, _cropX, _cropY, _cropImg.width * _cropScale, _cropImg.height * _cropScale);
+    ctx.restore();
 }
 
 function closeCropModal() {
@@ -1057,7 +1067,7 @@ function applyCrop() {
     if (!_cropImg) return;
     const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
     const r  = _cropCircleR;
-    const out = 400; // output size in pixels
+    const out = 800; // Increased output resolution to 800x800 for Ultra HD avatars!
 
     // Map crop circle center back to image coordinates
     const srcX = (cx - r - _cropX) / _cropScale;
@@ -1077,6 +1087,7 @@ function applyCrop() {
 
     ctx.drawImage(_cropImg, srcX, srcY, srcS, srcS, 0, 0, out, out);
 
+    // Export with high-quality JPEG compression (0.95 quality for ultra HD rendering)
     const result = offscreen.toDataURL('image/jpeg', 0.95);
     myProfilePic = result;
     if (avatarPreviewImg) {
