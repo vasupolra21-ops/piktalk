@@ -372,20 +372,73 @@ function setupEventListeners() {
         if (!file) return;
         if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
 
-        // Send raw original file as base64 — no canvas re-encoding, true Full HD quality
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (socket) {
-                socket.emit('send-message', {
-                    roomID: currentRoomID,
-                    message: '',
-                    image: e.target.result // raw base64, original quality
-                });
-            } else {
-                alert("Not connected to server. Image could not be sent.");
-            }
-        };
-        reader.readAsDataURL(file); // preserves original format (JPEG/PNG/WEBP/etc.)
+        if (file.type === 'image/gif') {
+            // Send raw GIF to preserve animation
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (socket) {
+                    socket.emit('send-message', {
+                        roomID: currentRoomID,
+                        message: '',
+                        image: e.target.result
+                    });
+                } else {
+                    alert("Not connected to server. Image could not be sent.");
+                }
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Compress other images (JPEG, PNG, WEBP, etc.) before sending
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const maxW = 1200;
+                    const maxH = 1200;
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    if (width > maxW || height > maxH) {
+                        if (width > height) {
+                            height = Math.round((height * maxW) / width);
+                            width = maxW;
+                        } else {
+                            width = Math.round((width * maxH) / height);
+                            height = maxH;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: compressedBase64
+                        });
+                    } else {
+                        alert("Not connected to server. Image could not be sent.");
+                    }
+                };
+                img.onerror = () => {
+                    // Fallback to sending original base64 if drawing to canvas fails
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: e.target.result
+                        });
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
         imgInput.value = ''; // reset so same file can be re-sent
     });
 
