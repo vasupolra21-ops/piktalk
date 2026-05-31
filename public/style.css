@@ -1395,9 +1395,7 @@ body.light-mode .waveform-bar {
 .author-name {
     font-weight: 700;
     margin-left: 6px;
-    background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #ef4444;
     display: inline-block;
     opacity: 1;
 }
