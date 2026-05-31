@@ -869,11 +869,15 @@ function openCropModal(src) {
     const zoomSlider = document.getElementById('crop-zoom');
     if (!modal || !canvas || !wrap) return;
 
+    // Show modal first so that wrap has physical dimensions!
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
     _cropImg = new Image();
     _cropImg.onload = () => {
-        // Size canvas to wrap
-        _cropCanvasW = wrap.clientWidth;
-        _cropCanvasH = wrap.clientHeight;
+        // Size canvas to wrap (with sensible fallback if 0)
+        _cropCanvasW = wrap.clientWidth || 400;
+        _cropCanvasH = wrap.clientHeight || 340;
         canvas.width  = _cropCanvasW;
         canvas.height = _cropCanvasH;
 
@@ -898,8 +902,6 @@ function openCropModal(src) {
         zoomSlider.value = _cropScale;
 
         renderCrop();
-        modal.classList.add('open');
-        document.body.style.overflow = 'hidden';
     };
     _cropImg.src = src;
 }
