@@ -92,8 +92,8 @@ body {
 
 .theme-toggle-card {
     position: absolute;
-    top: 15px;
-    right: 15px;
+    top: 14px;
+    right: 14px;
     z-index: 100;
 }
 
@@ -1490,7 +1490,8 @@ body.light-mode .waveform-bar {
     }
 
     .main-hero {
-        padding: 2rem 1.5rem;
+        padding: 1.5rem 1.5rem 2rem;
+        padding-top: 4.5rem; /* Extra top space to prevent content overlapping the theme toggle button */
         margin: 16px;
         width: calc(100% - 32px);
         max-width: 380px;
