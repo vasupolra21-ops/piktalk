@@ -6,6 +6,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const os = require('os');
 const compression = require('compression');
+const db = require('./db');
 
 const app = express();
 const server = http.createServer(app);
@@ -99,12 +100,17 @@ io.on('connection', (socket) => {
     // Send network IP to help with link sharing
     socket.emit('ip-info', { ip: networkIP, port: PORT });
 
-    socket.on('join-room', ({ roomID, nickname, profilePic }) => {
+    socket.on('join-room', async ({ roomID, nickname, profilePic, userId }) => {
         const cleanRoomID = String(roomID).trim();
         socket.join(cleanRoomID);
         users[socket.id] = { roomID: cleanRoomID, nickname, profilePic };
         console.log(`${nickname} joined room: ${cleanRoomID}`);
         
+        // Save profile if userId is provided
+        if (userId) {
+            await db.saveProfile(userId, nickname, profilePic);
+        }
+
         // Designate admin if room has no admin yet
         if (!rooms[cleanRoomID] || !rooms[cleanRoomID].adminSocketId) {
             rooms[cleanRoomID] = { adminSocketId: socket.id };
@@ -118,6 +124,18 @@ io.on('connection', (socket) => {
 
         // Send updated users list to all users in the room
         sendRoomUsers(cleanRoomID);
+    });
+
+    socket.on('get-profile', async ({ userId }) => {
+        if (!userId) return;
+        const profile = await db.getProfile(userId);
+        socket.emit('profile-data', profile || null);
+    });
+
+    socket.on('save-profile', async ({ userId, nickname, profilePic }) => {
+        if (!userId || !nickname) return;
+        const saved = await db.saveProfile(userId, nickname, profilePic);
+        socket.emit('profile-saved', saved);
     });
 
     socket.on('send-message', (data) => {

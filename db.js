@@ -1,0 +1,101 @@
+// db.js - Pluggable Database Layer for PikTalk
+const fs = require('fs');
+const path = require('path');
+
+const DB_FILE = path.join(__dirname, 'db.json');
+
+// Initialize local JSON file if not exists
+if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify({ profiles: {} }, null, 4));
+}
+
+let useMongo = false;
+let mongoClient = null;
+let mongoDb = null;
+
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (MONGODB_URI) {
+    try {
+        const { MongoClient } = require('mongodb');
+        mongoClient = new MongoClient(MONGODB_URI);
+        mongoClient.connect()
+            .then(client => {
+                mongoDb = client.db();
+                useMongo = true;
+                console.log("🌐 Connected successfully to MongoDB Atlas database!");
+            })
+            .catch(err => {
+                console.error("❌ MongoDB connection failed. Falling back to local JSON database:", err.message);
+            });
+    } catch (e) {
+        console.warn("⚠️ MongoDB driver package not loaded. Falling back to local JSON database.");
+    }
+}
+
+// ── Local JSON Helper Functions ──
+function readJSON() {
+    try {
+        const data = fs.readFileSync(DB_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (e) {
+        console.error("Error reading JSON database, resetting:", e);
+        return { profiles: {} };
+    }
+}
+
+function writeJSON(data) {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 4));
+    } catch (e) {
+        console.error("Error writing to JSON database:", e);
+    }
+}
+
+// ── Exported Database API ──
+const db = {
+    getProfile: async (userId) => {
+        if (useMongo && mongoDb) {
+            try {
+                const profile = await mongoDb.collection('profiles').findOne({ userId });
+                return profile;
+            } catch (err) {
+                console.error("MongoDB getProfile error:", err.message);
+            }
+        }
+        
+        // Fallback to JSON
+        const data = readJSON();
+        return data.profiles[userId] || null;
+    },
+
+    saveProfile: async (userId, nickname, profilePic) => {
+        const updatedAt = new Date().toISOString();
+
+        if (useMongo && mongoDb) {
+            try {
+                const profile = { userId, nickname, profilePic, updatedAt };
+                await mongoDb.collection('profiles').updateOne(
+                    { userId },
+                    { $set: profile },
+                    { upsert: true }
+                );
+                return profile;
+            } catch (err) {
+                console.error("MongoDB saveProfile error:", err.message);
+            }
+        }
+
+        // Fallback to JSON
+        const data = readJSON();
+        data.profiles[userId] = {
+            nickname,
+            profilePic,
+            updatedAt
+        };
+        writeJSON(data);
+        return data.profiles[userId];
+    }
+};
+
+module.exports = db;

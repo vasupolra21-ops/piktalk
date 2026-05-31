@@ -62,6 +62,18 @@ let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
 
+// Persistent user identity — stored in localStorage so profile is remembered across sessions
+function getOrCreateUserId() {
+    let uid = localStorage.getItem('piktalk_userId');
+    if (!uid) {
+        // Generate a random UUID-like identifier
+        uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('piktalk_userId', uid);
+    }
+    return uid;
+}
+let myUserId = getOrCreateUserId();
+
 // Voice recording state
 let mediaRecorder = null;
 let audioChunks = [];
@@ -225,7 +237,13 @@ function setupEventListeners() {
             myNickname = nick;
             showChat();
             if (socket) {
-                socket.emit('join-room', { roomID: currentRoomID, nickname: myNickname, profilePic: myProfilePic });
+                // Pass userId so server can save the profile to the database
+                socket.emit('join-room', {
+                    roomID: currentRoomID,
+                    nickname: myNickname,
+                    profilePic: myProfilePic,
+                    userId: myUserId
+                });
             } else {
                 console.warn("Socket not initialized. Attempting fallback join...");
             }
@@ -524,6 +542,11 @@ function showChat() {
 
 function showNicknameModal() {
     if (nicknameModal) nicknameModal.classList.add('active');
+
+    // Load saved profile from the database for this browser's userId
+    if (socket && myUserId) {
+        socket.emit('get-profile', { userId: myUserId });
+    }
 }
 
 function sendMessage() {
@@ -584,6 +607,32 @@ if (socket) {
     socket.on('kicked', () => {
         alert('You have been removed from the chat by the admin.');
         window.location.href = '/';
+    });
+
+    // Profile loaded from DB — pre-fill nickname and profile picture in the modal
+    socket.on('profile-data', (profile) => {
+        if (!profile) return;
+
+        // Pre-fill nickname if input is empty
+        if (nicknameInput && !nicknameInput.value.trim() && profile.nickname) {
+            nicknameInput.value = profile.nickname;
+        }
+
+        // Restore profile picture preview
+        if (profile.profilePic) {
+            myProfilePic = profile.profilePic;
+            if (avatarPreviewImg) {
+                avatarPreviewImg.src = profile.profilePic;
+                avatarPreviewImg.classList.remove('hidden');
+                avatarPreviewImg.style.objectFit = 'cover';
+            }
+            if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        }
+    });
+
+    // Profile saved confirmation (optional: could show a toast)
+    socket.on('profile-saved', (saved) => {
+        console.log('Profile saved to database:', saved && saved.nickname);
     });
 }
 
