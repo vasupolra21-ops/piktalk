@@ -315,25 +315,26 @@ function setupEventListeners() {
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
     if (imgInput) imgInput.addEventListener('change', () => {
         const file = imgInput.files[0];
-        if (file && file.size < 50000000) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                compressImage(e.target.result, 1920, 1920, 0.95, (compressedBase64) => {
-                    if (socket) {
-                        socket.emit('send-message', {
-                            roomID: currentRoomID,
-                            message: '',
-                            image: compressedBase64,
-                            nickname: myNickname,
-                            profilePic: myProfilePic
-                        });
-                    } else {
-                        alert("Not connected to server. Image could not be sent.");
-                    }
+        if (!file) return;
+        if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
+
+        // Send raw original file as base64 — no canvas re-encoding, true Full HD quality
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (socket) {
+                socket.emit('send-message', {
+                    roomID: currentRoomID,
+                    message: '',
+                    image: e.target.result, // raw base64, original quality
+                    nickname: myNickname,
+                    profilePic: myProfilePic
                 });
-            };
-            reader.readAsDataURL(file);
-        } else if (file) alert('Image too large (Max 50MB)');
+            } else {
+                alert("Not connected to server. Image could not be sent.");
+            }
+        };
+        reader.readAsDataURL(file); // preserves original format (JPEG/PNG/WEBP/etc.)
+        imgInput.value = ''; // reset so same file can be re-sent
     });
 
     // ── Voice message listeners ──
