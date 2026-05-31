@@ -64,11 +64,11 @@ let serverPort = null;
 
 // Persistent user identity — stored in localStorage so profile is remembered across sessions
 function getOrCreateUserId() {
-    let uid = localStorage.getItem('piktalk_userId');
-    if (!uid) {
+    let uid = sessionStorage.getItem('piktalk_userId');
+    if (!uid || uid === 'null' || uid === 'undefined') {
         // Generate a random UUID-like identifier
         uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-        localStorage.setItem('piktalk_userId', uid);
+        sessionStorage.setItem('piktalk_userId', uid);
     }
     return uid;
 }
