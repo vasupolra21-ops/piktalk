@@ -783,7 +783,9 @@ function appendMessage(data, isSentByMe) {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'sender-name';
-    nameSpan.style.color = color;
+    if (!isSentByMe) {
+        nameSpan.style.color = color;
+    }
     nameSpan.textContent = isSentByMe ? 'You' : data.nickname;
 
     const timeSpan = document.createElement('span');

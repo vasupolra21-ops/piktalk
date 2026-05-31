@@ -671,6 +671,10 @@ body.light-mode .btn-icon {
     justify-content: flex-end;
 }
 
+.message.sent .sender-name {
+    color: var(--text-muted);
+}
+
 .message.sent .message-content {
     flex-direction: row-reverse;
 }
