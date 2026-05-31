@@ -62,17 +62,58 @@ let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
 
-// Persistent user identity — stored in localStorage so profile is remembered across sessions
+// Persistent user identity — stored in localStorage (per browser app, never shared across different browsers)
 function getOrCreateUserId() {
-    let uid = sessionStorage.getItem('piktalk_userId');
-    if (!uid || uid === 'null' || uid === 'undefined') {
-        // Generate a random UUID-like identifier
-        uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-        sessionStorage.setItem('piktalk_userId', uid);
+    try {
+        let uid = localStorage.getItem('piktalk_userId');
+        if (!uid || uid === 'null' || uid === 'undefined') {
+            uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem('piktalk_userId', uid);
+        }
+        return uid;
+    } catch(e) {
+        // Fallback if localStorage is blocked (e.g. private mode edge cases)
+        return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
     }
-    return uid;
 }
 let myUserId = getOrCreateUserId();
+
+// Load this browser's saved profile directly from localStorage (no server needed).
+// This is intentionally browser-isolated: different browser apps on the same device
+// each have their own localStorage and will NEVER see another browser's profile.
+function loadSavedProfile() {
+    try {
+        const raw = localStorage.getItem('piktalk_profile');
+        if (!raw) return;
+        const profile = JSON.parse(raw);
+        if (!profile) return;
+        // Pre-fill nickname if input is empty
+        if (nicknameInput && !nicknameInput.value.trim() && profile.nickname) {
+            nicknameInput.value = profile.nickname;
+        }
+        // Restore profile picture preview
+        if (profile.profilePic) {
+            myProfilePic = profile.profilePic;
+            if (avatarPreviewImg) {
+                avatarPreviewImg.src = profile.profilePic;
+                avatarPreviewImg.classList.remove('hidden');
+                avatarPreviewImg.style.objectFit = 'cover';
+            }
+            if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        }
+    } catch(e) {
+        console.warn('Could not load saved profile from localStorage:', e);
+    }
+}
+
+// Save this user's profile locally so it is remembered on THIS device/browser only.
+function saveProfileLocally(nickname, profilePic) {
+    try {
+        localStorage.setItem('piktalk_profile', JSON.stringify({ nickname, profilePic: profilePic || null }));
+    } catch(e) {
+        console.warn('Could not save profile to localStorage:', e);
+    }
+}
 
 // Voice recording state
 let mediaRecorder = null;
@@ -235,9 +276,11 @@ function setupEventListeners() {
         const nick = nicknameInput.value.trim();
         if (nick) {
             myNickname = nick;
+            // Save profile locally so this device/browser remembers it next time
+            saveProfileLocally(myNickname, myProfilePic);
             showChat();
             if (socket) {
-                // Pass userId so server can save the profile to the database
+                // Pass userId so server can also save the profile to MongoDB Atlas
                 socket.emit('join-room', {
                     roomID: currentRoomID,
                     nickname: myNickname,
@@ -542,11 +585,10 @@ function showChat() {
 
 function showNicknameModal() {
     if (nicknameModal) nicknameModal.classList.add('active');
-
-    // Load saved profile from the database for this browser's userId
-    if (socket && myUserId) {
-        socket.emit('get-profile', { userId: myUserId });
-    }
+    // Load profile directly from THIS browser's localStorage.
+    // This is fully isolated per browser app — different browsers on the same
+    // device will never see each other's nickname or profile picture.
+    loadSavedProfile();
 }
 
 function sendMessage() {
@@ -609,28 +651,11 @@ if (socket) {
         window.location.href = '/';
     });
 
-    // Profile loaded from DB — pre-fill nickname and profile picture in the modal
-    socket.on('profile-data', (profile) => {
-        if (!profile) return;
+    // profile-data is no longer used for auto-fill (localStorage handles that).
+    // Kept here as a no-op so the server event doesn't cause unhandled warnings.
+    socket.on('profile-data', () => {});
 
-        // Pre-fill nickname if input is empty
-        if (nicknameInput && !nicknameInput.value.trim() && profile.nickname) {
-            nicknameInput.value = profile.nickname;
-        }
-
-        // Restore profile picture preview
-        if (profile.profilePic) {
-            myProfilePic = profile.profilePic;
-            if (avatarPreviewImg) {
-                avatarPreviewImg.src = profile.profilePic;
-                avatarPreviewImg.classList.remove('hidden');
-                avatarPreviewImg.style.objectFit = 'cover';
-            }
-            if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
-        }
-    });
-
-    // Profile saved confirmation (optional: could show a toast)
+    // Profile saved to MongoDB Atlas (logging only)
     socket.on('profile-saved', (saved) => {
         console.log('Profile saved to database:', saved && saved.nickname);
     });
