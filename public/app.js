@@ -103,6 +103,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'light') {
         document.body.classList.add('light-mode');
+        const icon = '<i class="fas fa-moon"></i>';
+        if (themeToggle) themeToggle.innerHTML = icon;
+        if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
+    } else {
         const icon = '<i class="fas fa-sun"></i>';
         if (themeToggle) themeToggle.innerHTML = icon;
         if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
@@ -463,7 +467,7 @@ function sendVoiceMessage() {
 function toggleTheme() {
     document.body.classList.toggle('light-mode');
     const isLight = document.body.classList.contains('light-mode');
-    const icon = isLight ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+    const icon = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
     if (themeToggle) themeToggle.innerHTML = icon;
     if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
@@ -615,12 +619,24 @@ function appendMessage(data, isSentByMe) {
 
         const progressWrap = document.createElement('div');
         progressWrap.className = 'voice-bubble-progress';
+        progressWrap.id = 'waveform-container-' + bubbleId;
         progressWrap.addEventListener('click', (e) => seekVoiceBubble(e, bubbleId));
 
-        const progressBar = document.createElement('div');
-        progressBar.className = 'voice-bubble-bar';
-        progressBar.id = 'bar-' + bubbleId;
-        progressWrap.appendChild(progressBar);
+        const barCount = 28;
+        for (let i = 0; i < barCount; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'waveform-bar';
+            
+            // Seed a consistent height based on bubbleId + index
+            let hash = 0;
+            const str = bubbleId + i;
+            for (let j = 0; j < str.length; j++) {
+                hash = str.charCodeAt(j) + ((hash << 5) - hash);
+            }
+            const heightPercent = 15 + (Math.abs(hash) % 76); // 15% to 90%
+            bar.style.height = heightPercent + '%';
+            progressWrap.appendChild(bar);
+        }
 
         const durSpan = document.createElement('span');
         durSpan.className = 'voice-bubble-duration';
@@ -685,7 +701,6 @@ function toggleVoiceBubble(bubbleId) {
 
     let audio = _voiceAudios[bubbleId];
     const playBtnI = document.querySelector('#' + bubbleId + ' .voice-bubble-play i');
-    const bar      = document.getElementById('bar-' + bubbleId);
     const dur      = document.getElementById('dur-' + bubbleId);
 
     if (!audio) {
@@ -694,12 +709,12 @@ function toggleVoiceBubble(bubbleId) {
 
         audio.ontimeupdate = () => {
             const pct = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
-            if (bar) bar.style.width = pct + '%';
+            updateWaveformProgress(bubbleId, pct);
             if (dur) dur.textContent = formatSeconds(Math.floor(audio.currentTime));
         };
         audio.onended = () => {
             if (playBtnI) playBtnI.className = 'fas fa-play';
-            if (bar) bar.style.width = '0%';
+            updateWaveformProgress(bubbleId, 0);
         };
     }
 
@@ -728,7 +743,20 @@ function seekVoiceBubble(event, bubbleId) {
     const rect  = event.currentTarget.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
     audio.currentTime = ratio * audio.duration;
+}
 
+function updateWaveformProgress(bubbleId, pct) {
+    const container = document.getElementById('waveform-container-' + bubbleId);
+    if (!container) return;
+    const bars = container.querySelectorAll('.waveform-bar');
+    const activeCount = Math.round((pct / 100) * bars.length);
+    bars.forEach((bar, idx) => {
+        if (idx < activeCount) {
+            bar.classList.add('active');
+        } else {
+            bar.classList.remove('active');
+        }
+    });
 }
 
 function appendSystemMessage(text) {

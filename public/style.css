@@ -1337,23 +1337,28 @@ body.light-mode .voice-bubble-play {
 
 .voice-bubble-progress {
     flex: 1;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
-    overflow: hidden;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
     cursor: pointer;
 }
 
-body.light-mode .voice-bubble-progress {
-    background: rgba(0, 0, 0, 0.08);
+.waveform-bar {
+    width: 3px;
+    min-height: 4px;
+    background: rgba(255, 255, 255, 0.2); /* Default for received in dark mode */
+    border-radius: 2px;
+    transition: background 0.15s ease, height 0.15s ease;
 }
 
-.voice-bubble-bar {
-    height: 100%;
-    width: 0%;
-    background: var(--primary); /* Indigo progress bar */
-    border-radius: 3px;
-    transition: width 0.1s linear;
+body.light-mode .waveform-bar {
+    background: rgba(0, 0, 0, 0.15); /* Received in light mode */
+}
+
+/* When a bar is played/active in received message */
+.waveform-bar.active {
+    background: var(--primary);
 }
 
 .voice-bubble-duration {
@@ -1374,12 +1379,13 @@ body.light-mode .voice-bubble-progress {
     background: rgba(255, 255, 255, 0.35);
 }
 
-.message.sent .voice-bubble-progress {
-    background: rgba(255, 255, 255, 0.25);
+/* Overrides for Sent voice bubble waveform elements */
+.message.sent .waveform-bar {
+    background: rgba(255, 255, 255, 0.35); /* Unplayed sent */
 }
 
-.message.sent .voice-bubble-bar {
-    background: rgba(255, 255, 255, 0.9);
+.message.sent .waveform-bar.active {
+    background: #ffffff; /* Played sent */
 }
 
 .message.sent .voice-bubble-duration {
