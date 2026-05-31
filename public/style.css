@@ -165,19 +165,6 @@ body.light-mode .bg-moon {
     vertical-align: middle;
 }
 
-.logo-link {
-    text-decoration: none;
-    color: inherit;
-    display: inline-block;
-    cursor: pointer;
-    transition: transform 0.2s ease, filter 0.2s ease;
-}
-
-.logo-link:hover, .logo-link:active {
-    transform: scale(1.05);
-    filter: brightness(1.1);
-}
-
 /* Auth Pages */
 .auth-card {
     padding: 2.5rem;
