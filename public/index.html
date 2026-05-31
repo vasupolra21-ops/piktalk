@@ -18,13 +18,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=44" as="style">
+    <link rel="preload" href="/style.css?v=45" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=44" as="script">
+    <link rel="preload" href="/app.js?v=45" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=44">
+    <link rel="stylesheet" href="/style.css?v=45">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -201,6 +201,28 @@
     <!-- Sound Effects -->
     <audio id="msg-sound" src="https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3" preload="none"></audio>
 
+    <!-- Profile Picture Crop Modal -->
+    <div id="crop-modal" class="crop-modal-overlay" role="dialog" aria-modal="true" aria-label="Crop Profile Picture">
+        <div class="crop-modal-box">
+            <div class="crop-modal-header">
+                <span class="crop-modal-title">Crop Profile Picture</span>
+                <button class="crop-cancel-btn" id="crop-cancel-btn" aria-label="Cancel">&times;</button>
+            </div>
+            <div class="crop-canvas-wrap" id="crop-canvas-wrap">
+                <canvas id="crop-canvas"></canvas>
+                <div class="crop-circle-overlay" id="crop-circle-overlay"></div>
+            </div>
+            <div class="crop-controls">
+                <i class="fas fa-search-minus crop-zoom-icon"></i>
+                <input type="range" id="crop-zoom" min="0.1" max="3" step="0.01" value="1" class="crop-zoom-slider">
+                <i class="fas fa-search-plus crop-zoom-icon"></i>
+            </div>
+            <div class="crop-modal-footer">
+                <button class="btn crop-use-btn" id="crop-use-btn"><i class="fas fa-check"></i> Use Photo</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Lightbox -->
     <div class="img-lightbox" id="img-lightbox" role="dialog" aria-modal="true">
         <button class="img-lightbox-close" id="img-lightbox-close" aria-label="Close">&times;</button>
@@ -208,6 +230,6 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=44"></script>
+    <script src="/app.js?v=45"></script>
 </body>
 </html>

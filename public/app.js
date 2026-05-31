@@ -114,6 +114,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     setupEventListeners();
     initLightbox();
+    initCropModal();
 });
 
 function initLightbox() {
@@ -269,20 +270,12 @@ function setupEventListeners() {
 
     if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file && file.size < 20000000) { // Support up to 20MB raw photos
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                // Compress avatar to 400x400 HD quality for sharp, clear avatars
-                compressImage(event.target.result, 400, 400, 0.95, (compressedBase64) => {
-                    myProfilePic = compressedBase64;
-                    avatarPreviewImg.src = myProfilePic;
-                    avatarPreviewImg.classList.remove('hidden');
-                    avatarPreviewImg.style.objectFit = 'cover';
-                    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
-                });
-            };
-            reader.readAsDataURL(file);
-        } else if (file) alert('Profile picture too large (Max 20MB)');
+        if (!file) return;
+        if (file.size > 20000000) { alert('Image too large (Max 20MB)'); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => openCropModal(ev.target.result);
+        reader.readAsDataURL(file);
+        profilePicInput.value = '';
     });
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
@@ -850,4 +843,232 @@ function compressImage(base64Str, maxWidth, maxHeight, quality, callback) {
         console.error("Image loading failed for compression:", err);
         callback(base64Str);
     };
+}
+
+/* ══════════════════════════════════════
+   Profile Picture Crop Modal Engine
+   ══════════════════════════════════════ */
+let _cropImg = null;       // source Image object
+let _cropX = 0;            // pan offset X
+let _cropY = 0;            // pan offset Y
+let _cropScale = 1;        // zoom level
+let _cropDragging = false;
+let _cropDragStartX = 0;
+let _cropDragStartY = 0;
+let _cropDragOriginX = 0;
+let _cropDragOriginY = 0;
+let _cropPinchDist = 0;
+let _cropCircleR = 0;      // radius of crop circle in canvas px
+let _cropCanvasW = 0;
+let _cropCanvasH = 0;
+
+function openCropModal(src) {
+    const modal = document.getElementById('crop-modal');
+    const canvas = document.getElementById('crop-canvas');
+    const wrap = document.getElementById('crop-canvas-wrap');
+    const zoomSlider = document.getElementById('crop-zoom');
+    if (!modal || !canvas || !wrap) return;
+
+    _cropImg = new Image();
+    _cropImg.onload = () => {
+        // Size canvas to wrap
+        _cropCanvasW = wrap.clientWidth;
+        _cropCanvasH = wrap.clientHeight;
+        canvas.width  = _cropCanvasW;
+        canvas.height = _cropCanvasH;
+
+        _cropCircleR = Math.min(_cropCanvasW, _cropCanvasH) * 0.42;
+
+        // Position the circle overlay div
+        const overlay = document.getElementById('crop-circle-overlay');
+        const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+        overlay.style.left   = (cx - _cropCircleR) + 'px';
+        overlay.style.top    = (cy - _cropCircleR) + 'px';
+        overlay.style.width  = (_cropCircleR * 2) + 'px';
+        overlay.style.height = (_cropCircleR * 2) + 'px';
+
+        // Fit image to fill circle by default
+        const minDim = Math.min(_cropImg.width, _cropImg.height);
+        _cropScale = (_cropCircleR * 2) / minDim;
+        _cropX = _cropCanvasW / 2 - (_cropImg.width  * _cropScale) / 2;
+        _cropY = _cropCanvasH / 2 - (_cropImg.height * _cropScale) / 2;
+
+        zoomSlider.min   = (_cropCircleR * 2 / Math.max(_cropImg.width, _cropImg.height)).toFixed(3);
+        zoomSlider.max   = 5;
+        zoomSlider.value = _cropScale;
+
+        renderCrop();
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    };
+    _cropImg.src = src;
+}
+
+function renderCrop() {
+    const canvas = document.getElementById('crop-canvas');
+    if (!canvas || !_cropImg) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, _cropCanvasW, _cropCanvasH);
+    ctx.drawImage(_cropImg, _cropX, _cropY, _cropImg.width * _cropScale, _cropImg.height * _cropScale);
+}
+
+function closeCropModal() {
+    const modal = document.getElementById('crop-modal');
+    if (modal) modal.classList.remove('open');
+    document.body.style.overflow = '';
+    _cropImg = null;
+}
+
+function applyCrop() {
+    if (!_cropImg) return;
+    const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+    const r  = _cropCircleR;
+    const out = 400; // output size in pixels
+
+    // Map crop circle center back to image coordinates
+    const srcX = (cx - r - _cropX) / _cropScale;
+    const srcY = (cy - r - _cropY) / _cropScale;
+    const srcS = (r * 2) / _cropScale;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width  = out;
+    offscreen.height = out;
+    const ctx = offscreen.getContext('2d');
+
+    // Clip to circle
+    ctx.beginPath();
+    ctx.arc(out / 2, out / 2, out / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+
+    ctx.drawImage(_cropImg, srcX, srcY, srcS, srcS, 0, 0, out, out);
+
+    const result = offscreen.toDataURL('image/jpeg', 0.95);
+    myProfilePic = result;
+    if (avatarPreviewImg) {
+        avatarPreviewImg.src = result;
+        avatarPreviewImg.classList.remove('hidden');
+        avatarPreviewImg.style.objectFit = 'cover';
+    }
+    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+    closeCropModal();
+}
+
+// ── Crop event wiring (called once from initLightbox area) ──
+function initCropModal() {
+    const wrap      = document.getElementById('crop-canvas-wrap');
+    const zoomSlider = document.getElementById('crop-zoom');
+    const useBtn    = document.getElementById('crop-use-btn');
+    const cancelBtn = document.getElementById('crop-cancel-btn');
+    if (!wrap) return;
+
+    // Confirm / Cancel
+    if (useBtn)    useBtn.addEventListener('click', applyCrop);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeCropModal);
+
+    // Zoom slider
+    if (zoomSlider) {
+        zoomSlider.addEventListener('input', () => {
+            const newScale = parseFloat(zoomSlider.value);
+            // Zoom toward center of circle
+            const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+            _cropX = cx - (cx - _cropX) * (newScale / _cropScale);
+            _cropY = cy - (cy - _cropY) * (newScale / _cropScale);
+            _cropScale = newScale;
+            clampCrop();
+            renderCrop();
+        });
+    }
+
+    // Mouse drag
+    wrap.addEventListener('mousedown', (e) => {
+        _cropDragging = true;
+        _cropDragStartX = e.clientX;
+        _cropDragStartY = e.clientY;
+        _cropDragOriginX = _cropX;
+        _cropDragOriginY = _cropY;
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!_cropDragging) return;
+        _cropX = _cropDragOriginX + (e.clientX - _cropDragStartX);
+        _cropY = _cropDragOriginY + (e.clientY - _cropDragStartY);
+        clampCrop();
+        renderCrop();
+    });
+    window.addEventListener('mouseup', () => { _cropDragging = false; });
+
+    // Touch drag
+    wrap.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+            _cropDragging = true;
+            _cropDragStartX = e.touches[0].clientX;
+            _cropDragStartY = e.touches[0].clientY;
+            _cropDragOriginX = _cropX;
+            _cropDragOriginY = _cropY;
+        } else if (e.touches.length === 2) {
+            _cropDragging = false;
+            _cropPinchDist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    wrap.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && _cropDragging) {
+            _cropX = _cropDragOriginX + (e.touches[0].clientX - _cropDragStartX);
+            _cropY = _cropDragOriginY + (e.touches[0].clientY - _cropDragStartY);
+            clampCrop();
+            renderCrop();
+        } else if (e.touches.length === 2) {
+            const dist = Math.hypot(
+                e.touches[0].clientX - e.touches[1].clientX,
+                e.touches[0].clientY - e.touches[1].clientY
+            );
+            const delta = dist / _cropPinchDist;
+            const newScale = Math.min(5, Math.max(parseFloat(zoomSlider.min), _cropScale * delta));
+            const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+            _cropX = cx - (cx - _cropX) * (newScale / _cropScale);
+            _cropY = cy - (cy - _cropY) * (newScale / _cropScale);
+            _cropScale = newScale;
+            if (zoomSlider) zoomSlider.value = _cropScale;
+            _cropPinchDist = dist;
+            clampCrop();
+            renderCrop();
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    wrap.addEventListener('touchend', () => { _cropDragging = false; });
+
+    // Scroll-to-zoom on desktop
+    wrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 1.08 : 0.93;
+        const newScale = Math.min(5, Math.max(parseFloat(zoomSlider.min || 0.1), _cropScale * delta));
+        const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+        _cropX = cx - (cx - _cropX) * (newScale / _cropScale);
+        _cropY = cy - (cy - _cropY) * (newScale / _cropScale);
+        _cropScale = newScale;
+        if (zoomSlider) zoomSlider.value = _cropScale;
+        clampCrop();
+        renderCrop();
+    }, { passive: false });
+}
+
+function clampCrop() {
+    // Ensure the crop circle is always fully covered by the image
+    const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
+    const r  = _cropCircleR;
+    const iw = _cropImg ? _cropImg.width  * _cropScale : 0;
+    const ih = _cropImg ? _cropImg.height * _cropScale : 0;
+    // Max allowed pan: right/bottom edge of image must reach left/top edge of circle
+    const maxX = cx - r;
+    const maxY = cy - r;
+    // Min allowed pan: left/top edge of image must reach right/bottom edge of circle
+    const minX = cx + r - iw;
+    const minY = cy + r - ih;
+    _cropX = Math.min(maxX, Math.max(minX, _cropX));
+    _cropY = Math.min(maxY, Math.max(minY, _cropY));
 }
