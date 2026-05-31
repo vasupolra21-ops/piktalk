@@ -62,28 +62,27 @@ let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
 
-// Persistent user identity — stored in localStorage (per browser app, never shared across different browsers)
+// Persistent user identity — stored in sessionStorage (isolated per browser tab/window)
 function getOrCreateUserId() {
     try {
-        let uid = localStorage.getItem('piktalk_userId');
+        let uid = sessionStorage.getItem('piktalk_userId');
         if (!uid || uid === 'null' || uid === 'undefined') {
             uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-            localStorage.setItem('piktalk_userId', uid);
+            sessionStorage.setItem('piktalk_userId', uid);
         }
         return uid;
     } catch(e) {
-        // Fallback if localStorage is blocked (e.g. private mode edge cases)
+        // Fallback if sessionStorage is blocked
         return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
     }
 }
 let myUserId = getOrCreateUserId();
 
-// Load this browser's saved profile directly from localStorage (no server needed).
-// This is intentionally browser-isolated: different browser apps on the same device
-// each have their own localStorage and will NEVER see another browser's profile.
+// Load this tab's saved profile directly from sessionStorage (no server needed).
+// This is isolated per tab: opening a new tab to test will start with a fresh, empty profile.
 function loadSavedProfile() {
     try {
-        const raw = localStorage.getItem('piktalk_profile');
+        const raw = sessionStorage.getItem('piktalk_profile');
         if (!raw) return;
         const profile = JSON.parse(raw);
         if (!profile) return;
@@ -102,16 +101,16 @@ function loadSavedProfile() {
             if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
         }
     } catch(e) {
-        console.warn('Could not load saved profile from localStorage:', e);
+        console.warn('Could not load saved profile from sessionStorage:', e);
     }
 }
 
-// Save this user's profile locally so it is remembered on THIS device/browser only.
+// Save this user's profile locally so it is remembered on THIS tab session.
 function saveProfileLocally(nickname, profilePic) {
     try {
-        localStorage.setItem('piktalk_profile', JSON.stringify({ nickname, profilePic: profilePic || null }));
+        sessionStorage.setItem('piktalk_profile', JSON.stringify({ nickname, profilePic: profilePic || null }));
     } catch(e) {
-        console.warn('Could not save profile to localStorage:', e);
+        console.warn('Could not save profile to sessionStorage:', e);
     }
 }
 
