@@ -269,11 +269,11 @@ function setupEventListeners() {
 
     if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (file && file.size < 10000000) { // Support up to 10MB raw photos before compression
+        if (file && file.size < 20000000) { // Support up to 20MB raw photos
             const reader = new FileReader();
             reader.onload = (event) => {
-                // Compress avatar to small size (120x120) for fast room joins
-                compressImage(event.target.result, 120, 120, 0.8, (compressedBase64) => {
+                // Compress avatar to 400x400 HD quality for sharp, clear avatars
+                compressImage(event.target.result, 400, 400, 0.95, (compressedBase64) => {
                     myProfilePic = compressedBase64;
                     avatarPreviewImg.src = myProfilePic;
                     avatarPreviewImg.classList.remove('hidden');
@@ -282,7 +282,7 @@ function setupEventListeners() {
                 });
             };
             reader.readAsDataURL(file);
-        } else if (file) alert('Profile picture too large (Max 10MB before compression)');
+        } else if (file) alert('Profile picture too large (Max 20MB)');
     });
 
     if (sendBtn) sendBtn.addEventListener('click', sendMessage);
