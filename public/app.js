@@ -151,8 +151,8 @@ window.addEventListener('DOMContentLoaded', () => {
         renderEmojiPicker();
     }
 
-    // Load theme
-    const savedTheme = localStorage.getItem('theme');
+    // Load theme (default to light if not set)
+    const savedTheme = localStorage.getItem('theme') || 'light';
     if (savedTheme === 'light') {
         document.body.classList.add('light-mode');
         const icon = '<i class="fas fa-moon"></i>';
