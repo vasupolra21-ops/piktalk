@@ -545,16 +545,6 @@ function setupEventListeners() {
                 }, 2000);
             }
         });
-
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                // Stop typing indicator immediately on send
-                clearTimeout(typingTimeout);
-                if (socket) socket.emit('stop-typing');
-                sendMessage();
-            }
-        });
     }
 
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
