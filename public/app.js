@@ -168,7 +168,42 @@ window.addEventListener('DOMContentLoaded', () => {
     initLightbox();
     initCropModal();
     initMembersModal();
+    initViewportHandler();
 });
+
+// ── Visual Viewport Handler ──
+// Fixes the iOS/Android mobile keyboard issue:
+// When keyboard opens, resize the app to the visible area so:
+// - No white gap appears below the input bar
+// - Messages scroll up, and the input sits right above the keyboard (like WhatsApp)
+function initViewportHandler() {
+    if (!window.visualViewport) return;
+
+    function applyViewportHeight() {
+        const vh = window.visualViewport.height;
+        document.documentElement.style.setProperty('--viewport-height', vh + 'px');
+
+        // Scroll to bottom so the latest message is visible above the keyboard
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    window.visualViewport.addEventListener('resize', applyViewportHeight);
+
+    // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
+    window.visualViewport.addEventListener('scroll', () => {
+        window.scrollTo(0, 0);
+    });
+
+    // Also reset on any window scroll
+    window.addEventListener('scroll', () => {
+        window.scrollTo(0, 0);
+    }, { passive: false });
+
+    // Set initial value
+    applyViewportHeight();
+}
 
 function initLightbox() {
     const lb = document.getElementById('img-lightbox');

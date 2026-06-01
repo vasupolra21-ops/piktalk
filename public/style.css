@@ -1490,7 +1490,7 @@ body.light-mode .waveform-bar {
     .container {
         padding: 0;
         height: 100dvh;
-        height: -webkit-fill-available;
+        height: var(--viewport-height, 100dvh);
     }
 
     .main-hero {
@@ -1512,7 +1512,7 @@ body.light-mode .waveform-bar {
     .chat-container {
         width: 100vw;
         height: 100dvh;
-        height: -webkit-fill-available;
+        height: var(--viewport-height, 100dvh);
         border-radius: 0;
         border: none;
     }
