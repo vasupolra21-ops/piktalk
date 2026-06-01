@@ -502,7 +502,18 @@ function setupEventListeners() {
         profilePicInput.value = '';
     });
 
-    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (sendBtn) {
+        // Prevent send button from stealing focus from the textarea on mobile
+        // Using mousedown preventDefault stops iOS Safari from dismissing the keyboard
+        sendBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+        sendBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            sendMessage();
+        }, { passive: false });
+        sendBtn.addEventListener('click', sendMessage);
+    }
     if (messageInput) {
         messageInput.addEventListener('input', () => {
             messageInput.style.height = 'auto';
@@ -819,6 +830,13 @@ function sendMessage() {
             });
             messageInput.value = '';
             messageInput.style.height = '38px'; // Reset textarea height
+            // Re-focus the input to keep the keyboard open on mobile
+            // Use a short timeout so the DOM can settle before refocusing
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) {
+                    messageInput.focus();
+                }
+            }, 0);
         } else {
             alert("Not connected to server. Message could not be sent.");
         }
