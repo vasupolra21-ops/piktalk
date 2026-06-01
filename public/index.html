@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=67" as="style">
+    <link rel="preload" href="/style.css?v=68" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=67" as="script">
+    <link rel="preload" href="/app.js?v=68" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=67">
+    <link rel="stylesheet" href="/style.css?v=68">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -178,7 +178,7 @@
                         <i class="fas fa-paperclip"></i>
                     </button>
                     <input type="file" id="image-input" accept="image/*" hidden>
-                    <textarea id="message-input" placeholder="Type a message..." autocomplete="off" rows="1"></textarea>
+                    <textarea id="message-input" placeholder="Type a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" rows="1"></textarea>
                     <button id="emoji-btn" class="btn-icon-small right">
                         <i class="far fa-smile"></i>
                     </button>
@@ -205,7 +205,7 @@
                 <input type="file" id="profile-pic-input" accept="image/*" hidden>
                 <p>Click to upload a profile picture (Optional)</p>
             </div>
-            <input type="text" id="nickname-input" placeholder="Enter Nickname..." maxlength="20">
+            <input type="text" id="nickname-input" placeholder="Enter Nickname..." maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-form-type="other">
             <button id="join-chat-btn" class="btn btn-primary">Join Chat</button>
         </div>
     </div>
@@ -255,6 +255,6 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=67"></script>
+    <script src="/app.js?v=68"></script>
 </body>
 </html>
