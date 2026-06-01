@@ -1606,6 +1606,25 @@ body.light-mode .waveform-bar {
         width: calc(100% - 32px);
         max-width: 360px;
     }
+
+    /* Modal adjusts perfectly to visual viewport height on mobile (avoids being pushed under keyboard) */
+    .modal {
+        height: var(--viewport-height, 100dvh);
+    }
+
+    /* Save vertical space when typing nickname by hiding the avatar configuration */
+    #nickname-modal.keyboard-active .profile-setup {
+        display: none !important;
+    }
+
+    #nickname-modal.keyboard-active .modal-content {
+        padding: 1.2rem 1.5rem !important;
+    }
+
+    #nickname-modal.keyboard-active h3 {
+        margin-bottom: 0.8rem !important;
+        font-size: 1.3rem !important;
+    }
 }
 /* ── Profile Picture Crop Modal ── */
 .crop-modal-overlay {

@@ -207,8 +207,8 @@ function initViewportHandler() {
 }
 
 // ── Modal Keyboard Handler ──
-// When nickname input is focused on mobile, slides the modal card UP
-// just enough so both the input AND Join button are visible above the keyboard.
+// When nickname input is focused on mobile, hides the avatar setup to save space
+// and slides the modal card UP just enough so both the input AND Join button are visible.
 function initModalKeyboardHandler() {
     const nicknameInput = document.getElementById('nickname-input');
     const modal = document.getElementById('nickname-modal');
@@ -218,6 +218,7 @@ function initModalKeyboardHandler() {
     if (!modalContent) return;
 
     nicknameInput.addEventListener('focus', () => {
+        modal.classList.add('keyboard-active');
         // Wait for the keyboard to fully open before measuring
         setTimeout(() => {
             const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
@@ -233,11 +234,55 @@ function initModalKeyboardHandler() {
     });
 
     nicknameInput.addEventListener('blur', () => {
+        modal.classList.remove('keyboard-active');
         // Slide back to original centered position
         modalContent.style.transition = 'transform 0.28s ease';
         modalContent.style.transform = 'translateY(0)';
     });
 }
+
+// ── Manage Focusable Inputs State ──
+// Dynamically enables/disables inputs depending on the active view.
+// This ensures iOS Safari's Form Assistant knows there is only exactly ONE focusable
+// input on the page at any time, which hides/disables the navigation arrows (^ v) and Done bar.
+function updateInputsState() {
+    const isHomeActive = homeView && homeView.classList.contains('active');
+    const isChatActive = chatView && chatView.classList.contains('active');
+    const isModalActive = nicknameModal && nicknameModal.classList.contains('active');
+
+    // Home view input
+    if (joinRoomInput) {
+        joinRoomInput.disabled = !isHomeActive || isModalActive;
+        joinRoomInput.setAttribute('tabindex', (isHomeActive && !isModalActive) ? '0' : '-1');
+    }
+
+    // Modal input
+    if (nicknameInput) {
+        nicknameInput.disabled = !isModalActive;
+        nicknameInput.setAttribute('tabindex', isModalActive ? '0' : '-1');
+    }
+
+    // Chat input
+    if (messageInput) {
+        messageInput.disabled = !isChatActive;
+        messageInput.setAttribute('tabindex', isChatActive ? '0' : '-1');
+    }
+
+    // Room link input (always disabled, copy uses modern clipboard API)
+    if (roomLinkInput) {
+        roomLinkInput.disabled = true;
+        roomLinkInput.setAttribute('tabindex', '-1');
+    }
+
+    // Hidden file inputs should also be disabled when their views are inactive to satisfy iOS Safari
+    if (profilePicInput) {
+        profilePicInput.disabled = !isModalActive;
+    }
+    if (imgInput) {
+        imgInput.disabled = !isChatActive;
+    }
+}
+
 
 function initLightbox() {
     const lb = document.getElementById('img-lightbox');
@@ -372,10 +417,26 @@ function setupEventListeners() {
     });
 
     if (copyBtn) copyBtn.addEventListener('click', () => {
-        roomLinkInput.select();
-        document.execCommand('copy');
-        copyBtn.textContent = 'Copied!';
-        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(roomLinkInput.value).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            }).catch(() => {
+                fallbackCopy();
+            });
+        } else {
+            fallbackCopy();
+        }
+
+        function fallbackCopy() {
+            const wasDisabled = roomLinkInput.disabled;
+            roomLinkInput.disabled = false;
+            roomLinkInput.select();
+            document.execCommand('copy');
+            roomLinkInput.disabled = wasDisabled;
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+        }
     });
 
     if (leaveBtn) leaveBtn.addEventListener('click', () => {
@@ -682,6 +743,7 @@ function toggleTheme() {
 function showHome() {
     [homeView, chatView, nicknameModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (homeView) homeView.classList.add('active');
+    updateInputsState();
 }
 
 function showChat() {
@@ -698,6 +760,7 @@ function showChat() {
         onlineStatus.textContent = 'Online';
         onlineStatus.style.color = 'var(--accent)';
     }
+    updateInputsState();
 }
 
 function showNicknameModal() {
@@ -706,6 +769,7 @@ function showNicknameModal() {
     // This is fully isolated per browser app — different browsers on the same
     // device will never see each other's nickname or profile picture.
     loadSavedProfile();
+    updateInputsState();
 }
 
 function sendMessage() {
