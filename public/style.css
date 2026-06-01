@@ -655,12 +655,14 @@ body.light-mode .btn-icon {
 }
 
 .bubble {
+    position: relative;
     padding: 10px 16px;
+    padding-bottom: 24px; /* Space at bottom for timestamp */
     border-radius: 18px;
     background: var(--input-bg);
     border: 1px solid var(--glass-border);
     max-width: 80%;
-    min-width: 50px;
+    min-width: 75px; /* Ensure space for short text + timestamp */
     word-wrap: break-word;
     white-space: pre-wrap;
     line-height: 1.5;
@@ -668,6 +670,27 @@ body.light-mode .btn-icon {
     color: var(--text-main);
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     text-align: left;
+}
+
+.bubble-timestamp {
+    position: absolute;
+    bottom: 4px;
+    right: 10px;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    opacity: 0.75;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+}
+
+body.light-mode .bubble-timestamp {
+    color: #475569;
+    opacity: 0.8;
+}
+
+.message.sent .bubble-timestamp {
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .bubble.big-emoji {
@@ -707,6 +730,7 @@ body.light-mode .btn-icon {
 /* ── WhatsApp-style image bubble ── */
 .bubble-image {
     padding: 3px !important;
+    padding-bottom: 3px !important;
     background: var(--input-bg) !important;
     border: 1px solid var(--glass-border) !important;
     box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
@@ -717,6 +741,18 @@ body.light-mode .btn-icon {
     display: inline-block !important;
     overflow: hidden;
     position: relative;
+}
+
+.bubble-image .bubble-timestamp {
+    background: rgba(0, 0, 0, 0.45);
+    padding: 2px 6px;
+    border-radius: 8px;
+    color: #ffffff !important;
+    bottom: 8px;
+    right: 8px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    opacity: 1;
 }
 
 .message.sent .bubble-image {
@@ -1391,10 +1427,12 @@ body.light-mode .btn-icon {
 
 /* Voice message bubble in chat */
 .voice-bubble {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
+    padding-bottom: 24px !important; /* Space at bottom for timestamp */
     border-radius: 18px;
     background: var(--input-bg);
     border: 1px solid var(--glass-border);

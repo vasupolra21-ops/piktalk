@@ -998,6 +998,12 @@ function appendMessage(data, isSentByMe) {
         bubble.appendChild(playBtn);
         bubble.appendChild(progressWrap);
         bubble.appendChild(durSpan);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.textContent = timeStr;
+        bubble.appendChild(timeSpan);
+
         contentEl = bubble;
 
     } else if (data.image) {
@@ -1009,12 +1015,24 @@ function appendMessage(data, isSentByMe) {
         img.className = 'message-image';
         img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.textContent = timeStr;
+        bubble.appendChild(timeSpan);
+
         contentEl = bubble;
 
     } else {
         const bubble = document.createElement('div');
         bubble.className = 'bubble';
         bubble.textContent = data.message;
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.textContent = timeStr;
+        bubble.appendChild(timeSpan);
+
         contentEl = bubble;
     }
 
@@ -1029,12 +1047,7 @@ function appendMessage(data, isSentByMe) {
     }
     nameSpan.textContent = isSentByMe ? 'You' : data.nickname;
 
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'timestamp';
-    timeSpan.textContent = timeStr;
-
     infoDiv.appendChild(nameSpan);
-    infoDiv.appendChild(timeSpan);
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
