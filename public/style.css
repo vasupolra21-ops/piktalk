@@ -1028,11 +1028,15 @@ body.light-mode .btn-icon {
     left: 0;
     width: 100%;
     height: 100%;
+    height: var(--viewport-height, 100%);
     background: rgba(0, 0, 0, 0.8);
     display: none;
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transition: height 0.1s ease;
 }
 
 .modal.active {
@@ -1602,9 +1606,13 @@ body.light-mode .waveform-bar {
 
     .modal-content {
         padding: 1.5rem;
-        margin: 16px;
+        margin: 16px auto;
         width: calc(100% - 32px);
         max-width: 360px;
+        /* Ensure card is never taller than the visible area */
+        max-height: calc(var(--viewport-height, 100dvh) - 32px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 }
 /* ── Profile Picture Crop Modal ── */

@@ -179,13 +179,34 @@ window.addEventListener('DOMContentLoaded', () => {
 function initViewportHandler() {
     if (!window.visualViewport) return;
 
+    const modal = document.getElementById('nickname-modal');
+    const nicknameInput = document.getElementById('nickname-input');
+
     function applyViewportHeight() {
         const vh = window.visualViewport.height;
+        const fullVh = window.screen.height;
+        const keyboardOpen = vh < fullVh * 0.75; // keyboard is open if visible area < 75% of screen
+
         document.documentElement.style.setProperty('--viewport-height', vh + 'px');
 
-        // Scroll to bottom so the latest message is visible above the keyboard
+        // Chat: scroll to bottom so latest message is visible above keyboard
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // Modal: when keyboard opens, move card to top so input is visible
+        if (modal && modal.classList.contains('active')) {
+            if (keyboardOpen) {
+                modal.style.alignItems = 'flex-start';
+                modal.style.paddingTop = '16px';
+                // Scroll nickname input into view
+                if (nicknameInput) {
+                    setTimeout(() => nicknameInput.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                }
+            } else {
+                modal.style.alignItems = 'center';
+                modal.style.paddingTop = '0';
+            }
         }
     }
 
