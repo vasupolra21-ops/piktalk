@@ -86,10 +86,8 @@ function loadSavedProfile() {
         if (!raw) return;
         const profile = JSON.parse(raw);
         if (!profile) return;
-        // Pre-fill nickname if input is empty
-        if (nicknameInput && !nicknameInput.value.trim() && profile.nickname) {
-            nicknameInput.value = profile.nickname;
-        }
+        // Always clear nickname input so user types a fresh name each time
+        if (nicknameInput) nicknameInput.value = '';
         // Restore profile picture preview
         if (profile.profilePic) {
             myProfilePic = profile.profilePic;
