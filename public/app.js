@@ -283,6 +283,39 @@ function updateInputsState() {
     }
 }
 
+// ── Manage Theme Color & Elastic Scroll Background ──
+// Dynamically adjusts meta theme-color and body background classes.
+// This forces iOS Safari to dynamically color its virtual keyboard accessory bar:
+// - BLACK/DARK (#000000) when any modal (e.g. Set Your Profile, Crop Avatar) is open,
+//   so the keyboard toolbar seamlessly matches the dark overlay background.
+// - WHITE (#ffffff) when in Light Mode chat, matching the clean white inputs and messages.
+// - INDIGO/NAVY (#0f172a) when in Dark Mode chat, matching the deep dark interface.
+function updateThemeColor() {
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    const isLightMode = document.body.classList.contains('light-mode');
+    
+    // Check if any modal is currently visible
+    const isNicknameActive = nicknameModal && nicknameModal.classList.contains('active');
+    const cropModal = document.getElementById('crop-modal');
+    const isCropActive = cropModal && cropModal.classList.contains('open');
+    const membersModal = document.getElementById('members-modal');
+    const isMembersActive = membersModal && membersModal.classList.contains('open');
+    
+    const isAnyModalActive = isNicknameActive || isCropActive || isMembersActive;
+
+    if (isAnyModalActive) {
+        document.documentElement.classList.add('modal-open');
+        document.body.classList.add('modal-open');
+        if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
+    } else {
+        document.documentElement.classList.remove('modal-open');
+        document.body.classList.remove('modal-open');
+        if (metaThemeColor) {
+            metaThemeColor.setAttribute('content', isLightMode ? '#ffffff' : '#0f172a');
+        }
+    }
+}
+
 
 function initLightbox() {
     const lb = document.getElementById('img-lightbox');
@@ -738,12 +771,14 @@ function toggleTheme() {
     if (themeToggle) themeToggle.innerHTML = icon;
     if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    updateThemeColor();
 }
 
 function showHome() {
     [homeView, chatView, nicknameModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (homeView) homeView.classList.add('active');
     updateInputsState();
+    updateThemeColor();
 }
 
 function showChat() {
@@ -761,6 +796,7 @@ function showChat() {
         onlineStatus.style.color = 'var(--accent)';
     }
     updateInputsState();
+    updateThemeColor();
 }
 
 function showNicknameModal() {
@@ -770,6 +806,7 @@ function showNicknameModal() {
     // device will never see each other's nickname or profile picture.
     loadSavedProfile();
     updateInputsState();
+    updateThemeColor();
 }
 
 function sendMessage() {
@@ -1137,6 +1174,7 @@ function openCropModal(src) {
     // Show modal first so that wrap has physical dimensions!
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
+    updateThemeColor();
 
     _cropImg = new Image();
     _cropImg.onload = () => {
@@ -1193,6 +1231,7 @@ function closeCropModal() {
     const modal = document.getElementById('crop-modal');
     if (modal) modal.classList.remove('open');
     document.body.style.overflow = '';
+    updateThemeColor();
     _cropImg = null;
 }
 
@@ -1363,6 +1402,7 @@ function initMembersModal() {
         btn.addEventListener('click', () => {
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
+            updateThemeColor();
         });
     }
 
@@ -1370,11 +1410,13 @@ function initMembersModal() {
         closeBtn.addEventListener('click', () => {
             modal.classList.remove('open');
             document.body.style.overflow = '';
+            updateThemeColor();
         });
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 modal.classList.remove('open');
                 document.body.style.overflow = '';
+                updateThemeColor();
             }
         });
     }
