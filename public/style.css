@@ -1504,18 +1504,21 @@ body.light-mode .waveform-bar {
         font-size: 16px !important;
     }
 
+    html {
+        height: var(--viewport-height, 100dvh) !important;
+        overflow: hidden;
+    }
+
     body {
-        height: 100dvh;
-        height: -webkit-fill-available;
+        height: var(--viewport-height, 100dvh) !important;
         overflow: hidden;
         position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
+        top: 0; left: 0; right: 0; bottom: auto !important;
     }
 
     .container {
         padding: 0;
-        height: 100dvh;
-        height: var(--viewport-height, 100dvh);
+        height: 100%;
     }
 
     .main-hero {
@@ -1536,15 +1539,14 @@ body.light-mode .waveform-bar {
     
     .chat-container {
         width: 100vw;
-        height: 100dvh;
-        height: var(--viewport-height, 100dvh);
+        height: 100%;
         border-radius: 0;
         border: none;
     }
     
     .chat-header {
-        padding: 10px 16px;
-        padding-top: calc(20px + env(safe-area-inset-top)); /* Notch status bar overlap fix */
+        padding: 8px 12px;
+        padding-top: calc(8px + env(safe-area-inset-top)); /* Notch status bar overlap fix */
     }
 
     .room-info {
@@ -1576,13 +1578,13 @@ body.light-mode .waveform-bar {
     }
 
     .messages-container {
-        padding: 10px 12px;
-        gap: 8px;
+        padding: 8px 10px;
+        gap: 6px;
     }
  
     .chat-input-area {
-        padding: 10px 12px;
-        padding-bottom: calc(10px + env(safe-area-inset-bottom)); /* Bottom safe area notch support */
+        padding: 8px 10px;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom)); /* Bottom safe area notch support */
         gap: 8px;
     }
     
@@ -1610,7 +1612,7 @@ body.light-mode .waveform-bar {
     
     .message {
         max-width: 85%;
-        padding: 10px 14px;
+        padding: 2px 0;
         font-size: 0.9rem;
     }
 

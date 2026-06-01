@@ -184,6 +184,11 @@ function initViewportHandler() {
         const vh = window.visualViewport.height;
         document.documentElement.style.setProperty('--viewport-height', vh + 'px');
 
+        // Force reset any window/body scroll shifts
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+
         // Chat: scroll to bottom so latest message is visible above keyboard
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -195,12 +200,24 @@ function initViewportHandler() {
     // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
     window.visualViewport.addEventListener('scroll', () => {
         window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
     });
 
     // Also reset on any window scroll
     window.addEventListener('scroll', () => {
         window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
     }, { passive: false });
+
+    // Reset layout viewport position when message input receives focus
+    if (messageInput) {
+        messageInput.addEventListener('focus', () => {
+            setTimeout(applyViewportHeight, 50);
+            setTimeout(applyViewportHeight, 150);
+        });
+    }
 
     // Set initial value
     applyViewportHeight();
