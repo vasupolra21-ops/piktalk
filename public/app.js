@@ -211,9 +211,16 @@ function initViewportHandler() {
         document.documentElement.scrollTop = 0;
     }, { passive: false });
 
-    // Reset layout viewport position when message input receives focus
+    // Reset layout viewport position when message input receives focus/blur
     if (messageInput) {
         messageInput.addEventListener('focus', () => {
+            document.body.classList.add('keyboard-active');
+            setTimeout(applyViewportHeight, 50);
+            setTimeout(applyViewportHeight, 150);
+        });
+
+        messageInput.addEventListener('blur', () => {
+            document.body.classList.remove('keyboard-active');
             setTimeout(applyViewportHeight, 50);
             setTimeout(applyViewportHeight, 150);
         });

@@ -1626,6 +1626,10 @@ body.light-mode .waveform-bar {
         gap: 8px;
     }
     
+    body.keyboard-active .chat-input-area {
+        padding-bottom: 8px !important;
+    }
+    
     .btn-mic,
     .btn-send {
         width: 40px;
