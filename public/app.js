@@ -169,6 +169,7 @@ window.addEventListener('DOMContentLoaded', () => {
     initCropModal();
     initMembersModal();
     initViewportHandler();
+    initModalKeyboardHandler();
 });
 
 // ── Visual Viewport Handler ──
@@ -203,6 +204,39 @@ function initViewportHandler() {
 
     // Set initial value
     applyViewportHeight();
+}
+
+// ── Modal Keyboard Handler ──
+// When nickname input is focused on mobile, slides the modal card UP
+// just enough so both the input AND Join button are visible above the keyboard.
+function initModalKeyboardHandler() {
+    const nicknameInput = document.getElementById('nickname-input');
+    const modal = document.getElementById('nickname-modal');
+    if (!nicknameInput || !modal) return;
+
+    const modalContent = modal.querySelector('.modal-content');
+    if (!modalContent) return;
+
+    nicknameInput.addEventListener('focus', () => {
+        // Wait for the keyboard to fully open before measuring
+        setTimeout(() => {
+            const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const cardRect = modalContent.getBoundingClientRect();
+            const cardBottom = cardRect.bottom;
+            // How many px the card overflows below the visible area
+            const overflow = cardBottom - vvHeight + 16; // +16px breathing room
+            if (overflow > 0) {
+                modalContent.style.transition = 'transform 0.28s ease';
+                modalContent.style.transform = `translateY(-${overflow}px)`;
+            }
+        }, 320);
+    });
+
+    nicknameInput.addEventListener('blur', () => {
+        // Slide back to original centered position
+        modalContent.style.transition = 'transform 0.28s ease';
+        modalContent.style.transform = 'translateY(0)';
+    });
 }
 
 function initLightbox() {
