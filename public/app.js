@@ -545,6 +545,16 @@ function setupEventListeners() {
                 }, 2000);
             }
         });
+
+        messageInput.addEventListener('keydown', (e) => {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (!isMobile && e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                clearTimeout(typingTimeout);
+                if (socket) socket.emit('stop-typing');
+                sendMessage();
+            }
+        });
     }
 
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
