@@ -402,7 +402,10 @@ function renderEmojiPicker() {
                 e.stopPropagation();
                 if (messageInput) {
                     messageInput.value += emoji;
-                    messageInput.focus();
+                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                        messageInput.focus();
+                    }
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
                 }
             });
@@ -500,7 +503,14 @@ function setupEventListeners() {
 
     if (emojiBtn) emojiBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        const willShow = emojiPicker.classList.contains('hidden');
         emojiPicker.classList.toggle('hidden');
+        if (willShow) {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (isMobile && messageInput) {
+                messageInput.blur();
+            }
+        }
     });
 
     document.addEventListener('click', (e) => {
@@ -852,13 +862,23 @@ function sendMessage() {
             });
             messageInput.value = '';
             messageInput.style.height = '38px'; // Reset textarea height
-            // Re-focus the input to keep the keyboard open on mobile
-            // Use a short timeout so the DOM can settle before refocusing
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) {
-                    messageInput.focus();
-                }
-            }, 0);
+            
+            // Check if emoji picker is open
+            const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
+            
+            // Hide the emoji picker when message is sent
+            if (emojiPicker) {
+                emojiPicker.classList.add('hidden');
+            }
+
+            // Only refocus if the emoji picker was not open (user was typing text)
+            if (!isEmojiOpen) {
+                setTimeout(() => {
+                    if (messageInput && !messageInput.disabled) {
+                        messageInput.focus();
+                    }
+                }, 0);
+            }
         } else {
             alert("Not connected to server. Message could not be sent.");
         }
