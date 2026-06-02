@@ -1019,14 +1019,6 @@ function appendMessage(data, isSentByMe) {
         const timeText = document.createTextNode(timeStr);
         timeSpan.appendChild(timeText);
 
-        if (isSentByMe) {
-            const statusTicks = document.createElement('i');
-            statusTicks.className = 'fas fa-check-double status-ticks';
-            statusTicks.style.color = '#38bdf8';
-            statusTicks.style.marginLeft = '4px';
-            timeSpan.appendChild(statusTicks);
-        }
-
         bubble.appendChild(timeSpan);
 
         contentEl = bubble;
@@ -1046,14 +1038,6 @@ function appendMessage(data, isSentByMe) {
         const timeText = document.createTextNode(timeStr);
         timeSpan.appendChild(timeText);
 
-        if (isSentByMe) {
-            const statusTicks = document.createElement('i');
-            statusTicks.className = 'fas fa-check-double status-ticks';
-            statusTicks.style.color = '#38bdf8';
-            statusTicks.style.marginLeft = '4px';
-            timeSpan.appendChild(statusTicks);
-        }
-
         bubble.appendChild(timeSpan);
 
         contentEl = bubble;
@@ -1071,14 +1055,6 @@ function appendMessage(data, isSentByMe) {
         timeSpan.className = 'bubble-timestamp';
         const timeText = document.createTextNode(timeStr);
         timeSpan.appendChild(timeText);
-
-        if (isSentByMe) {
-            const statusTicks = document.createElement('i');
-            statusTicks.className = 'fas fa-check-double status-ticks';
-            statusTicks.style.color = '#38bdf8';
-            statusTicks.style.marginLeft = '4px';
-            timeSpan.appendChild(statusTicks);
-        }
 
         bubble.appendChild(timeSpan);
 

@@ -675,7 +675,7 @@ body.light-mode .btn-icon {
     white-space: pre-wrap;
     line-height: 1.5;
     font-size: 0.95rem;
-    color: var(--text-main);
+    color: inherit;
     text-align: left;
 }
 
