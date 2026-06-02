@@ -655,32 +655,41 @@ body.light-mode .btn-icon {
 }
 
 .bubble {
-    position: relative;
-    padding: 10px 20px 24px 16px; /* Extra bottom and right padding to prevent text overlapping the timestamp */
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 12px; /* WhatsApp style padding */
     border-radius: 18px;
     background: var(--input-bg);
     border: 1px solid var(--glass-border);
     max-width: 80%;
     min-width: 85px; /* Ensure space for short text + timestamp without overflow */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.bubble-text {
+    flex: 1 1 auto;
     word-wrap: break-word;
     white-space: pre-wrap;
     line-height: 1.5;
     font-size: 0.95rem;
     color: var(--text-main);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     text-align: left;
 }
 
 .bubble-timestamp {
-    position: absolute;
-    bottom: 5px;
-    right: 12px;
+    display: inline-flex;
+    align-items: center;
     font-size: 0.68rem;
     color: var(--text-muted);
     opacity: 0.75;
     pointer-events: none;
     user-select: none;
     white-space: nowrap;
+    margin-left: auto;
+    margin-bottom: -2px; /* Align slightly lower, closer to baseline */
 }
 
 body.light-mode .bubble-timestamp {
@@ -743,6 +752,7 @@ body.light-mode .bubble-timestamp {
 }
 
 .bubble-image .bubble-timestamp {
+    position: absolute;
     background: rgba(0, 0, 0, 0.45);
     padding: 2px 6px;
     border-radius: 8px;
@@ -1437,6 +1447,12 @@ body.light-mode .bubble-timestamp {
     border: 1px solid var(--glass-border);
     min-width: 200px;
     max-width: 280px;
+}
+
+.voice-bubble .bubble-timestamp {
+    position: absolute;
+    bottom: 5px;
+    right: 12px;
 }
 
 .message.sent .voice-bubble {
