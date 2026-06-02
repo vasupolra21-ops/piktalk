@@ -568,7 +568,7 @@ body.light-mode .btn-icon {
     padding: 1.25rem 1.5rem;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 4px;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
 }
