@@ -1062,24 +1062,24 @@ function appendMessage(data, isSentByMe) {
     }
 
     // Build message DOM directly (no innerHTML with user data)
-    const infoDiv = document.createElement('div');
-    infoDiv.className = 'message-info';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'sender-name';
     if (!isSentByMe) {
-        nameSpan.style.color = color;
-    }
-    nameSpan.textContent = isSentByMe ? 'You' : data.nickname;
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'message-info';
 
-    infoDiv.appendChild(nameSpan);
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'sender-name';
+        nameSpan.style.color = color;
+        nameSpan.textContent = data.nickname;
+
+        infoDiv.appendChild(nameSpan);
+        msgDiv.appendChild(infoDiv);
+    }
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     if (avatar) contentDiv.innerHTML = avatar; // avatar is safe HTML we generate
     contentDiv.appendChild(contentEl);
 
-    msgDiv.appendChild(infoDiv);
     msgDiv.appendChild(contentDiv);
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
