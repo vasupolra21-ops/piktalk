@@ -583,7 +583,7 @@ body.light-mode .btn-icon {
 }
 
 .message {
-    max-width: 100%;
+    max-width: 65%; /* Like WhatsApp — capped at ~2/3 of the screen */
     display: flex;
     flex-direction: column;
     animation: slideUp 0.3s ease forwards;
@@ -664,7 +664,7 @@ body.light-mode .btn-icon {
     border-radius: 18px;
     background: var(--input-bg);
     border: 1px solid var(--glass-border);
-    max-width: 80%;
+    max-width: 100%; /* Capped by .message max-width */
     min-width: 85px; /* Ensure space for short text + timestamp without overflow */
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
@@ -672,11 +672,14 @@ body.light-mode .btn-icon {
 .bubble-text {
     flex: 1 1 auto;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word; /* Force wrap on very long unbroken strings */
     white-space: pre-wrap;
     line-height: 1.5;
     font-size: 0.95rem;
     color: inherit;
     text-align: left;
+    min-width: 0; /* Needed for flex child to allow shrink */
 }
 
 .bubble-timestamp {
@@ -1668,7 +1671,7 @@ body.light-mode .waveform-bar {
     }
     
     .message {
-        max-width: 85%;
+        max-width: 75%; /* WhatsApp-style on mobile */
         padding: 2px 0;
         font-size: 0.9rem;
     }
