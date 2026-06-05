@@ -977,6 +977,38 @@ function hideTyping() {
     indicator.classList.remove('visible');
 }
 
+// Detect if a string is a single emoji (no other text)
+function isSingleEmoji(str) {
+    if (!str) return false;
+    const trimmed = str.trim();
+    // Use Intl segmenter if available (modern browsers)
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+        const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+        const segments = [...seg.segment(trimmed)];
+        if (segments.length !== 1) return false;
+        const cp = trimmed.codePointAt(0);
+        // Must be in emoji range
+        return (
+            (cp >= 0x1F600 && cp <= 0x1F64F) || // emoticons
+            (cp >= 0x1F300 && cp <= 0x1F5FF) || // symbols & pictographs
+            (cp >= 0x1F680 && cp <= 0x1F6FF) || // transport
+            (cp >= 0x1F700 && cp <= 0x1F77F) || // alchemical
+            (cp >= 0x1F780 && cp <= 0x1F7FF) || // geometric
+            (cp >= 0x1F800 && cp <= 0x1F8FF) || // supp arrows
+            (cp >= 0x1F900 && cp <= 0x1F9FF) || // supp symbols
+            (cp >= 0x1FA00 && cp <= 0x1FA6F) || // chess
+            (cp >= 0x1FA70 && cp <= 0x1FAFF) || // symbols extended
+            (cp >= 0x2600  && cp <= 0x26FF)  || // misc symbols
+            (cp >= 0x2700  && cp <= 0x27BF)  || // dingbats
+            (cp >= 0xFE00  && cp <= 0xFE0F)  || // variation selectors
+            cp === 0x200D                        // ZWJ
+        );
+    }
+    // Fallback regex for older browsers
+    const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})(\uFE0F|\u20D0-\u20FF|\uFE0E|\uFE0F)*$/u;
+    return emojiRegex.test(trimmed);
+}
+
 function appendMessage(data, isSentByMe) {
     if (!messagesContainer) return;
     const msgDiv = document.createElement('div');
@@ -1064,19 +1096,28 @@ function appendMessage(data, isSentByMe) {
 
     } else {
         const bubble = document.createElement('div');
-        bubble.className = 'bubble';
+        const singleEmoji = isSingleEmoji(data.message);
 
-        const textSpan = document.createElement('span');
-        textSpan.className = 'bubble-text';
-        textSpan.textContent = data.message;
-        bubble.appendChild(textSpan);
+        if (singleEmoji) {
+            bubble.className = 'bubble big-emoji';
+            const textSpan = document.createElement('span');
+            textSpan.className = 'bubble-text big-emoji-text';
+            textSpan.textContent = data.message;
+            bubble.appendChild(textSpan);
+            // No timestamp for single emoji (WhatsApp style)
+        } else {
+            bubble.className = 'bubble';
+            const textSpan = document.createElement('span');
+            textSpan.className = 'bubble-text';
+            textSpan.textContent = data.message;
+            bubble.appendChild(textSpan);
 
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'bubble-timestamp';
-        const timeText = document.createTextNode(timeStr);
-        timeSpan.appendChild(timeText);
-
-        bubble.appendChild(timeSpan);
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'bubble-timestamp';
+            const timeText = document.createTextNode(timeStr);
+            timeSpan.appendChild(timeText);
+            bubble.appendChild(timeSpan);
+        }
 
         contentEl = bubble;
     }
