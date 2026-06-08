@@ -25,6 +25,8 @@ let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
 const msgReactions = {};   // msgId → { emoji → Map<socketId, nickname> }
 let replyingTo = null;     // { msgId, nickname, preview } or null
 let replyBarEl = null;     // the reply preview bar DOM element
+let globalFullEmojiPanel = null;
+let currentReactionMsgId = null;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -1535,11 +1537,11 @@ function appendMessage(data, isSentByMe) {
         const actionBar = document.createElement('div');
         actionBar.className = 'msg-action-bar';
 
-        // Quick react popup
+        // Quick react popup (WhatsApp-style: 6 emojis + plus icon)
         const quickMenu = document.createElement('div');
         quickMenu.className = 'quick-react-menu';
-        const EMOJIS = ['❤️','👍','😂','😮','😢','😡','🔥','🎉','🥰','😍','🤣','😭','👏','🙏','💯','😱','🤔','💪','😎','🥳'];
-        EMOJIS.forEach(em => {
+        const QUICK_EMOJIS = ['👍','❤️','😂','😮','😢','🙏'];
+        QUICK_EMOJIS.forEach(em => {
             const btn = document.createElement('button');
             btn.className = 'quick-react-btn';
             btn.textContent = em;
@@ -1547,12 +1549,24 @@ function appendMessage(data, isSentByMe) {
                 e.stopPropagation();
                 quickMenu.classList.remove('visible');
                 msgDiv.classList.remove('action-visible');
-                // Find any existing reaction from this user on this message
                 const previousEmoji = getMyReactionOnMsg(data.msgId);
                 if (socket) socket.emit('toggle-reaction', { msgId: data.msgId, emoji: em, previousEmoji });
             });
             quickMenu.appendChild(btn);
         });
+        
+        // Plus button to open full emoji panel
+        const plusBtn = document.createElement('button');
+        plusBtn.className = 'quick-react-btn plus-btn';
+        plusBtn.textContent = '+';
+        plusBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            quickMenu.classList.remove('visible');
+            msgDiv.classList.remove('action-visible');
+            showFullEmojiPanel(data.msgId, bubbleWrapper);
+        });
+        quickMenu.appendChild(plusBtn);
+        
         bubbleWrapper.appendChild(quickMenu);
 
         // React button
@@ -1563,7 +1577,12 @@ function appendMessage(data, isSentByMe) {
         reactBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isOpen = quickMenu.classList.contains('visible');
+            // Close any open quick menus and full emoji panels first
             document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+            document.querySelectorAll('.full-emoji-panel.visible').forEach(m => {
+                m.classList.remove('visible');
+                m.remove();
+            });
             if (!isOpen) quickMenu.classList.add('visible');
         });
 
@@ -1604,11 +1623,128 @@ function appendMessage(data, isSentByMe) {
     // Close any open menus when tapping elsewhere
     document.addEventListener('click', () => {
         document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+        document.querySelectorAll('.full-emoji-panel.visible').forEach(m => {
+            m.classList.remove('visible');
+            m.remove();
+        });
         document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
     }, { once: false, capture: true, passive: true });
 
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ── EMOJI PICKER CATEGORIES ──
+const EMOJI_CATEGORIES = {
+    smileys: {
+        icon: '😀',
+        label: 'Smileys & Hands',
+        emojis: [
+            '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫣','🤭','🤫','🤥','😶','😐','😑','😬','🫠','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','😵‍💫','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕',
+            '👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘','👌','👈','👉','👆','👇','☝️','✋','🤚','🖐️','🖖','👋','🤙','💪','🦾','🖕','✍️','🙏','🤝','👏','🙌','👐','🤲','💅','🤳'
+        ]
+    },
+    hearts: {
+        icon: '❤️',
+        label: 'Hearts & Symbols',
+        emojis: [
+            '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','💯','🔥','✨','🌟','⭐','🎉','🎊','🎈','🎂','🎁'
+        ]
+    },
+    objects: {
+        icon: '🚀',
+        label: 'Objects & Food',
+        emojis: [
+            '🚀','👑','💎','🍕','🍔','🍟','🍺','🍻','🍷','☕','🌮','🍣','🍿','🍩','🍪','🍧','🍦','🍰'
+        ]
+    }
+};
+
+// ── Show WhatsApp-style expanded emoji panel ──
+function showFullEmojiPanel(msgId, bubbleWrapper) {
+    currentReactionMsgId = msgId;
+
+    if (!globalFullEmojiPanel) {
+        globalFullEmojiPanel = document.createElement('div');
+        globalFullEmojiPanel.className = 'full-emoji-panel';
+
+        const tabsContainer = document.createElement('div');
+        tabsContainer.className = 'emoji-panel-tabs';
+
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'emoji-panel-grid';
+
+        const categories = [
+            { id: 'smileys', icon: '😀', label: 'Smileys & Hands' },
+            { id: 'hearts', icon: '❤️', label: 'Hearts & Symbols' },
+            { id: 'objects', icon: '🚀', label: 'Objects & Food' }
+        ];
+
+        categories.forEach(cat => {
+            const tabBtn = document.createElement('button');
+            tabBtn.className = 'emoji-panel-tab-btn';
+            tabBtn.innerHTML = cat.icon;
+            tabBtn.title = cat.label;
+            tabBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tabsContainer.querySelectorAll('.emoji-panel-tab-btn').forEach(btn => btn.classList.remove('active'));
+                tabBtn.classList.add('active');
+                renderCategoryEmojis(cat.id, gridContainer);
+            });
+            tabsContainer.appendChild(tabBtn);
+        });
+
+        globalFullEmojiPanel.appendChild(tabsContainer);
+        globalFullEmojiPanel.appendChild(gridContainer);
+
+        // Click inside the panel shouldn't close it
+        globalFullEmojiPanel.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // Initialize active tab styling and render first category
+        tabsContainer.firstChild.classList.add('active');
+        renderCategoryEmojis('smileys', gridContainer);
+    }
+
+    // Hide any other visible emoji panels
+    document.querySelectorAll('.full-emoji-panel.visible').forEach(panel => {
+        if (panel !== globalFullEmojiPanel) {
+            panel.classList.remove('visible');
+            panel.remove();
+        }
+    });
+
+    bubbleWrapper.appendChild(globalFullEmojiPanel);
+    
+    // Smooth transition toggle
+    setTimeout(() => {
+        globalFullEmojiPanel.classList.add('visible');
+    }, 10);
+}
+
+function renderCategoryEmojis(catId, gridEl) {
+    gridEl.innerHTML = '';
+    const category = EMOJI_CATEGORIES[catId];
+    if (!category) return;
+    
+    category.emojis.forEach(em => {
+        const btn = document.createElement('button');
+        btn.className = 'emoji-panel-btn';
+        btn.textContent = em;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentReactionMsgId) {
+                const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
+                if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
+            }
+            if (globalFullEmojiPanel) {
+                globalFullEmojiPanel.classList.remove('visible');
+                globalFullEmojiPanel.remove();
+            }
+        });
+        gridEl.appendChild(btn);
+    });
 }
 
 // ── Helper: find this user's current emoji on a message ──
