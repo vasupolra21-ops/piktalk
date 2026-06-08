@@ -2219,3 +2219,230 @@ body.light-mode .member-admin-badge {
     background: rgba(239, 68, 68, 0.2);
     transform: translateY(-0.5px);
 }
+
+/* ── WhatsApp-style Message Action Bar ── */
+.message {
+    position: relative;
+}
+
+.msg-action-bar {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 20;
+}
+
+.message.sent .msg-action-bar  { right: calc(100% + 6px); flex-direction: row-reverse; }
+.message.received .msg-action-bar { left: calc(100% + 6px); }
+
+.message:hover .msg-action-bar,
+.message.action-visible .msg-action-bar {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.msg-action-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    flex-shrink: 0;
+}
+.msg-action-btn:hover {
+    color: var(--accent);
+    transform: scale(1.15);
+    background: rgba(99,102,241,0.15);
+    border-color: rgba(99,102,241,0.3);
+}
+
+/* ── Quick Emoji Picker ── */
+.quick-react-menu {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 6px 10px;
+    display: flex;
+    gap: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transform: scale(0.85) translateY(6px);
+    transition: opacity 0.18s cubic-bezier(0.34,1.56,0.64,1),
+                transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+}
+.quick-react-menu.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1) translateY(0);
+}
+.message.sent .quick-react-menu  { right: 0; }
+.message.received .quick-react-menu { left: 0; }
+
+.quick-react-btn {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 50%;
+    transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1);
+    line-height: 1;
+}
+.quick-react-btn:hover { transform: scale(1.45) translateY(-3px); }
+
+/* ── Reaction Pills below bubble ── */
+.reaction-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+.message.sent .reaction-row  { justify-content: flex-end; }
+.message.received .reaction-row { justify-content: flex-start; }
+
+.reaction-pill {
+    background: var(--card-bg);
+    border: 1.5px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    user-select: none;
+}
+.reaction-pill:hover { transform: scale(1.1); }
+.reaction-pill.mine {
+    border-color: var(--primary);
+    background: rgba(99,102,241,0.15);
+    color: var(--primary);
+}
+
+/* ── Reply Preview Bar (above input) ── */
+.reply-preview-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    padding: 8px 14px;
+    width: 100%;
+    box-sizing: border-box;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: slideUpReply 0.2s ease forwards;
+}
+@keyframes slideUpReply {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.reply-preview-inner {
+    display: flex;
+    flex-direction: column;
+    border-left: 3px solid var(--primary);
+    padding-left: 8px;
+    font-size: 0.82rem;
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+}
+.reply-preview-name {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--primary);
+    margin-bottom: 1px;
+}
+.reply-preview-text {
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.reply-cancel-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 50%;
+    margin-left: 8px;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+.reply-cancel-btn:hover {
+    color: var(--danger);
+    background: rgba(239,68,68,0.1);
+}
+
+/* ── Quoted reply block inside a bubble ── */
+.reply-quote {
+    display: flex;
+    flex-direction: column;
+    border-left: 3px solid var(--primary);
+    background: rgba(0,0,0,0.08);
+    border-radius: 4px 8px 8px 4px;
+    padding: 5px 10px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+body.light-mode .reply-quote { background: rgba(0,0,0,0.05); }
+.reply-quote:hover { background: rgba(0,0,0,0.13); }
+.reply-quote-name {
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 1px;
+    font-size: 0.78rem;
+}
+.reply-quote-text {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    font-size: 0.8rem;
+}
+
+/* ── Highlight flash when jumping to quoted message ── */
+@keyframes msgFlash {
+    0%   { outline: 2px solid var(--primary); background: rgba(99,102,241,0.18); }
+    70%  { outline: 2px solid var(--primary); background: rgba(99,102,241,0.18); }
+    100% { outline: 2px solid transparent;    background: transparent; }
+}
+.message.flash-highlight .bubble,
+.message.flash-highlight .voice-bubble {
+    animation: msgFlash 1.2s ease forwards;
+    border-radius: 12px;
+}
+

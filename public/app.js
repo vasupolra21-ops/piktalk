@@ -19,6 +19,11 @@ let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, 
 let roomNotFoundModal, roomNotFoundHomeBtn;
 let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
 
+// Reactions + Reply state
+const msgReactions = {};   // msgId → { emoji → Set<socketId> }
+let replyingTo = null;     // { msgId, nickname, preview } or null
+let replyBarEl = null;     // the reply preview bar DOM element
+
 function initDOMElements() {
     homeView = document.getElementById('home-view');
     chatView = document.getElementById('chat-view');
@@ -753,8 +758,10 @@ function setupEventListeners() {
                     socket.emit('send-message', {
                         roomID: currentRoomID,
                         message: '',
-                        image: e.target.result
+                        image: e.target.result,
+                        replyTo: replyingTo || null
                     });
+                    clearReply();
                 } else {
                     alert("Not connected to server. Image could not be sent.");
                 }
@@ -792,8 +799,10 @@ function setupEventListeners() {
                         socket.emit('send-message', {
                             roomID: currentRoomID,
                             message: '',
-                            image: compressedBase64
+                            image: compressedBase64,
+                            replyTo: replyingTo || null
                         });
+                        clearReply();
                     } else {
                         alert("Not connected to server. Image could not be sent.");
                     }
@@ -804,8 +813,10 @@ function setupEventListeners() {
                         socket.emit('send-message', {
                             roomID: currentRoomID,
                             message: '',
-                            image: e.target.result
+                            image: e.target.result,
+                            replyTo: replyingTo || null
                         });
+                        clearReply();
                     }
                 };
                 img.src = e.target.result;
@@ -959,13 +970,15 @@ function sendVoiceMessage() {
     const reader = new FileReader();
     reader.onload = (e) => {
         if (socket) {
-            socket.emit('voice-recording-stop'); // clear indicator before send
+            socket.emit('voice-recording-stop');
             socket.emit('send-message', {
                 roomID: currentRoomID,
                 message: '',
                 audio: e.target.result,
-                audioDuration: recordingSeconds
+                audioDuration: recordingSeconds,
+                replyTo: replyingTo || null
             });
+            clearReply();
             discardPreview();
         } else {
             alert("Not connected to server. Voice message could not be sent.");
@@ -1038,25 +1051,18 @@ function sendMessage() {
         if (socket) {
             socket.emit('send-message', {
                 roomID: currentRoomID,
-                message: text
+                message: text,
+                replyTo: replyingTo || null
             });
             messageInput.value = '';
-            messageInput.style.height = '38px'; // Reset textarea height
-            
-            // Check if emoji picker is open
-            const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
-            
-            // Hide the emoji picker when message is sent
-            if (emojiPicker) {
-                emojiPicker.classList.add('hidden');
-            }
+            messageInput.style.height = '38px';
+            clearReply();
 
-            // Only refocus if the emoji picker was not open (user was typing text)
+            const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
+            if (emojiPicker) emojiPicker.classList.add('hidden');
             if (!isEmojiOpen) {
                 setTimeout(() => {
-                    if (messageInput && !messageInput.disabled) {
-                        messageInput.focus();
-                    }
+                    if (messageInput && !messageInput.disabled) messageInput.focus();
                 }, 0);
             }
         } else {
@@ -1068,9 +1074,20 @@ function sendMessage() {
 // Socket Events
 if (socket) {
     socket.on('receive-message', (data) => {
-        hideTyping(); // hide typing bubble when message arrives
+        hideTyping();
         appendMessage(data, data.id === socket.id);
         if (msgSound) msgSound.play().catch(() => {});
+    });
+
+    // Real-time reaction update
+    socket.on('reaction-toggled', ({ msgId, emoji, socketId }) => {
+        if (!msgReactions[msgId]) msgReactions[msgId] = {};
+        if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Set();
+        const set = msgReactions[msgId][emoji];
+        if (set.has(socketId)) set.delete(socketId);
+        else set.add(socketId);
+        if (set.size === 0) delete msgReactions[msgId][emoji];
+        renderReactions(msgId);
     });
 
     socket.on('system-message', (data) => {
@@ -1267,6 +1284,8 @@ function appendMessage(data, isSentByMe) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
+    else msgDiv.classList.add('received');
+    if (data.msgId) msgDiv.dataset.msgId = data.msgId;
 
     const color = isSentByMe ? 'var(--text-muted)' : getNicknameColor(data.nickname);
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);
@@ -1275,7 +1294,6 @@ function appendMessage(data, isSentByMe) {
     let contentEl;
 
     if (data.audio) {
-        // Store src in map — never embed base64 in HTML attribute
         const bubbleId = 'vb-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5);
         _voiceData[bubbleId] = data.audio;
         const durLabel = data.audioDuration ? formatSeconds(data.audioDuration) : '0:00';
@@ -1298,14 +1316,10 @@ function appendMessage(data, isSentByMe) {
         for (let i = 0; i < barCount; i++) {
             const bar = document.createElement('div');
             bar.className = 'waveform-bar';
-            
-            // Seed a consistent height based on bubbleId + index
             let hash = 0;
             const str = bubbleId + i;
-            for (let j = 0; j < str.length; j++) {
-                hash = str.charCodeAt(j) + ((hash << 5) - hash);
-            }
-            const heightPercent = 15 + (Math.abs(hash) % 76); // 15% to 90%
+            for (let j = 0; j < str.length; j++) hash = str.charCodeAt(j) + ((hash << 5) - hash);
+            const heightPercent = 15 + (Math.abs(hash) % 76);
             bar.style.height = heightPercent + '%';
             progressWrap.appendChild(bar);
         }
@@ -1321,11 +1335,8 @@ function appendMessage(data, isSentByMe) {
 
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
-        const timeText = document.createTextNode(timeStr);
-        timeSpan.appendChild(timeText);
-
+        timeSpan.appendChild(document.createTextNode(timeStr));
         bubble.appendChild(timeSpan);
-
         contentEl = bubble;
 
     } else if (data.image) {
@@ -1337,19 +1348,32 @@ function appendMessage(data, isSentByMe) {
         img.className = 'message-image';
         img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
-
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
-        const timeText = document.createTextNode(timeStr);
-        timeSpan.appendChild(timeText);
-
+        timeSpan.appendChild(document.createTextNode(timeStr));
         bubble.appendChild(timeSpan);
-
         contentEl = bubble;
 
     } else {
         const bubble = document.createElement('div');
         const singleEmoji = isSingleEmoji(data.message);
+
+        // ── Reply quote block ──
+        if (data.replyTo) {
+            const quote = document.createElement('div');
+            quote.className = 'reply-quote';
+            const qName = document.createElement('div');
+            qName.className = 'reply-quote-name';
+            qName.textContent = data.replyTo.nickname;
+            const qText = document.createElement('div');
+            qText.className = 'reply-quote-text';
+            qText.textContent = data.replyTo.preview;
+            quote.appendChild(qName);
+            quote.appendChild(qText);
+            // Click to scroll to original
+            quote.addEventListener('click', () => scrollToMessage(data.replyTo.msgId));
+            bubble.appendChild(quote);
+        }
 
         if (singleEmoji) {
             bubble.className = 'bubble big-emoji';
@@ -1357,11 +1381,9 @@ function appendMessage(data, isSentByMe) {
             textSpan.className = 'bubble-text big-emoji-text';
             textSpan.textContent = data.message;
             bubble.appendChild(textSpan);
-
             const timeSpan = document.createElement('span');
             timeSpan.className = 'bubble-timestamp big-emoji-timestamp';
-            const timeText = document.createTextNode(timeStr);
-            timeSpan.appendChild(timeText);
+            timeSpan.appendChild(document.createTextNode(timeStr));
             bubble.appendChild(timeSpan);
         } else {
             bubble.className = 'bubble';
@@ -1369,44 +1391,204 @@ function appendMessage(data, isSentByMe) {
             textSpan.className = 'bubble-text';
             textSpan.textContent = data.message;
             bubble.appendChild(textSpan);
-
             const timeSpan = document.createElement('span');
             timeSpan.className = 'bubble-timestamp';
-            const timeText = document.createTextNode(timeStr);
-            timeSpan.appendChild(timeText);
+            timeSpan.appendChild(document.createTextNode(timeStr));
             bubble.appendChild(timeSpan);
         }
-
         contentEl = bubble;
     }
 
-    // Build message DOM directly (no innerHTML with user data)
+    // Build message DOM
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
         infoDiv.className = 'message-info';
-
         const nameSpan = document.createElement('span');
         nameSpan.className = 'sender-name';
         nameSpan.style.color = color;
         nameSpan.textContent = data.nickname;
-
         infoDiv.appendChild(nameSpan);
         msgDiv.appendChild(infoDiv);
     }
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    if (avatar) contentDiv.innerHTML = avatar; // avatar is safe HTML we generate
+    if (avatar) contentDiv.innerHTML = avatar;
     contentDiv.appendChild(contentEl);
-
     msgDiv.appendChild(contentDiv);
+
+    // ── Reaction row (populated later) ──
+    if (data.msgId) {
+        const reactionRow = document.createElement('div');
+        reactionRow.className = 'reaction-row';
+        reactionRow.id = 'reactions-' + data.msgId;
+        msgDiv.appendChild(reactionRow);
+    }
+
+    // ── Action bar (react + reply) ──
+    if (data.msgId) {
+        const actionBar = document.createElement('div');
+        actionBar.className = 'msg-action-bar';
+
+        // Quick react popup
+        const quickMenu = document.createElement('div');
+        quickMenu.className = 'quick-react-menu';
+        const EMOJIS = ['👍','❤️','😂','😮','😢','😡'];
+        EMOJIS.forEach(em => {
+            const btn = document.createElement('button');
+            btn.className = 'quick-react-btn';
+            btn.textContent = em;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                quickMenu.classList.remove('visible');
+                msgDiv.classList.remove('action-visible');
+                if (socket) socket.emit('toggle-reaction', { msgId: data.msgId, emoji: em });
+            });
+            quickMenu.appendChild(btn);
+        });
+        contentDiv.style.position = 'relative';
+        contentDiv.appendChild(quickMenu);
+
+        // React button
+        const reactBtn = document.createElement('button');
+        reactBtn.className = 'msg-action-btn';
+        reactBtn.title = 'React';
+        reactBtn.innerHTML = '<i class="far fa-smile"></i>';
+        reactBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = quickMenu.classList.contains('visible');
+            document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+            if (!isOpen) quickMenu.classList.add('visible');
+        });
+
+        // Reply button
+        const replyBtn = document.createElement('button');
+        replyBtn.className = 'msg-action-btn';
+        replyBtn.title = 'Reply';
+        replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
+        replyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            msgDiv.classList.remove('action-visible');
+            const preview = data.audio ? '🎤 Voice message'
+                          : data.image ? '🖼️ Image'
+                          : (data.message || '').slice(0, 80);
+            setReply({ msgId: data.msgId, nickname: data.nickname || 'You', preview });
+        });
+
+        actionBar.appendChild(reactBtn);
+        actionBar.appendChild(replyBtn);
+        msgDiv.appendChild(actionBar);
+    }
+
+    // ── Long-press for mobile ──
+    if (data.msgId) {
+        let lpTimer = null;
+        const startLP = () => {
+            lpTimer = setTimeout(() => {
+                document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
+                msgDiv.classList.add('action-visible');
+            }, 500);
+        };
+        const cancelLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+        msgDiv.addEventListener('touchstart', startLP, { passive: true });
+        msgDiv.addEventListener('touchend', cancelLP);
+        msgDiv.addEventListener('touchmove', cancelLP);
+    }
+
+    // Close any open menus when tapping elsewhere
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+        document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
+    }, { once: false, capture: true, passive: true });
+
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// ── Render reaction pills for a msgId ──
+function renderReactions(msgId) {
+    const row = document.getElementById('reactions-' + msgId);
+    if (!row) return;
+    row.innerHTML = '';
+    const reactions = msgReactions[msgId] || {};
+    Object.entries(reactions).forEach(([emoji, set]) => {
+        if (set.size === 0) return;
+        const pill = document.createElement('button');
+        pill.className = 'reaction-pill' + (socket && set.has(socket.id) ? ' mine' : '');
+        pill.title = [...set].length + ' reaction(s)';
+        const emSpan = document.createElement('span');
+        emSpan.textContent = emoji;
+        const countSpan = document.createElement('span');
+        countSpan.textContent = set.size;
+        pill.appendChild(emSpan);
+        pill.appendChild(countSpan);
+        pill.addEventListener('click', () => {
+            if (socket) socket.emit('toggle-reaction', { msgId, emoji });
+        });
+        row.appendChild(pill);
+    });
+}
+
+// ── Reply bar management ──
+function setReply({ msgId, nickname, preview }) {
+    replyingTo = { msgId, nickname, preview };
+
+    // Remove existing bar if any
+    if (replyBarEl) replyBarEl.remove();
+
+    const chatInputArea = document.querySelector('.chat-input-area');
+    if (!chatInputArea) return;
+
+    replyBarEl = document.createElement('div');
+    replyBarEl.className = 'reply-preview-bar';
+
+    const inner = document.createElement('div');
+    inner.className = 'reply-preview-inner';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'reply-preview-name';
+    nameEl.textContent = nickname;
+
+    const textEl = document.createElement('div');
+    textEl.className = 'reply-preview-text';
+    textEl.textContent = preview;
+
+    inner.appendChild(nameEl);
+    inner.appendChild(textEl);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'reply-cancel-btn';
+    cancelBtn.innerHTML = '&times;';
+    cancelBtn.addEventListener('click', clearReply);
+
+    replyBarEl.appendChild(inner);
+    replyBarEl.appendChild(cancelBtn);
+
+    chatInputArea.insertBefore(replyBarEl, chatInputArea.firstChild);
+    if (messageInput) messageInput.focus();
+}
+
+function clearReply() {
+    replyingTo = null;
+    if (replyBarEl) { replyBarEl.remove(); replyBarEl = null; }
+}
+
+// ── Scroll to quoted message and flash it ──
+function scrollToMessage(msgId) {
+    if (!msgId) return;
+    const target = messagesContainer.querySelector('[data-msg-id="' + msgId + '"]');
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('flash-highlight');
+    void target.offsetWidth; // force reflow to restart animation
+    target.classList.add('flash-highlight');
+    setTimeout(() => target.classList.remove('flash-highlight'), 1400);
 }
 
 // ── Voice Bubble Playback ──
 const _voiceData   = {};   // bubbleId → audio src (base64)
 const _voiceAudios = {};   // bubbleId → Audio instance
+
 
 function toggleVoiceBubble(bubbleId) {
     const src = _voiceData[bubbleId];
