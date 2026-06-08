@@ -655,7 +655,17 @@ function setupEventListeners() {
     });
 
     if (inviteBtn) inviteBtn.addEventListener('click', () => {
-        if (shareSection) shareSection.classList.toggle('hidden');
+        if (shareSection) {
+            shareSection.classList.toggle('hidden');
+            if (!shareSection.classList.contains('hidden')) {
+                if (currentRoomPassword) {
+                    if (sharePasswordArea) sharePasswordArea.style.display = 'block';
+                    if (sharePasswordInput) sharePasswordInput.value = currentRoomPassword;
+                } else {
+                    if (sharePasswordArea) sharePasswordArea.style.display = 'none';
+                }
+            }
+        }
     });
 
     if (copyBtn) copyBtn.addEventListener('click', () => {
@@ -670,6 +680,7 @@ function setupEventListeners() {
             fallbackCopy();
         }
 
+        // Internal helper to support clipboard-incompatible environments
         function fallbackCopy() {
             const wasDisabled = roomLinkInput.disabled;
             roomLinkInput.disabled = false;
@@ -678,6 +689,29 @@ function setupEventListeners() {
             roomLinkInput.disabled = wasDisabled;
             copyBtn.textContent = 'Copied!';
             setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+        }
+    });
+
+    if (copyPasswordBtn) copyPasswordBtn.addEventListener('click', () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(sharePasswordInput.value).then(() => {
+                copyPasswordBtn.textContent = 'Copied!';
+                setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
+            }).catch(() => {
+                fallbackCopyPassword();
+            });
+        } else {
+            fallbackCopyPassword();
+        }
+
+        function fallbackCopyPassword() {
+            const wasDisabled = sharePasswordInput.disabled;
+            sharePasswordInput.disabled = false;
+            sharePasswordInput.select();
+            document.execCommand('copy');
+            sharePasswordInput.disabled = wasDisabled;
+            copyPasswordBtn.textContent = 'Copied!';
+            setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
         }
     });
 
@@ -1079,20 +1113,16 @@ function showChat() {
         onlineStatus.textContent = 'Online';
         onlineStatus.style.color = 'var(--accent)';
     }
-    // Hide invite button by default — shown only once admin status is confirmed
-    if (inviteBtn) inviteBtn.style.display = 'none';
+    // Show invite button by default — visible to all members
+    if (inviteBtn) inviteBtn.style.display = '';
     updateInputsState();
     updateThemeColor();
 }
 
 // Show or hide admin-only UI elements based on current admin status
 function updateAdminUI() {
-    // Invite button (reveals room link + password) — admin only
-    if (inviteBtn) inviteBtn.style.display = amIAdmin ? '' : 'none';
-    // If we lost admin status while share section is open, close it
-    if (!amIAdmin && shareSection && !shareSection.classList.contains('hidden')) {
-        shareSection.classList.add('hidden');
-    }
+    // Invite button (reveals room link + password) — visible to all members
+    if (inviteBtn) inviteBtn.style.display = '';
 }
 
 function showNicknameModal() {
