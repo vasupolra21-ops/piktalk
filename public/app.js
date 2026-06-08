@@ -1604,6 +1604,75 @@ function appendMessage(data, isSentByMe) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+// ── Show Instagram-style reaction sheet ──
+function showReactionSheet(msgId) {
+    const reactions = msgReactions[msgId] || {};
+    // Collect all reactors across all emojis
+    const allReactors = []; // { nickname, profilePic, emoji, isMe }
+    Object.entries(reactions).forEach(([emoji, map]) => {
+        map.forEach((user, sid) => {
+            const { nickname, profilePic } = typeof user === 'object' ? user : { nickname: user, profilePic: null };
+            const isMe = socket && sid === socket.id;
+            allReactors.push({ nickname: isMe ? 'You' : nickname, profilePic, emoji, isMe });
+        });
+    });
+    if (allReactors.length === 0) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'reactions-sheet-overlay';
+
+    const sheet = document.createElement('div');
+    sheet.className = 'reactions-sheet';
+
+    const handle = document.createElement('div');
+    handle.className = 'reactions-sheet-handle';
+
+    const title = document.createElement('div');
+    title.className = 'reactions-sheet-title';
+    title.textContent = 'Reactions';
+
+    sheet.appendChild(handle);
+    sheet.appendChild(title);
+
+    allReactors.forEach(({ nickname, profilePic, emoji, isMe }) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'reactions-sheet-row';
+
+        const av = document.createElement('div');
+        av.className = 'reactions-sheet-avatar';
+        if (profilePic) {
+            const img = document.createElement('img');
+            img.src = profilePic;
+            img.alt = nickname;
+            av.appendChild(img);
+        } else {
+            av.textContent = nickname.charAt(0).toUpperCase();
+            av.style.background = getNicknameColor(nickname);
+        }
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'reactions-sheet-name' + (isMe ? ' is-me' : '');
+        nameEl.textContent = nickname;
+
+        const emojiEl = document.createElement('span');
+        emojiEl.className = 'reactions-sheet-emoji';
+        emojiEl.textContent = emoji;
+
+        rowEl.appendChild(av);
+        rowEl.appendChild(nameEl);
+        rowEl.appendChild(emojiEl);
+        sheet.appendChild(rowEl);
+    });
+
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+
+    // Close on overlay background tap
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+}
+
 // ── Render reaction pills for a msgId ──
 function renderReactions(msgId) {
     const row = document.getElementById('reactions-' + msgId);
@@ -1613,23 +1682,8 @@ function renderReactions(msgId) {
     Object.entries(reactions).forEach(([emoji, map]) => {
         if (map.size === 0) return;
         const pill = document.createElement('button');
-        pill.className = 'reaction-pill' + (socket && map.has(socket.id) ? ' mine' : '');
-
-        // Build reactor list
-        const reactors = [];
-        let hasMe = false;
-        map.forEach((user, sid) => {
-            const { nickname, profilePic } = typeof user === 'object' ? user : { nickname: user, profilePic: null };
-            if (socket && sid === socket.id) {
-                hasMe = true;
-                reactors.unshift({ nickname: 'You', profilePic, isMe: true });
-            } else {
-                reactors.push({ nickname, profilePic, isMe: false });
-            }
-        });
-
-        const tooltipText = reactors.map(r => r.nickname).join(', ');
-        pill.title = tooltipText;
+        const isMine = socket && map.has(socket.id);
+        pill.className = 'reaction-pill' + (isMine ? ' mine' : '');
 
         const emSpan = document.createElement('span');
         emSpan.textContent = emoji;
@@ -1639,43 +1693,28 @@ function renderReactions(msgId) {
         pill.appendChild(emSpan);
         pill.appendChild(countSpan);
 
-        // Rich avatar tooltip
-        if (reactors.length > 0) {
-            const tooltipEl = document.createElement('div');
-            tooltipEl.className = 'reaction-tooltip';
-            reactors.forEach(({ nickname, profilePic, isMe }) => {
-                const row = document.createElement('div');
-                row.className = 'reaction-tooltip-row';
-
-                const av = document.createElement('div');
-                av.className = 'reaction-tooltip-avatar';
-                if (profilePic) {
-                    const img = document.createElement('img');
-                    img.src = profilePic;
-                    img.alt = nickname;
-                    av.appendChild(img);
-                } else {
-                    av.textContent = nickname.charAt(0).toUpperCase();
-                    av.style.background = getNicknameColor(nickname);
-                }
-
-                const nameEl = document.createElement('span');
-                nameEl.className = 'reaction-tooltip-name' + (isMe ? ' reaction-tooltip-me' : '');
-                nameEl.textContent = nickname;
-
-                row.appendChild(av);
-                row.appendChild(nameEl);
-                tooltipEl.appendChild(row);
-            });
-            pill.appendChild(tooltipEl);
-        }
-
-        pill.addEventListener('click', () => {
-            if (socket) socket.emit('toggle-reaction', { msgId, emoji });
+        // Short tap: show the reaction sheet (who reacted)
+        // The toggle is done via the emoji in the quick-react menu above
+        pill.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // If tapping the count area → show sheet; if tapping emoji → toggle
+            showReactionSheet(msgId);
         });
+
+        // Allow toggling by long-press (hold 400ms) or Ctrl+click
+        let holdTimer = null;
+        pill.addEventListener('pointerdown', () => {
+            holdTimer = setTimeout(() => {
+                if (socket) socket.emit('toggle-reaction', { msgId, emoji });
+            }, 600);
+        });
+        pill.addEventListener('pointerup', () => clearTimeout(holdTimer));
+        pill.addEventListener('pointerleave', () => clearTimeout(holdTimer));
+
         row.appendChild(pill);
     });
 }
+
 
 // ── Reply bar management ──
 function setReply({ msgId, nickname, preview }) {
