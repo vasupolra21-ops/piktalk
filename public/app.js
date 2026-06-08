@@ -1568,10 +1568,10 @@ function setReply({ msgId, nickname, preview }) {
     replyBarEl.appendChild(cancelBtn);
 
     chatInputArea.insertBefore(replyBarEl, chatInputArea.firstChild);
-    // Focus after a short delay so the reply bar renders first before the
-    // mobile keyboard opens (which would otherwise shrink the viewport and
-    // hide the textarea before the user sees it).
-    if (messageInput) setTimeout(() => messageInput.focus(), 100);
+    // Call focus immediately — mobile browsers require it to be inside the
+    // user gesture (tap) context to open the keyboard. The layout is protected
+    // by flex-shrink:0 on .chat-input-area so the textarea stays visible.
+    if (messageInput) messageInput.focus();
 }
 
 function clearReply() {
