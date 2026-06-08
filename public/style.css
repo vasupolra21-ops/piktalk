@@ -41,6 +41,10 @@ html {
 html.modal-open,
 body.modal-open {
     background-color: #000000 !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
 }
 
 body.modal-open .animated-bg {
@@ -1814,31 +1818,40 @@ body.light-mode .waveform-bar {
         font-size: 0.95rem;
     }
 
-    /* Smooth shrink transition when typing to keep avatar preview visible and avoid notches */
-    #nickname-modal.keyboard-active .profile-setup {
+    /* Smooth shrink transition when typing to keep elements visible and avoid being pushed offscreen */
+    .modal.keyboard-active .profile-setup {
         margin-bottom: 0.75rem;
     }
 
-    #nickname-modal.keyboard-active .avatar-preview {
+    .modal.keyboard-active .avatar-preview {
         width: 65px;
         height: 65px;
     }
 
-    #nickname-modal.keyboard-active .avatar-preview i {
+    .modal.keyboard-active .avatar-preview i {
         font-size: 1.25rem;
     }
 
-    #nickname-modal.keyboard-active .modal-content input {
-        margin-bottom: 0.75rem;
+    .modal.keyboard-active .modal-content input {
+        margin-bottom: 0.75rem !important;
     }
 
-    #nickname-modal.keyboard-active .modal-content {
+    .modal.keyboard-active .modal-content {
         padding: 1.1rem 1.25rem !important;
     }
 
-    #nickname-modal.keyboard-active h3 {
+    .modal.keyboard-active h3 {
         margin-bottom: 0.6rem !important;
         font-size: 1.2rem !important;
+    }
+
+    .modal.keyboard-active p {
+        margin-bottom: 0.75rem !important;
+    }
+
+    .modal.keyboard-active .room-setup-fields,
+    .modal.keyboard-active .password-input-wrapper {
+        margin-bottom: 0.75rem !important;
     }
 }
 /* ── Profile Picture Crop Modal ── */

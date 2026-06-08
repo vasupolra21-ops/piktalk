@@ -18,7 +18,6 @@ let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRo
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
 let roomNotFoundModal, roomNotFoundHomeBtn;
 let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
-let adminPasswordRow, adminPasswordText, togglePwdBtn;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -84,11 +83,6 @@ function initDOMElements() {
     sharePasswordArea = document.getElementById('share-password-area');
     sharePasswordInput = document.getElementById('share-password-input');
     copyPasswordBtn = document.getElementById('copy-password-btn');
-
-    // Admin-only password row in header
-    adminPasswordRow = document.getElementById('admin-password-row');
-    adminPasswordText = document.getElementById('admin-password-text');
-    togglePwdBtn = document.getElementById('toggle-pwd-btn');
 }
 
 // State
@@ -278,37 +272,61 @@ function initViewportHandler() {
 }
 
 // ── Modal Keyboard Handler ──
-// When nickname input is focused on mobile, hides the avatar setup to save space
-// and slides the modal card UP just enough so both the input AND Join button are visible.
+// When any input inside a modal is focused on mobile, shrinks margins/padding
+// and slides the modal card UP just enough so both the input AND action buttons are visible.
 function initModalKeyboardHandler() {
-    const nicknameInput = document.getElementById('nickname-input');
-    const modal = document.getElementById('nickname-modal');
-    if (!nicknameInput || !modal) return;
-
-    const modalContent = modal.querySelector('.modal-content');
-    if (!modalContent) return;
-
-    nicknameInput.addEventListener('focus', () => {
-        modal.classList.add('keyboard-active');
-        // Wait for the keyboard to fully open before measuring
-        setTimeout(() => {
+    const modals = document.querySelectorAll('.modal');
+    
+    modals.forEach(modal => {
+        const modalContent = modal.querySelector('.modal-content');
+        if (!modalContent) return;
+        
+        const inputs = modal.querySelectorAll('input');
+        let blurTimeout = null;
+        
+        const adjustPosition = () => {
             const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            const cardRect = modalContent.getBoundingClientRect();
-            const cardBottom = cardRect.bottom;
-            // How many px the card overflows below the visible area
-            const overflow = cardBottom - vvHeight + 16; // +16px breathing room
+            
+            // Temporarily reset transform to measure the natural bounding rect
+            modalContent.style.transform = 'none';
+            modalContent.style.transition = 'none';
+            
+            // Force browser layout recalculation
+            modalContent.offsetHeight;
+            
+            const naturalRect = modalContent.getBoundingClientRect();
+            const naturalBottom = naturalRect.bottom;
+            const overflow = naturalBottom - vvHeight + 16; // +16px breathing room
+            
+            modalContent.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
             if (overflow > 0) {
-                modalContent.style.transition = 'transform 0.28s ease';
                 modalContent.style.transform = `translateY(-${overflow}px)`;
+            } else {
+                modalContent.style.transform = 'none';
             }
-        }, 320);
-    });
-
-    nicknameInput.addEventListener('blur', () => {
-        modal.classList.remove('keyboard-active');
-        // Slide back to original centered position
-        modalContent.style.transition = 'transform 0.28s ease';
-        modalContent.style.transform = 'translateY(0)';
+        };
+        
+        inputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                if (blurTimeout) {
+                    clearTimeout(blurTimeout);
+                    blurTimeout = null;
+                }
+                modal.classList.add('keyboard-active');
+                
+                // Adjust position quickly and again once keyboard is fully visible
+                setTimeout(adjustPosition, 50);
+                setTimeout(adjustPosition, 320);
+            });
+            
+            input.addEventListener('blur', () => {
+                blurTimeout = setTimeout(() => {
+                    modal.classList.remove('keyboard-active');
+                    modalContent.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
+                    modalContent.style.transform = 'none';
+                }, 100);
+            });
+        });
     });
 }
 
@@ -387,12 +405,15 @@ function updateThemeColor() {
     
     // Check if any modal is currently visible
     const isNicknameActive = nicknameModal && nicknameModal.classList.contains('active');
+    const isCreateRoomActive = createRoomModal && createRoomModal.classList.contains('active');
+    const isPasswordActive = passwordModal && passwordModal.classList.contains('active');
+    const isNotFoundActive = roomNotFoundModal && roomNotFoundModal.classList.contains('active');
     const cropModal = document.getElementById('crop-modal');
     const isCropActive = cropModal && cropModal.classList.contains('open');
     const membersModal = document.getElementById('members-modal');
     const isMembersActive = membersModal && membersModal.classList.contains('open');
     
-    const isAnyModalActive = isNicknameActive || isCropActive || isMembersActive;
+    const isAnyModalActive = isNicknameActive || isCreateRoomActive || isPasswordActive || isNotFoundActive || isCropActive || isMembersActive;
 
     if (isAnyModalActive) {
         document.documentElement.classList.add('modal-open');
@@ -995,42 +1016,6 @@ function updateAdminUI() {
     // If we lost admin status while share section is open, close it
     if (!amIAdmin && shareSection && !shareSection.classList.contains('hidden')) {
         shareSection.classList.add('hidden');
-    }
-
-    // Admin password row in the header
-    if (adminPasswordRow) {
-        if (amIAdmin) {
-            const pwd = currentRoomPassword;
-            if (pwd) {
-                // Show dots by default, store real value in dataset
-                adminPasswordText.dataset.realPwd = pwd;
-                adminPasswordText.dataset.visible = 'false';
-                adminPasswordText.textContent = '\u2022'.repeat(Math.min(pwd.length, 8));
-                adminPasswordRow.style.display = 'flex';
-
-                // Wire eye toggle (only once)
-                if (togglePwdBtn && !togglePwdBtn._wired) {
-                    togglePwdBtn._wired = true;
-                    togglePwdBtn.addEventListener('click', () => {
-                        const isVisible = adminPasswordText.dataset.visible === 'true';
-                        if (isVisible) {
-                            adminPasswordText.textContent = '\u2022'.repeat(Math.min(adminPasswordText.dataset.realPwd.length, 8));
-                            adminPasswordText.dataset.visible = 'false';
-                            togglePwdBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                        } else {
-                            adminPasswordText.textContent = adminPasswordText.dataset.realPwd;
-                            adminPasswordText.dataset.visible = 'true';
-                            togglePwdBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
-                        }
-                    });
-                }
-            } else {
-                // Room has no password
-                adminPasswordRow.style.display = 'none';
-            }
-        } else {
-            adminPasswordRow.style.display = 'none';
-        }
     }
 }
 
