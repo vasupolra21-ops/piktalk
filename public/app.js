@@ -1302,7 +1302,12 @@ function appendMessage(data, isSentByMe) {
             textSpan.className = 'bubble-text big-emoji-text';
             textSpan.textContent = data.message;
             bubble.appendChild(textSpan);
-            // No timestamp for single emoji (WhatsApp style)
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'bubble-timestamp big-emoji-timestamp';
+            const timeText = document.createTextNode(timeStr);
+            timeSpan.appendChild(timeText);
+            bubble.appendChild(timeSpan);
         } else {
             bubble.className = 'bubble';
             const textSpan = document.createElement('span');
