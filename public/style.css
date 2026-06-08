@@ -1036,9 +1036,20 @@ body.light-mode .bubble-timestamp {
     position: relative;
     padding: 1.5rem;
     display: flex;
-    gap: 12px;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     border-top: 1px solid var(--glass-border);
+    flex-shrink: 0;          /* Never let the messages container squeeze this */
+    overflow: visible;       /* Allow reply bar to stack above naturally */
+}
+
+.chat-input-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
 }
 
 .chat-input-area .input-wrapper-chat {
@@ -1743,6 +1754,7 @@ body.light-mode .waveform-bar {
         padding: 8px 10px;
         padding-bottom: calc(8px + env(safe-area-inset-bottom)); /* Bottom safe area notch support */
         gap: 8px;
+        flex-shrink: 0;    /* Prevent squeeze by messages container on mobile */
     }
     
     body.keyboard-active .chat-input-area {
@@ -2343,15 +2355,13 @@ body.light-mode .member-admin-badge {
     color: var(--primary);
 }
 
-/* ── Reply Preview Bar (above input) ── */
 .reply-preview-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--card-bg);
     border: 1px solid var(--glass-border);
-    border-bottom: none;
-    border-radius: 12px 12px 0 0;
+    border-radius: 12px;
     padding: 8px 14px;
     width: 100%;
     box-sizing: border-box;

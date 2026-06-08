@@ -1568,7 +1568,10 @@ function setReply({ msgId, nickname, preview }) {
     replyBarEl.appendChild(cancelBtn);
 
     chatInputArea.insertBefore(replyBarEl, chatInputArea.firstChild);
-    if (messageInput) messageInput.focus();
+    // Focus after a short delay so the reply bar renders first before the
+    // mobile keyboard opens (which would otherwise shrink the viewport and
+    // hide the textarea before the user sees it).
+    if (messageInput) setTimeout(() => messageInput.focus(), 100);
 }
 
 function clearReply() {
