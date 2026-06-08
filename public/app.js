@@ -1635,7 +1635,7 @@ function appendMessage(data, isSentByMe) {
 }
 
 // ── EMOJI PICKER CATEGORIES ──
-const EMOJI_CATEGORIES = {
+const REACTION_EMOJI_CATEGORIES = {
     smileys: {
         icon: '😀',
         label: 'Smileys & Hands',
@@ -1725,7 +1725,7 @@ function showFullEmojiPanel(msgId, bubbleWrapper) {
 
 function renderCategoryEmojis(catId, gridEl) {
     gridEl.innerHTML = '';
-    const category = EMOJI_CATEGORIES[catId];
+    const category = REACTION_EMOJI_CATEGORIES[catId];
     if (!category) return;
     
     category.emojis.forEach(em => {
