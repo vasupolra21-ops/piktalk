@@ -658,7 +658,7 @@ function setupEventListeners() {
         if (shareSection) {
             shareSection.classList.toggle('hidden');
             if (!shareSection.classList.contains('hidden')) {
-                if (currentRoomPassword) {
+                if (currentRoomPassword && amIAdmin) {
                     if (sharePasswordArea) sharePasswordArea.style.display = 'block';
                     if (sharePasswordInput) sharePasswordInput.value = currentRoomPassword;
                 } else {
@@ -1123,6 +1123,10 @@ function showChat() {
 function updateAdminUI() {
     // Invite button (reveals room link + password) — visible to all members
     if (inviteBtn) inviteBtn.style.display = '';
+    // Only the admin should see the password in the sharing overlay
+    if (!amIAdmin && sharePasswordArea) {
+        sharePasswordArea.style.display = 'none';
+    }
 }
 
 function showNicknameModal() {
