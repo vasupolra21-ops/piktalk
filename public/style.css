@@ -2406,21 +2406,26 @@ body.light-mode .member-admin-badge {
 .reply-quote {
     display: flex;
     flex-direction: column;
-    border-left: 3px solid var(--primary);
-    background: rgba(0,0,0,0.08);
-    border-radius: 4px 8px 8px 4px;
-    padding: 5px 10px;
-    margin-bottom: 5px;
+    border-left: 4px solid var(--primary);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
     font-size: 0.8rem;
     cursor: pointer;
     transition: background 0.15s;
+    flex-basis: 100%; /* force to occupy full row in the wrap flex container */
+    width: 100%;
+    box-sizing: border-box;
 }
-body.light-mode .reply-quote { background: rgba(0,0,0,0.05); }
-.reply-quote:hover { background: rgba(0,0,0,0.13); }
+body.light-mode .reply-quote { background: rgba(0, 0, 0, 0.05); }
+.reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
+body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
+
 .reply-quote-name {
     font-weight: 700;
     color: var(--primary);
-    margin-bottom: 1px;
+    margin-bottom: 2px;
     font-size: 0.78rem;
 }
 .reply-quote-text {
@@ -2432,6 +2437,21 @@ body.light-mode .reply-quote { background: rgba(0,0,0,0.05); }
     -webkit-box-orient: vertical;
     white-space: normal;
     font-size: 0.8rem;
+}
+
+/* Sent message override for dark/light mode readability inside primary-colored bubble */
+.message.sent .reply-quote {
+    border-left-color: #ffffff;
+    background: rgba(255, 255, 255, 0.18);
+}
+.message.sent .reply-quote:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+.message.sent .reply-quote-name {
+    color: #ffffff !important;
+}
+.message.sent .reply-quote-text {
+    color: rgba(255, 255, 255, 0.88) !important;
 }
 
 /* ── Highlight flash when jumping to quoted message ── */
