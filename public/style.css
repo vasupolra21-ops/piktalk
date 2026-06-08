@@ -2253,6 +2253,24 @@ body.light-mode .member-admin-badge {
 .message.sent .msg-action-bar  { right: calc(100% + 6px); flex-direction: row-reverse; }
 .message.received .msg-action-bar { left: calc(100% + 6px); }
 
+/* Bridge the hover gap between bubble and action bar */
+.msg-action-bar::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    bottom: -10px;
+    background: transparent;
+    z-index: -1;
+}
+.message.sent .msg-action-bar::before {
+    left: -10px;
+    right: -20px;
+}
+.message.received .msg-action-bar::before {
+    right: -10px;
+    left: -20px;
+}
+
 .message:hover .msg-action-bar,
 .message.action-visible .msg-action-bar {
     opacity: 1;
@@ -2334,6 +2352,7 @@ body.light-mode .member-admin-badge {
 .message.received .reaction-row { justify-content: flex-start; }
 
 .reaction-pill {
+    position: relative;
     background: var(--card-bg);
     border: 1.5px solid var(--glass-border);
     border-radius: 20px;
@@ -2353,6 +2372,44 @@ body.light-mode .member-admin-badge {
     border-color: var(--primary);
     background: rgba(99,102,241,0.15);
     color: var(--primary);
+}
+
+/* Premium Glassmorphic Tooltip for Reactions */
+.reaction-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--text-main);
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 100;
+}
+
+.reaction-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: var(--card-bg);
+}
+
+.reaction-pill:hover .reaction-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .reply-preview-bar {

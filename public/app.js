@@ -20,7 +20,7 @@ let roomNotFoundModal, roomNotFoundHomeBtn;
 let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
 
 // Reactions + Reply state
-const msgReactions = {};   // msgId → { emoji → Set<socketId> }
+const msgReactions = {};   // msgId → { emoji → Map<socketId, nickname> }
 let replyingTo = null;     // { msgId, nickname, preview } or null
 let replyBarEl = null;     // the reply preview bar DOM element
 
@@ -1080,13 +1080,13 @@ if (socket) {
     });
 
     // Real-time reaction update
-    socket.on('reaction-toggled', ({ msgId, emoji, socketId }) => {
+    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname }) => {
         if (!msgReactions[msgId]) msgReactions[msgId] = {};
-        if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Set();
-        const set = msgReactions[msgId][emoji];
-        if (set.has(socketId)) set.delete(socketId);
-        else set.add(socketId);
-        if (set.size === 0) delete msgReactions[msgId][emoji];
+        if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
+        const map = msgReactions[msgId][emoji];
+        if (map.has(socketId)) map.delete(socketId);
+        else map.set(socketId, nickname || 'Anonymous');
+        if (map.size === 0) delete msgReactions[msgId][emoji];
         renderReactions(msgId);
     });
 
@@ -1514,17 +1514,43 @@ function renderReactions(msgId) {
     if (!row) return;
     row.innerHTML = '';
     const reactions = msgReactions[msgId] || {};
-    Object.entries(reactions).forEach(([emoji, set]) => {
-        if (set.size === 0) return;
+    Object.entries(reactions).forEach(([emoji, map]) => {
+        if (map.size === 0) return;
         const pill = document.createElement('button');
-        pill.className = 'reaction-pill' + (socket && set.has(socket.id) ? ' mine' : '');
-        pill.title = [...set].length + ' reaction(s)';
+        pill.className = 'reaction-pill' + (socket && map.has(socket.id) ? ' mine' : '');
+        
+        // Build tooltip content of user names
+        const names = [];
+        let hasMe = false;
+        map.forEach((nick, sid) => {
+            if (socket && sid === socket.id) {
+                hasMe = true;
+            } else {
+                names.push(nick);
+            }
+        });
+        if (hasMe) {
+            names.unshift('You');
+        }
+        const tooltipText = names.join(', ');
+        pill.title = tooltipText;
+        
         const emSpan = document.createElement('span');
         emSpan.textContent = emoji;
         const countSpan = document.createElement('span');
-        countSpan.textContent = set.size;
+        countSpan.textContent = map.size;
+        
         pill.appendChild(emSpan);
         pill.appendChild(countSpan);
+        
+        // Custom glassmorphic tooltip element
+        if (tooltipText) {
+            const tooltipEl = document.createElement('span');
+            tooltipEl.className = 'reaction-tooltip';
+            tooltipEl.textContent = tooltipText;
+            pill.appendChild(tooltipEl);
+        }
+        
         pill.addEventListener('click', () => {
             if (socket) socket.emit('toggle-reaction', { msgId, emoji });
         });
