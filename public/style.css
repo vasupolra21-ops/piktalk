@@ -2550,3 +2550,121 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     align-items: flex-start;
 }
 
+/* ── Premium Connecting Overlay & Reaction Tooltip Avatar Styles ── */
+#connecting-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1500;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.connecting-box {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 30px 40px;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    max-width: 90%;
+    width: 320px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    animation: scaleUpOverlay 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes scaleUpOverlay {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.connecting-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(99, 102, 241, 0.15);
+    border-radius: 50%;
+    border-top-color: var(--primary);
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.connecting-room-id {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.connecting-room-id strong {
+    color: var(--primary);
+}
+
+.connecting-status {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* Reaction Tooltip Enhancements */
+.reaction-tooltip {
+    display: flex !important;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    min-width: 120px;
+    white-space: normal;
+}
+
+.reaction-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.reaction-tooltip-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+.reaction-tooltip-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.reaction-tooltip-name {
+    font-size: 0.75rem;
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.reaction-tooltip-me {
+    font-weight: 600;
+    color: var(--primary);
+}
+

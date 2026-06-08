@@ -3,7 +3,9 @@ let socket;
 try {
     socket = io({
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 5
+        reconnectionAttempts: 5,
+        timeout: 8000,
+        reconnectionDelay: 300
     });
 } catch (e) {
     console.error("Socket.io initialization failed:", e);
@@ -176,6 +178,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
     if (path.startsWith('/chat/')) {
         currentRoomID = path.split('/chat/')[1];
+
+        // ── Show connecting overlay instantly – don't wait for socket ──
+        showConnectingOverlay(currentRoomID);
+
         const checkDirectRoom = () => {
             if (socket) {
                 socket.emit('check-room', { roomID: currentRoomID });
@@ -186,6 +192,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 checkDirectRoom();
             } else {
                 socket.once('connect', checkDirectRoom);
+                // Fallback: if socket takes > 6s, retry once
+                setTimeout(() => {
+                    if (socket && !socket.connected) {
+                        socket.connect();
+                    }
+                }, 6000);
             }
         }
     } else {
@@ -999,9 +1011,58 @@ function toggleTheme() {
 
 function showHome() {
     [homeView, chatView, nicknameModal, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
+    // Remove connecting overlay if present
+    const existingOverlay = document.getElementById('connecting-overlay');
+    if (existingOverlay) existingOverlay.remove();
     if (homeView) homeView.classList.add('active');
     updateInputsState();
     updateThemeColor();
+}
+
+// ── Instant connecting overlay shown before socket handshakes ──
+function showConnectingOverlay(roomID) {
+    // Hide home so user doesn't see it flash
+    if (homeView) homeView.classList.remove('active');
+
+    let overlay = document.getElementById('connecting-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'connecting-overlay';
+        overlay.innerHTML = `
+            <div class="connecting-box">
+                <div class="connecting-spinner"></div>
+                <div class="connecting-room-id">Room: <strong>${roomID}</strong></div>
+                <div class="connecting-status">Connecting to room&hellip;</div>
+                <button id="connecting-cancel-btn" class="btn btn-secondary" style="margin-top: 10px; font-size: 0.85rem; padding: 6px 12px; display: none;">Go Back</button>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        // Show cancel button and update status if it takes more than 4 seconds
+        setTimeout(() => {
+            const cancelBtn = document.getElementById('connecting-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.style.display = 'block';
+                cancelBtn.onclick = () => {
+                    hideConnectingOverlay();
+                    showHome();
+                    window.history.pushState({}, '', '/');
+                };
+            }
+            const statusEl = overlay.querySelector('.connecting-status');
+            if (statusEl) {
+                statusEl.textContent = 'Server is waking up, please wait&hellip;';
+            }
+        }, 4000);
+    }
+}
+
+function hideConnectingOverlay() {
+    const overlay = document.getElementById('connecting-overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => overlay.remove(), 300);
+    }
 }
 
 function showChat() {
@@ -1080,12 +1141,12 @@ if (socket) {
     });
 
     // Real-time reaction update
-    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname }) => {
+    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic }) => {
         if (!msgReactions[msgId]) msgReactions[msgId] = {};
         if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
         const map = msgReactions[msgId][emoji];
         if (map.has(socketId)) map.delete(socketId);
-        else map.set(socketId, nickname || 'Anonymous');
+        else map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
         if (map.size === 0) delete msgReactions[msgId][emoji];
         renderReactions(msgId);
     });
@@ -1161,6 +1222,7 @@ if (socket) {
 
     // Room presence and password requirement verification
     socket.on('room-checked', ({ roomID, exists, hasPassword }) => {
+        hideConnectingOverlay();
         if (!exists) {
             if (roomNotFoundModal) roomNotFoundModal.classList.add('active');
             updateInputsState();
@@ -1518,39 +1580,62 @@ function renderReactions(msgId) {
         if (map.size === 0) return;
         const pill = document.createElement('button');
         pill.className = 'reaction-pill' + (socket && map.has(socket.id) ? ' mine' : '');
-        
-        // Build tooltip content of user names
-        const names = [];
+
+        // Build reactor list
+        const reactors = [];
         let hasMe = false;
-        map.forEach((nick, sid) => {
+        map.forEach((user, sid) => {
+            const { nickname, profilePic } = typeof user === 'object' ? user : { nickname: user, profilePic: null };
             if (socket && sid === socket.id) {
                 hasMe = true;
+                reactors.unshift({ nickname: 'You', profilePic, isMe: true });
             } else {
-                names.push(nick);
+                reactors.push({ nickname, profilePic, isMe: false });
             }
         });
-        if (hasMe) {
-            names.unshift('You');
-        }
-        const tooltipText = names.join(', ');
+
+        const tooltipText = reactors.map(r => r.nickname).join(', ');
         pill.title = tooltipText;
-        
+
         const emSpan = document.createElement('span');
         emSpan.textContent = emoji;
         const countSpan = document.createElement('span');
         countSpan.textContent = map.size;
-        
+
         pill.appendChild(emSpan);
         pill.appendChild(countSpan);
-        
-        // Custom glassmorphic tooltip element
-        if (tooltipText) {
-            const tooltipEl = document.createElement('span');
+
+        // Rich avatar tooltip
+        if (reactors.length > 0) {
+            const tooltipEl = document.createElement('div');
             tooltipEl.className = 'reaction-tooltip';
-            tooltipEl.textContent = tooltipText;
+            reactors.forEach(({ nickname, profilePic, isMe }) => {
+                const row = document.createElement('div');
+                row.className = 'reaction-tooltip-row';
+
+                const av = document.createElement('div');
+                av.className = 'reaction-tooltip-avatar';
+                if (profilePic) {
+                    const img = document.createElement('img');
+                    img.src = profilePic;
+                    img.alt = nickname;
+                    av.appendChild(img);
+                } else {
+                    av.textContent = nickname.charAt(0).toUpperCase();
+                    av.style.background = getNicknameColor(nickname);
+                }
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'reaction-tooltip-name' + (isMe ? ' reaction-tooltip-me' : '');
+                nameEl.textContent = nickname;
+
+                row.appendChild(av);
+                row.appendChild(nameEl);
+                tooltipEl.appendChild(row);
+            });
             pill.appendChild(tooltipEl);
         }
-        
+
         pill.addEventListener('click', () => {
             if (socket) socket.emit('toggle-reaction', { msgId, emoji });
         });

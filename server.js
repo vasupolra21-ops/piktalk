@@ -216,7 +216,8 @@ io.on('connection', (socket) => {
                 msgId,
                 emoji,
                 socketId: socket.id,
-                nickname: user.nickname
+                nickname: user.nickname,
+                profilePic: user.profilePic || null
             });
         }
     });
