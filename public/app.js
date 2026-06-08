@@ -19,7 +19,6 @@ let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, 
 let roomNotFoundModal, roomNotFoundHomeBtn;
 let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
 let adminPasswordRow, adminPasswordText, togglePwdBtn;
-let replyPreviewBar, replyPreviewSender, replyPreviewText, cancelReplyBtn;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -90,12 +89,6 @@ function initDOMElements() {
     adminPasswordRow = document.getElementById('admin-password-row');
     adminPasswordText = document.getElementById('admin-password-text');
     togglePwdBtn = document.getElementById('toggle-pwd-btn');
-
-    // Reply preview bar elements
-    replyPreviewBar = document.getElementById('reply-preview-bar');
-    replyPreviewSender = document.getElementById('reply-preview-sender');
-    replyPreviewText = document.getElementById('reply-preview-text');
-    cancelReplyBtn = document.getElementById('cancel-reply-btn');
 }
 
 // State
@@ -106,8 +99,6 @@ let serverIP = null;
 let serverPort = null;
 let currentRoomPassword = null;
 let amIAdmin = false; // true only for the room creator / current admin
-let replyingToMessage = null;
-const messageReactions = {};
 
 // Persistent user identity — stored in sessionStorage (isolated per browser tab/window)
 function getOrCreateUserId() {
@@ -650,34 +641,9 @@ function setupEventListeners() {
         }
     });
 
-    if (copyPasswordBtn) copyPasswordBtn.addEventListener('click', () => {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(sharePasswordInput.value).then(() => {
-                copyPasswordBtn.textContent = 'Copied!';
-                setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
-            }).catch(() => {
-                fallbackCopyPassword();
-            });
-        } else {
-            fallbackCopyPassword();
-        }
-
-        function fallbackCopyPassword() {
-            const wasDisabled = sharePasswordInput.disabled;
-            sharePasswordInput.disabled = false;
-            sharePasswordInput.select();
-            document.execCommand('copy');
-            sharePasswordInput.disabled = wasDisabled;
-            copyPasswordBtn.textContent = 'Copied!';
-            setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
-        }
-    });
-
     if (leaveBtn) leaveBtn.addEventListener('click', () => {
         window.location.href = '/';
     });
-
-    if (cancelReplyBtn) cancelReplyBtn.addEventListener('click', cancelReply);
 
     if (emojiBtn) emojiBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -695,12 +661,6 @@ function setupEventListeners() {
         if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
             emojiPicker.classList.add('hidden');
         }
-        // Hide active quick reaction menus
-        document.querySelectorAll('.quick-react-menu.visible').forEach(menu => {
-            if (!menu.contains(e.target) && !e.target.classList.contains('react-btn') && !e.target.closest('.react-btn')) {
-                menu.classList.remove('visible');
-            }
-        });
     });
 
     if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
@@ -766,10 +726,15 @@ function setupEventListeners() {
             // Send raw GIF to preserve animation
             const reader = new FileReader();
             reader.onload = (e) => {
-                emitSendMessage({
-                    message: '',
-                    image: e.target.result
-                });
+                if (socket) {
+                    socket.emit('send-message', {
+                        roomID: currentRoomID,
+                        message: '',
+                        image: e.target.result
+                    });
+                } else {
+                    alert("Not connected to server. Image could not be sent.");
+                }
             };
             reader.readAsDataURL(file);
         } else {
@@ -800,17 +765,25 @@ function setupEventListeners() {
                     ctx.drawImage(img, 0, 0, width, height);
 
                     const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    emitSendMessage({
-                        message: '',
-                        image: compressedBase64
-                    });
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: compressedBase64
+                        });
+                    } else {
+                        alert("Not connected to server. Image could not be sent.");
+                    }
                 };
                 img.onerror = () => {
                     // Fallback to sending original base64 if drawing to canvas fails
-                    emitSendMessage({
-                        message: '',
-                        image: e.target.result
-                    });
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: e.target.result
+                        });
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -964,7 +937,8 @@ function sendVoiceMessage() {
     reader.onload = (e) => {
         if (socket) {
             socket.emit('voice-recording-stop'); // clear indicator before send
-            emitSendMessage({
+            socket.emit('send-message', {
+                roomID: currentRoomID,
                 message: '',
                 audio: e.target.result,
                 audioDuration: recordingSeconds
@@ -1058,17 +1032,6 @@ function updateAdminUI() {
             adminPasswordRow.style.display = 'none';
         }
     }
-
-    // Admin password sharing area
-    if (sharePasswordArea && sharePasswordInput) {
-        if (amIAdmin && currentRoomPassword) {
-            sharePasswordInput.value = currentRoomPassword;
-            sharePasswordArea.style.display = 'block';
-        } else {
-            sharePasswordInput.value = '';
-            sharePasswordArea.style.display = 'none';
-        }
-    }
 }
 
 function showNicknameModal() {
@@ -1082,143 +1045,12 @@ function showNicknameModal() {
     updateThemeColor();
 }
 
-function emitSendMessage(extraData) {
-    if (!socket) return;
-    const payload = {
-        roomID: currentRoomID,
-        ...extraData
-    };
-    if (replyingToMessage) {
-        payload.replyTo = {
-            msgId: replyingToMessage.msgId,
-            nickname: replyingToMessage.nickname,
-            message: replyingToMessage.message,
-            image: replyingToMessage.image,
-            audio: replyingToMessage.audio
-        };
-        cancelReply();
-    }
-    socket.emit('send-message', payload);
-}
-
-function setReplyingTo(msgId) {
-    const msgEl = document.querySelector(`.message[data-msg-id="${msgId}"]`);
-    if (!msgEl) return;
-
-    const nickname = msgEl.dataset.nickname || '';
-    const message = msgEl.dataset.message || '';
-    const image = msgEl.dataset.image === 'true';
-    const audio = msgEl.dataset.audio === 'true';
-
-    replyingToMessage = { msgId, nickname, message, image, audio };
-
-    if (replyPreviewSender) replyPreviewSender.textContent = `Replying to ${nickname}`;
-    
-    if (replyPreviewText) {
-        if (image) {
-            replyPreviewText.innerHTML = '<i class="fas fa-camera"></i> Photo';
-        } else if (audio) {
-            replyPreviewText.innerHTML = '<i class="fas fa-microphone"></i> Voice message';
-        } else {
-            replyPreviewText.textContent = message;
-        }
-    }
-
-    if (replyPreviewBar) {
-        replyPreviewBar.classList.remove('hidden');
-    }
-    
-    // Focus message input so user can type reply immediately
-    if (messageInput && !messageInput.disabled) {
-        messageInput.focus();
-    }
-}
-
-function toggleReaction(msgId, emoji) {
-    if (socket) {
-        socket.emit('toggle-reaction', { msgId, emoji });
-    }
-}
-
-function updateMessageReactionsUI(msgId) {
-    const msgEl = document.querySelector(`.message[data-msg-id="${msgId}"]`);
-    if (!msgEl) return;
-
-    let reactionsContainer = msgEl.querySelector('.message-reactions');
-    if (!reactionsContainer) {
-        reactionsContainer = document.createElement('div');
-        reactionsContainer.className = 'message-reactions';
-        
-        const bubbleWrapper = msgEl.querySelector('.bubble-wrapper');
-        if (bubbleWrapper) {
-            bubbleWrapper.appendChild(reactionsContainer);
-        } else {
-            const contentDiv = msgEl.querySelector('.message-content');
-            if (contentDiv) contentDiv.appendChild(reactionsContainer);
-        }
-    }
-
-    reactionsContainer.innerHTML = '';
-
-    const reactions = messageReactions[msgId] || {};
-    let totalReactionsCount = 0;
-
-    Object.entries(reactions).forEach(([emoji, usersList]) => {
-        if (usersList.length === 0) return;
-        totalReactionsCount += usersList.length;
-
-        const pill = document.createElement('div');
-        pill.className = 'reaction-pill';
-
-        const didIReact = usersList.some(u => u.socketId === socket.id);
-        if (didIReact) {
-            pill.classList.add('active');
-        }
-
-        const emojiSpan = document.createElement('span');
-        emojiSpan.className = 'reaction-pill-emoji';
-        emojiSpan.textContent = emoji;
-
-        const countSpan = document.createElement('span');
-        countSpan.className = 'reaction-pill-count';
-        countSpan.textContent = usersList.length;
-
-        pill.appendChild(emojiSpan);
-        pill.appendChild(countSpan);
-
-        const names = usersList.map(u => u.nickname).join(', ');
-        pill.title = names;
-
-        pill.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleReaction(msgId, emoji);
-        });
-
-        reactionsContainer.appendChild(pill);
-    });
-
-    if (totalReactionsCount === 0) {
-        reactionsContainer.remove();
-        msgEl.classList.remove('has-reactions');
-    } else {
-        msgEl.classList.add('has-reactions');
-    }
-}
-
-function cancelReply() {
-    replyingToMessage = null;
-    if (replyPreviewBar) {
-        replyPreviewBar.classList.add('hidden');
-    }
-    if (replyPreviewSender) replyPreviewSender.textContent = '';
-    if (replyPreviewText) replyPreviewText.innerHTML = '';
-}
-
 function sendMessage() {
     const text = messageInput.value.trim();
     if (text && currentRoomID) {
         if (socket) {
-            emitSendMessage({
+            socket.emit('send-message', {
+                roomID: currentRoomID,
                 message: text
             });
             messageInput.value = '';
@@ -1252,45 +1084,6 @@ if (socket) {
         hideTyping(); // hide typing bubble when message arrives
         appendMessage(data, data.id === socket.id);
         if (msgSound) msgSound.play().catch(() => {});
-    });
-
-    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname }) => {
-        if (!messageReactions[msgId]) {
-            messageReactions[msgId] = {};
-        }
-        
-        const reactions = messageReactions[msgId];
-        let wasSameReaction = false;
-        
-        // WhatsApp rule: 1 reaction per user per message.
-        // First, check if this user has already reacted and remove it.
-        Object.keys(reactions).forEach(e => {
-            const list = reactions[e];
-            const idx = list.findIndex(u => u.socketId === socketId);
-            if (idx !== -1) {
-                list.splice(idx, 1);
-                if (e === emoji) {
-                    wasSameReaction = true;
-                }
-            }
-        });
-        
-        // Add new reaction if it wasn't a toggle-off
-        if (!wasSameReaction) {
-            if (!reactions[emoji]) {
-                reactions[emoji] = [];
-            }
-            reactions[emoji].push({ socketId, nickname });
-        }
-        
-        // Clean up empty emoji reaction groups
-        Object.keys(reactions).forEach(e => {
-            if (reactions[e].length === 0) {
-                delete reactions[e];
-            }
-        });
-        
-        updateMessageReactionsUI(msgId);
     });
 
     socket.on('system-message', (data) => {
@@ -1484,18 +1277,8 @@ function isSingleEmoji(str) {
 
 function appendMessage(data, isSentByMe) {
     if (!messagesContainer) return;
-    
-    const msgId = data.msgId || ('msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
-    
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
-    msgDiv.setAttribute('data-msg-id', msgId);
-    msgDiv.dataset.msgId = msgId;
-    msgDiv.dataset.nickname = data.nickname;
-    msgDiv.dataset.message = data.message || '';
-    msgDiv.dataset.image = !!data.image;
-    msgDiv.dataset.audio = !!data.audio;
-    
     if (isSentByMe) msgDiv.classList.add('sent');
 
     const color = isSentByMe ? 'var(--text-muted)' : getNicknameColor(data.nickname);
@@ -1610,47 +1393,6 @@ function appendMessage(data, isSentByMe) {
         contentEl = bubble;
     }
 
-    // Prepend quoted message if this message is a reply
-    if (data.replyTo) {
-        const replyQuote = document.createElement('div');
-        replyQuote.className = 'reply-quote-bubble';
-        
-        const quoteColor = data.replyTo.nickname === data.nickname ? 'var(--primary)' : getNicknameColor(data.replyTo.nickname);
-        replyQuote.style.borderLeftColor = quoteColor;
-        
-        const senderSpan = document.createElement('span');
-        senderSpan.className = 'reply-quote-sender';
-        senderSpan.style.color = quoteColor;
-        senderSpan.textContent = data.replyTo.nickname;
-        replyQuote.appendChild(senderSpan);
-        
-        const textSpan = document.createElement('span');
-        textSpan.className = 'reply-quote-text';
-        if (data.replyTo.image) {
-            textSpan.innerHTML = '<i class="fas fa-camera"></i> Photo';
-        } else if (data.replyTo.audio) {
-            textSpan.innerHTML = '<i class="fas fa-microphone"></i> Voice message';
-        } else {
-            textSpan.textContent = data.replyTo.message;
-        }
-        replyQuote.appendChild(textSpan);
-        
-        const targetId = data.replyTo.msgId;
-        replyQuote.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const targetEl = document.querySelector(`.message[data-msg-id="${targetId}"]`);
-            if (targetEl) {
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                targetEl.classList.add('highlight-message');
-                setTimeout(() => {
-                    targetEl.classList.remove('highlight-message');
-                }, 1500);
-            }
-        });
-        
-        contentEl.insertBefore(replyQuote, contentEl.firstChild);
-    }
-
     // Build message DOM directly (no innerHTML with user data)
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
@@ -1665,86 +1407,14 @@ function appendMessage(data, isSentByMe) {
         msgDiv.appendChild(infoDiv);
     }
 
-    // Wrap the bubble (contentEl) in a relative container
-    const bubbleWrapper = document.createElement('div');
-    bubbleWrapper.className = 'bubble-wrapper';
-    bubbleWrapper.appendChild(contentEl);
-
-    // Create action toolbar
-    const toolbar = document.createElement('div');
-    toolbar.className = 'message-actions-toolbar';
-
-    const replyBtn = document.createElement('button');
-    replyBtn.className = 'msg-action-btn reply-btn';
-    replyBtn.title = 'Reply';
-    replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
-    replyBtn.addEventListener('click', () => {
-        setReplyingTo(msgId);
-    });
-
-    const reactContainer = document.createElement('div');
-    reactContainer.className = 'react-menu-container';
-
-    const reactBtn = document.createElement('button');
-    reactBtn.className = 'msg-action-btn react-btn';
-    reactBtn.title = 'React';
-    reactBtn.innerHTML = '<i class="far fa-smile"></i>';
-
-    const emojiMenu = document.createElement('div');
-    emojiMenu.className = 'quick-react-menu';
-
-    const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '😡'];
-    quickEmojis.forEach(em => {
-        const emojiSpan = document.createElement('span');
-        emojiSpan.className = 'react-emoji';
-        emojiSpan.textContent = em;
-        emojiSpan.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleReaction(msgId, em);
-            emojiMenu.classList.remove('visible');
-        });
-        emojiMenu.appendChild(emojiSpan);
-    });
-
-    reactContainer.appendChild(reactBtn);
-    reactContainer.appendChild(emojiMenu);
-
-    toolbar.appendChild(replyBtn);
-    toolbar.appendChild(reactContainer);
-
-    // Long press toggle for mobile
-    let touchTimeout;
-    contentEl.addEventListener('touchstart', (e) => {
-        touchTimeout = setTimeout(() => {
-            document.querySelectorAll('.quick-react-menu.visible').forEach(menu => {
-                if (menu !== emojiMenu) menu.classList.remove('visible');
-            });
-            emojiMenu.classList.toggle('visible');
-        }, 500);
-    });
-    contentEl.addEventListener('touchend', () => clearTimeout(touchTimeout));
-    contentEl.addEventListener('touchmove', () => clearTimeout(touchTimeout));
-
-    reactBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        document.querySelectorAll('.quick-react-menu.visible').forEach(menu => {
-            if (menu !== emojiMenu) menu.classList.remove('visible');
-        });
-        emojiMenu.classList.toggle('visible');
-    });
-
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     if (avatar) contentDiv.innerHTML = avatar; // avatar is safe HTML we generate
-    contentDiv.appendChild(bubbleWrapper);
-    contentDiv.appendChild(toolbar);
+    contentDiv.appendChild(contentEl);
 
     msgDiv.appendChild(contentDiv);
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-    // Render any reactions that arrived before/during rendering
-    updateMessageReactionsUI(msgId);
 }
 
 // ── Voice Bubble Playback ──

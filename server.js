@@ -192,29 +192,15 @@ io.on('connection', (socket) => {
         const user = users[socket.id];
         if (user) {
             const messageData = {
-                msgId: uuidv4(),
                 id: socket.id,
                 nickname: data.nickname || user.nickname,
                 message: data.message,
                 image: data.image,
                 audio: data.audio,
                 audioDuration: data.audioDuration,
-                profilePic: data.profilePic || user.profilePic,
-                replyTo: data.replyTo || null
+                profilePic: data.profilePic || user.profilePic
             };
             io.to(user.roomID).emit('receive-message', messageData);
-        }
-    });
-
-    socket.on('toggle-reaction', ({ msgId, emoji }) => {
-        const user = users[socket.id];
-        if (user) {
-            io.to(user.roomID).emit('reaction-toggled', {
-                msgId,
-                emoji,
-                socketId: socket.id,
-                nickname: user.nickname
-            });
         }
     });
 
