@@ -1,8 +1,8 @@
-// Initialize Socket.io with error handling (polling first for instant connection, then upgrade)
+// Initialize Socket.io – websocket-first for fastest connection
 let socket;
 try {
     socket = io({
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'],
         reconnectionAttempts: 5
     });
 } catch (e) {

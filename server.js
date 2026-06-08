@@ -26,16 +26,18 @@ app.get('/ping', (req, res) => {
 
 // Serve static files with robust caching headers
 app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: '1d', // Cache static assets for 1 day
+    maxAge: '7d',   // Cache CSS/JS/images for 7 days (versioned via ?v=N)
+    etag: true,     // ETags allow 304 Not Modified on repeat visits
+    lastModified: true,
     setHeaders: (res, filePath) => {
-        // Do not cache HTML files to ensure users always get the latest version
+        // HTML: never cache — always serve the latest version
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
         } else {
-            // Cache other assets (CSS, JS, Fonts, Images) aggressively
-            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            // Versioned assets (CSS, JS, images, fonts) — cache immutably for 7 days
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
         }
     }
 }));
