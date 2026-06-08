@@ -1175,8 +1175,13 @@ if (socket) {
     });
 
     // Real-time reaction update
-    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic }) => {
+    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic, previousEmoji }) => {
         if (!msgReactions[msgId]) msgReactions[msgId] = {};
+        // Remove previous reaction if the user switched emojis (1 reaction per person)
+        if (previousEmoji && previousEmoji !== emoji && msgReactions[msgId][previousEmoji]) {
+            msgReactions[msgId][previousEmoji].delete(socketId);
+            if (msgReactions[msgId][previousEmoji].size === 0) delete msgReactions[msgId][previousEmoji];
+        }
         if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
         const map = msgReactions[msgId][emoji];
         if (map.has(socketId)) map.delete(socketId);
@@ -1533,7 +1538,7 @@ function appendMessage(data, isSentByMe) {
         // Quick react popup
         const quickMenu = document.createElement('div');
         quickMenu.className = 'quick-react-menu';
-        const EMOJIS = ['👍','❤️','😂','😮','😢','😡'];
+        const EMOJIS = ['❤️','👍','😂','😮','😢','😡','🔥','🎉','🥰','😍','🤣','😭','👏','🙏','💯','😱','🤔','💪','😎','🥳'];
         EMOJIS.forEach(em => {
             const btn = document.createElement('button');
             btn.className = 'quick-react-btn';
@@ -1542,7 +1547,9 @@ function appendMessage(data, isSentByMe) {
                 e.stopPropagation();
                 quickMenu.classList.remove('visible');
                 msgDiv.classList.remove('action-visible');
-                if (socket) socket.emit('toggle-reaction', { msgId: data.msgId, emoji: em });
+                // Find any existing reaction from this user on this message
+                const previousEmoji = getMyReactionOnMsg(data.msgId);
+                if (socket) socket.emit('toggle-reaction', { msgId: data.msgId, emoji: em, previousEmoji });
             });
             quickMenu.appendChild(btn);
         });
@@ -1604,6 +1611,15 @@ function appendMessage(data, isSentByMe) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+// ── Helper: find this user's current emoji on a message ──
+function getMyReactionOnMsg(msgId) {
+    if (!socket || !msgReactions[msgId]) return null;
+    for (const [emoji, map] of Object.entries(msgReactions[msgId])) {
+        if (map.has(socket.id)) return emoji;
+    }
+    return null;
+}
+
 // ── Show Instagram-style reaction sheet ──
 function showReactionSheet(msgId) {
     const reactions = msgReactions[msgId] || {};
@@ -1661,6 +1677,20 @@ function showReactionSheet(msgId) {
         rowEl.appendChild(av);
         rowEl.appendChild(nameEl);
         rowEl.appendChild(emojiEl);
+
+        // If this is the current user's row, add a Remove button
+        if (isMe) {
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'reactions-sheet-remove-btn';
+            removeBtn.textContent = 'Remove';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (socket) socket.emit('toggle-reaction', { msgId, emoji, previousEmoji: null });
+                overlay.remove();
+            });
+            rowEl.appendChild(removeBtn);
+        }
+
         sheet.appendChild(rowEl);
     });
 
@@ -1693,23 +1723,11 @@ function renderReactions(msgId) {
         pill.appendChild(emSpan);
         pill.appendChild(countSpan);
 
-        // Short tap: show the reaction sheet (who reacted)
-        // The toggle is done via the emoji in the quick-react menu above
+        // Tap the pill → open the reactions sheet
         pill.addEventListener('click', (e) => {
             e.stopPropagation();
-            // If tapping the count area → show sheet; if tapping emoji → toggle
             showReactionSheet(msgId);
         });
-
-        // Allow toggling by long-press (hold 400ms) or Ctrl+click
-        let holdTimer = null;
-        pill.addEventListener('pointerdown', () => {
-            holdTimer = setTimeout(() => {
-                if (socket) socket.emit('toggle-reaction', { msgId, emoji });
-            }, 600);
-        });
-        pill.addEventListener('pointerup', () => clearTimeout(holdTimer));
-        pill.addEventListener('pointerleave', () => clearTimeout(holdTimer));
 
         row.appendChild(pill);
     });

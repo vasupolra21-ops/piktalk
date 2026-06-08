@@ -209,7 +209,7 @@ io.on('connection', (socket) => {
     });
 
     // Real-time emoji reactions — relay to whole room
-    socket.on('toggle-reaction', ({ msgId, emoji }) => {
+    socket.on('toggle-reaction', ({ msgId, emoji, previousEmoji }) => {
         const user = users[socket.id];
         if (user && msgId && emoji) {
             io.to(user.roomID).emit('reaction-toggled', {
@@ -217,7 +217,8 @@ io.on('connection', (socket) => {
                 emoji,
                 socketId: socket.id,
                 nickname: user.nickname,
-                profilePic: user.profilePic || null
+                profilePic: user.profilePic || null,
+                previousEmoji: previousEmoji || null
             });
         }
     });
