@@ -2446,3 +2446,19 @@ body.light-mode .reply-quote { background: rgba(0,0,0,0.05); }
     border-radius: 12px;
 }
 
+/* ── Bubble Wrapper for action positioning ── */
+.bubble-wrapper {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    max-width: 100%;
+}
+
+.message.sent .bubble-wrapper {
+    align-items: flex-end;
+}
+
+.message.received .bubble-wrapper {
+    align-items: flex-start;
+}
+

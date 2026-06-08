@@ -1400,6 +1400,10 @@ function appendMessage(data, isSentByMe) {
     }
 
     // Build message DOM
+    const bubbleWrapper = document.createElement('div');
+    bubbleWrapper.className = 'bubble-wrapper';
+    bubbleWrapper.appendChild(contentEl);
+
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
         infoDiv.className = 'message-info';
@@ -1414,7 +1418,7 @@ function appendMessage(data, isSentByMe) {
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     if (avatar) contentDiv.innerHTML = avatar;
-    contentDiv.appendChild(contentEl);
+    contentDiv.appendChild(bubbleWrapper);
     msgDiv.appendChild(contentDiv);
 
     // ── Reaction row (populated later) ──
@@ -1422,7 +1426,7 @@ function appendMessage(data, isSentByMe) {
         const reactionRow = document.createElement('div');
         reactionRow.className = 'reaction-row';
         reactionRow.id = 'reactions-' + data.msgId;
-        msgDiv.appendChild(reactionRow);
+        bubbleWrapper.appendChild(reactionRow);
     }
 
     // ── Action bar (react + reply) ──
@@ -1446,8 +1450,7 @@ function appendMessage(data, isSentByMe) {
             });
             quickMenu.appendChild(btn);
         });
-        contentDiv.style.position = 'relative';
-        contentDiv.appendChild(quickMenu);
+        bubbleWrapper.appendChild(quickMenu);
 
         // React button
         const reactBtn = document.createElement('button');
@@ -1477,7 +1480,7 @@ function appendMessage(data, isSentByMe) {
 
         actionBar.appendChild(reactBtn);
         actionBar.appendChild(replyBtn);
-        msgDiv.appendChild(actionBar);
+        bubbleWrapper.appendChild(actionBar);
     }
 
     // ── Long-press for mobile ──
