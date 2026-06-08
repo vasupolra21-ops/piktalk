@@ -2456,6 +2456,7 @@ body.light-mode .reply-quote { background: rgba(0,0,0,0.05); }
 
 .message.sent .bubble-wrapper {
     align-items: flex-end;
+    margin-left: auto;
 }
 
 .message.received .bubble-wrapper {
