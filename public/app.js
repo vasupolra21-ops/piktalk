@@ -217,6 +217,32 @@ window.addEventListener('DOMContentLoaded', () => {
 // Fixes the iOS/Android mobile keyboard issue:
 // When keyboard opens, resize the app to the visible area so:
 // - No white gap appears below the input bar
+// ── Visual Viewport Modal Alignment Helper ──
+// Positions active modals absolute relative to the visual viewport to prevent 
+// them from getting pushed/scrolled out of view by the mobile keyboard.
+function updateActiveModalViewport() {
+    if (window.visualViewport) {
+        const vv = window.visualViewport;
+        const activeModal = document.querySelector('.modal.active');
+        if (activeModal) {
+            activeModal.style.position = 'absolute';
+            activeModal.style.top = `${vv.offsetTop}px`;
+            activeModal.style.left = `${vv.offsetLeft}px`;
+            activeModal.style.width = `${vv.width}px`;
+            activeModal.style.height = `${vv.height}px`;
+        } else {
+            // Reset modals when inactive
+            document.querySelectorAll('.modal').forEach(m => {
+                m.style.position = '';
+                m.style.top = '';
+                m.style.left = '';
+                m.style.width = '';
+                m.style.height = '';
+            });
+        }
+    }
+}
+
 // - Messages scroll up, and the input sits right above the keyboard (like WhatsApp)
 function initViewportHandler() {
     if (!window.visualViewport) return;
@@ -236,13 +262,17 @@ function initViewportHandler() {
         }
     }
 
-    window.visualViewport.addEventListener('resize', applyViewportHeight);
+    window.visualViewport.addEventListener('resize', () => {
+        applyViewportHeight();
+        updateActiveModalViewport();
+    });
 
     // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
     window.visualViewport.addEventListener('scroll', () => {
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
+        updateActiveModalViewport();
     });
 
     // Also reset on any window scroll
@@ -273,38 +303,13 @@ function initViewportHandler() {
 
 // ── Modal Keyboard Handler ──
 // When any input inside a modal is focused on mobile, shrinks margins/padding
-// and slides the modal card UP just enough so both the input AND action buttons are visible.
+// to ensure the card fits perfectly inside the visual viewport.
 function initModalKeyboardHandler() {
     const modals = document.querySelectorAll('.modal');
     
     modals.forEach(modal => {
-        const modalContent = modal.querySelector('.modal-content');
-        if (!modalContent) return;
-        
         const inputs = modal.querySelectorAll('input');
         let blurTimeout = null;
-        
-        const adjustPosition = () => {
-            const vvHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-            
-            // Temporarily reset transform to measure the natural bounding rect
-            modalContent.style.transform = 'none';
-            modalContent.style.transition = 'none';
-            
-            // Force browser layout recalculation
-            modalContent.offsetHeight;
-            
-            const naturalRect = modalContent.getBoundingClientRect();
-            const naturalBottom = naturalRect.bottom;
-            const overflow = naturalBottom - vvHeight + 16; // +16px breathing room
-            
-            modalContent.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
-            if (overflow > 0) {
-                modalContent.style.transform = `translateY(-${overflow}px)`;
-            } else {
-                modalContent.style.transform = 'none';
-            }
-        };
         
         inputs.forEach(input => {
             input.addEventListener('focus', () => {
@@ -313,17 +318,13 @@ function initModalKeyboardHandler() {
                     blurTimeout = null;
                 }
                 modal.classList.add('keyboard-active');
-                
-                // Adjust position quickly and again once keyboard is fully visible
-                setTimeout(adjustPosition, 50);
-                setTimeout(adjustPosition, 320);
+                updateActiveModalViewport();
             });
             
             input.addEventListener('blur', () => {
                 blurTimeout = setTimeout(() => {
                     modal.classList.remove('keyboard-active');
-                    modalContent.style.transition = 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)';
-                    modalContent.style.transform = 'none';
+                    updateActiveModalViewport();
                 }, 100);
             });
         });
@@ -426,6 +427,7 @@ function updateThemeColor() {
             metaThemeColor.setAttribute('content', isLightMode ? '#ffffff' : '#0f172a');
         }
     }
+    updateActiveModalViewport();
 }
 
 
