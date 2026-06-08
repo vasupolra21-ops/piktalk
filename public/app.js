@@ -13,6 +13,11 @@ try {
 let homeView, chatView, createRoomBtn, nicknameModal, nicknameInput, joinChatBtn, roomDisplayId, onlineStatus, messagesContainer, messageInput, sendBtn, inviteBtn, shareSection, roomLinkInput, copyBtn, leaveBtn, msgSound, emojiBtn, themeToggle, homeThemeToggle, attachBtn, imgInput, joinRoomInput, joinRoomBtn, emojiPicker, profilePicInput, avatarPreviewContainer, avatarPreviewImg, avatarPreviewIcon;
 let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPreviewBar, discardAudioBtn, playPreviewBtn, audioProgressBar, audioPreviewDuration, sendAudioBtn;
 
+// Custom Room & Password DOM Elements
+let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRoomBtn, cancelCreateRoomBtn, createRoomError, toggleCreatePasswordBtn;
+let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
+let roomNotFoundModal, roomNotFoundHomeBtn;
+
 function initDOMElements() {
     homeView = document.getElementById('home-view');
     chatView = document.getElementById('chat-view');
@@ -53,6 +58,25 @@ function initDOMElements() {
     audioProgressBar = document.getElementById('audio-progress-bar');
     audioPreviewDuration = document.getElementById('audio-preview-duration');
     sendAudioBtn = document.getElementById('send-audio-btn');
+
+    // Room ID & Password Modal Elements
+    createRoomModal = document.getElementById('create-room-modal');
+    createRoomIdInput = document.getElementById('create-room-id-input');
+    createRoomPasswordInput = document.getElementById('create-room-password-input');
+    confirmCreateRoomBtn = document.getElementById('confirm-create-room-btn');
+    cancelCreateRoomBtn = document.getElementById('cancel-create-room-btn');
+    createRoomError = document.getElementById('create-room-error');
+    toggleCreatePasswordBtn = document.getElementById('toggle-create-password');
+
+    passwordModal = document.getElementById('password-modal');
+    joinRoomPasswordInput = document.getElementById('join-room-password-input');
+    submitPasswordBtn = document.getElementById('submit-password-btn');
+    cancelPasswordBtn = document.getElementById('cancel-password-btn');
+    joinPasswordError = document.getElementById('join-password-error');
+    toggleJoinPasswordBtn = document.getElementById('toggle-join-password');
+
+    roomNotFoundModal = document.getElementById('room-not-found-modal');
+    roomNotFoundHomeBtn = document.getElementById('room-not-found-home-btn');
 }
 
 // State
@@ -61,6 +85,7 @@ let myNickname = null;
 let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
+let currentRoomPassword = null;
 
 // Persistent user identity — stored in sessionStorage (isolated per browser tab/window)
 function getOrCreateUserId() {
@@ -139,7 +164,18 @@ window.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
     if (path.startsWith('/chat/')) {
         currentRoomID = path.split('/chat/')[1];
-        showNicknameModal();
+        const checkDirectRoom = () => {
+            if (socket) {
+                socket.emit('check-room', { roomID: currentRoomID });
+            }
+        };
+        if (socket) {
+            if (socket.connected) {
+                checkDirectRoom();
+            } else {
+                socket.once('connect', checkDirectRoom);
+            }
+        }
     } else {
         showHome();
     }
@@ -271,11 +307,15 @@ function updateInputsState() {
     const isHomeActive = homeView && homeView.classList.contains('active');
     const isChatActive = chatView && chatView.classList.contains('active');
     const isModalActive = nicknameModal && nicknameModal.classList.contains('active');
+    const isCreateRoomModalActive = createRoomModal && createRoomModal.classList.contains('active');
+    const isPasswordModalActive = passwordModal && passwordModal.classList.contains('active');
+    const isRoomNotFoundModalActive = roomNotFoundModal && roomNotFoundModal.classList.contains('active');
+    const anyModalActive = isModalActive || isCreateRoomModalActive || isPasswordModalActive || isRoomNotFoundModalActive;
 
     // Home view input
     if (joinRoomInput) {
-        joinRoomInput.disabled = !isHomeActive || isModalActive;
-        joinRoomInput.setAttribute('tabindex', (isHomeActive && !isModalActive) ? '0' : '-1');
+        joinRoomInput.disabled = !isHomeActive || anyModalActive;
+        joinRoomInput.setAttribute('tabindex', (isHomeActive && !anyModalActive) ? '0' : '-1');
     }
 
     // Modal input
@@ -288,6 +328,22 @@ function updateInputsState() {
     if (messageInput) {
         messageInput.disabled = !isChatActive;
         messageInput.setAttribute('tabindex', isChatActive ? '0' : '-1');
+    }
+
+    // Custom Room setup inputs
+    if (createRoomIdInput) {
+        createRoomIdInput.disabled = !isCreateRoomModalActive;
+        createRoomIdInput.setAttribute('tabindex', isCreateRoomModalActive ? '0' : '-1');
+    }
+    if (createRoomPasswordInput) {
+        createRoomPasswordInput.disabled = !isCreateRoomModalActive;
+        createRoomPasswordInput.setAttribute('tabindex', isCreateRoomModalActive ? '0' : '-1');
+    }
+
+    // Password verification input
+    if (joinRoomPasswordInput) {
+        joinRoomPasswordInput.disabled = !isPasswordModalActive;
+        joinRoomPasswordInput.setAttribute('tabindex', isPasswordModalActive ? '0' : '-1');
     }
 
     // Room link input (always disabled, copy uses modern clipboard API)
@@ -426,37 +482,112 @@ function renderEmojiPicker() {
     loadCategory("Smileys");
 }
 
+function initPasswordToggle(inputEl, btnEl) {
+    if (inputEl && btnEl) {
+        btnEl.addEventListener('click', (e) => {
+            e.preventDefault();
+            const type = inputEl.getAttribute('type') === 'password' ? 'text' : 'password';
+            inputEl.setAttribute('type', type);
+            const icon = btnEl.querySelector('i');
+            if (icon) {
+                icon.className = type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+            }
+        });
+    }
+}
+
 function setupEventListeners() {
+    // Password toggles
+    initPasswordToggle(createRoomPasswordInput, toggleCreatePasswordBtn);
+    initPasswordToggle(joinRoomPasswordInput, toggleJoinPasswordBtn);
+
+    // Host room creation modal triggers
     if (createRoomBtn) createRoomBtn.addEventListener('click', () => {
-        const roomID = Math.random().toString(36).substring(2, 9);
-        window.history.pushState({}, '', `/chat/${roomID}`);
-        currentRoomID = roomID;
-        showNicknameModal();
+        const randomID = Math.random().toString(36).substring(2, 9);
+        if (createRoomIdInput) createRoomIdInput.value = randomID;
+        if (createRoomPasswordInput) createRoomPasswordInput.value = '';
+        if (createRoomError) createRoomError.style.display = 'none';
+        if (createRoomModal) createRoomModal.classList.add('active');
+        updateInputsState();
+        updateThemeColor();
     });
 
+    if (cancelCreateRoomBtn) cancelCreateRoomBtn.addEventListener('click', () => {
+        if (createRoomModal) createRoomModal.classList.remove('active');
+        updateInputsState();
+        updateThemeColor();
+    });
+
+    if (confirmCreateRoomBtn) confirmCreateRoomBtn.addEventListener('click', () => {
+        let roomID = createRoomIdInput.value.trim();
+        if (!roomID) {
+            roomID = Math.random().toString(36).substring(2, 9);
+        }
+        if (!/^[a-zA-Z0-9-_]+$/.test(roomID)) {
+            if (createRoomError) {
+                createRoomError.textContent = 'Room ID can only contain letters, numbers, hyphens, and underscores.';
+                createRoomError.style.display = 'block';
+            }
+            return;
+        }
+        if (socket) {
+            socket.emit('check-room-id-available', { roomID });
+        }
+    });
+
+    // Enter Room ID on home screen
     if (joinRoomBtn) joinRoomBtn.addEventListener('click', () => {
         const roomID = joinRoomInput.value.trim();
         if (roomID) {
-            window.history.pushState({}, '', `/chat/${roomID}`);
-            currentRoomID = roomID;
-            showNicknameModal();
+            if (socket) {
+                socket.emit('check-room', { roomID });
+            }
         }
+    });
+
+    if (joinRoomInput) joinRoomInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            joinRoomBtn.click();
+        }
+    });
+
+    // Password modal cancel/submit
+    if (cancelPasswordBtn) cancelPasswordBtn.addEventListener('click', () => {
+        if (passwordModal) passwordModal.classList.remove('active');
+        window.location.href = '/';
+    });
+
+    if (submitPasswordBtn) submitPasswordBtn.addEventListener('click', () => {
+        const password = joinRoomPasswordInput.value.trim();
+        if (socket && currentRoomID) {
+            socket.emit('verify-password', { roomID: currentRoomID, password });
+        }
+    });
+
+    if (joinRoomPasswordInput) joinRoomPasswordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            submitPasswordBtn.click();
+        }
+    });
+
+    // Room not found modal triggers
+    if (roomNotFoundHomeBtn) roomNotFoundHomeBtn.addEventListener('click', () => {
+        window.location.href = '/';
     });
 
     if (joinChatBtn) joinChatBtn.addEventListener('click', () => {
         const nick = nicknameInput.value.trim();
         if (nick) {
             myNickname = nick;
-            // Save profile locally so this device/browser remembers it next time
             saveProfileLocally(myNickname, myProfilePic);
             showChat();
             if (socket) {
-                // Pass userId so server can also save the profile to MongoDB Atlas
                 socket.emit('join-room', {
                     roomID: currentRoomID,
                     nickname: myNickname,
                     profilePic: myProfilePic,
-                    userId: myUserId
+                    userId: myUserId,
+                    password: currentRoomPassword
                 });
             } else {
                 console.warn("Socket not initialized. Attempting fallback join...");
@@ -818,14 +949,14 @@ function toggleTheme() {
 }
 
 function showHome() {
-    [homeView, chatView, nicknameModal].forEach(v => { if (v) v.classList.remove('active'); });
+    [homeView, chatView, nicknameModal, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (homeView) homeView.classList.add('active');
     updateInputsState();
     updateThemeColor();
 }
 
 function showChat() {
-    [homeView, chatView, nicknameModal].forEach(v => { if (v) v.classList.remove('active'); });
+    [homeView, chatView, nicknameModal, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (chatView) chatView.classList.add('active');
     if (roomDisplayId) roomDisplayId.textContent = `Room: ${currentRoomID}`;
     
@@ -843,6 +974,7 @@ function showChat() {
 }
 
 function showNicknameModal() {
+    [homeView, chatView, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (nicknameModal) nicknameModal.classList.add('active');
     // Load profile directly from THIS browser's localStorage.
     // This is fully isolated per browser app — different browsers on the same
@@ -934,6 +1066,72 @@ if (socket) {
     // Profile saved to MongoDB Atlas (logging only)
     socket.on('profile-saved', (saved) => {
         console.log('Profile saved to database:', saved && saved.nickname);
+    });
+
+    // Room ID verification during host creation
+    socket.on('room-id-available-checked', ({ roomID, available }) => {
+        if (available) {
+            if (createRoomError) createRoomError.style.display = 'none';
+            if (createRoomModal) createRoomModal.classList.remove('active');
+            
+            currentRoomID = roomID;
+            currentRoomPassword = createRoomPasswordInput.value.trim() || null;
+            
+            window.history.pushState({}, '', `/chat/${currentRoomID}`);
+            showNicknameModal();
+        } else {
+            if (createRoomError) {
+                createRoomError.textContent = 'Room ID is already in use. Please try another one.';
+                createRoomError.style.display = 'block';
+            }
+        }
+    });
+
+    // Room presence and password requirement verification
+    socket.on('room-checked', ({ roomID, exists, hasPassword }) => {
+        if (!exists) {
+            if (roomNotFoundModal) roomNotFoundModal.classList.add('active');
+            updateInputsState();
+            updateThemeColor();
+        } else {
+            currentRoomID = roomID;
+            if (hasPassword) {
+                if (joinRoomPasswordInput) joinRoomPasswordInput.value = '';
+                if (joinPasswordError) joinPasswordError.style.display = 'none';
+                if (passwordModal) passwordModal.classList.add('active');
+                updateInputsState();
+                updateThemeColor();
+            } else {
+                currentRoomPassword = null;
+                window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                showNicknameModal();
+            }
+        }
+    });
+
+    // Password verification feedback
+    socket.on('password-verified', ({ roomID, success }) => {
+        if (success) {
+            if (joinPasswordError) joinPasswordError.style.display = 'none';
+            if (passwordModal) passwordModal.classList.remove('active');
+            currentRoomPassword = joinRoomPasswordInput.value.trim();
+            
+            window.history.pushState({}, '', `/chat/${roomID}`);
+            showNicknameModal();
+        } else {
+            if (joinPasswordError) {
+                joinPasswordError.textContent = 'Incorrect password. Please try again.';
+                joinPasswordError.style.display = 'block';
+            }
+        }
+    });
+
+    // Fallback error during actual join-room trigger
+    socket.on('join-failed', ({ reason }) => {
+        if (reason === 'invalid-password') {
+            alert('Session expired or incorrect password. Please re-enter.');
+            window.location.href = '/';
+        }
     });
 }
 

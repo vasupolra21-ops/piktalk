@@ -100,8 +100,17 @@ io.on('connection', (socket) => {
     // Send network IP to help with link sharing
     socket.emit('ip-info', { ip: networkIP, port: PORT });
 
-    socket.on('join-room', async ({ roomID, nickname, profilePic, userId }) => {
+    socket.on('join-room', async ({ roomID, nickname, profilePic, userId, password }) => {
         const cleanRoomID = String(roomID).trim();
+        
+        // If room already exists, check password
+        if (rooms[cleanRoomID] && rooms[cleanRoomID].password) {
+            if (rooms[cleanRoomID].password !== password) {
+                socket.emit('join-failed', { reason: 'invalid-password' });
+                return;
+            }
+        }
+
         socket.join(cleanRoomID);
         users[socket.id] = { roomID: cleanRoomID, nickname, profilePic };
         console.log(`${nickname} joined room: ${cleanRoomID}`);
@@ -112,8 +121,11 @@ io.on('connection', (socket) => {
         }
 
         // Designate admin if room has no admin yet
-        if (!rooms[cleanRoomID] || !rooms[cleanRoomID].adminSocketId) {
-            rooms[cleanRoomID] = { adminSocketId: socket.id };
+        if (!rooms[cleanRoomID]) {
+            rooms[cleanRoomID] = { adminSocketId: socket.id, password: password || null };
+            console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id}) with password set: ${!!password}`);
+        } else if (!rooms[cleanRoomID].adminSocketId) {
+            rooms[cleanRoomID].adminSocketId = socket.id;
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
         }
 
@@ -124,6 +136,39 @@ io.on('connection', (socket) => {
 
         // Send updated users list to all users in the room
         sendRoomUsers(cleanRoomID);
+    });
+
+    socket.on('check-room-id-available', ({ roomID }) => {
+        const cleanRoomID = String(roomID).trim();
+        const exists = rooms[cleanRoomID] !== undefined;
+        socket.emit('room-id-available-checked', { roomID: cleanRoomID, available: !exists });
+    });
+
+    socket.on('check-room', ({ roomID }) => {
+        const cleanRoomID = String(roomID).trim();
+        const room = rooms[cleanRoomID];
+        if (room) {
+            const hasPassword = !!room.password;
+            socket.emit('room-checked', { roomID: cleanRoomID, exists: true, hasPassword });
+        } else {
+            socket.emit('room-checked', { roomID: cleanRoomID, exists: false });
+        }
+    });
+
+    socket.on('verify-password', ({ roomID, password }) => {
+        const cleanRoomID = String(roomID).trim();
+        const room = rooms[cleanRoomID];
+        if (room) {
+            const hasPassword = !!room.password;
+            if (!hasPassword) {
+                socket.emit('password-verified', { roomID: cleanRoomID, success: true });
+            } else {
+                const success = room.password === password;
+                socket.emit('password-verified', { roomID: cleanRoomID, success });
+            }
+        } else {
+            socket.emit('password-verified', { roomID: cleanRoomID, success: false, reason: 'room-not-found' });
+        }
     });
 
     socket.on('get-profile', async ({ userId }) => {

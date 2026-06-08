@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
     
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=87" as="style">
+    <link rel="preload" href="/style.css?v=89" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="https://cdn.socket.io/4.7.2/socket.io.min.js" as="script" crossorigin>
-    <link rel="preload" href="/app.js?v=87" as="script">
+    <link rel="preload" href="/app.js?v=89" as="script">
     
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=87">
+    <link rel="stylesheet" href="/style.css?v=89">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -193,6 +193,58 @@
         </div>
     </div>
 
+    <!-- Create Room Modal -->
+    <div id="create-room-modal" class="modal">
+        <div class="modal-content glass-card animate-scaleUp">
+            <h3>Create Private Chat</h3>
+            <p>Set a custom Room ID and Password for your private room.</p>
+            <div class="room-setup-fields" style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; width: 100%;">
+                <input type="text" id="create-room-id-input" placeholder="Room ID (Optional - auto-generated if blank)" maxlength="20" autocomplete="off" style="margin-bottom: 0;">
+                <div class="password-input-wrapper" style="position: relative; width: 100%;">
+                    <input type="password" id="create-room-password-input" placeholder="Password (Optional)" maxlength="20" autocomplete="off" style="margin-bottom: 0; padding-right: 45px; width: 100%;">
+                    <button type="button" id="toggle-create-password" class="btn-icon" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; height: auto; width: auto; padding: 5px;">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center; width: 100%;">
+                <button id="cancel-create-room-btn" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+                <button id="confirm-create-room-btn" class="btn btn-primary" style="flex: 1;">Create Room</button>
+            </div>
+            <div id="create-room-error" style="color: var(--danger); font-size: 0.85rem; margin-top: 10px; font-weight: 600; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Password Modal (for joining) -->
+    <div id="password-modal" class="modal">
+        <div class="modal-content glass-card animate-scaleUp">
+            <h3>Enter Room Password</h3>
+            <p>This room is password-protected. Please enter the password to join.</p>
+            <div class="password-input-wrapper" style="position: relative; width: 100%; margin-bottom: 20px;">
+                <input type="password" id="join-room-password-input" placeholder="Enter password..." maxlength="20" autocomplete="off" style="margin-bottom: 0; padding-right: 45px; width: 100%;">
+                <button type="button" id="toggle-join-password" class="btn-icon" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-muted); cursor: pointer; height: auto; width: auto; padding: 5px;">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </div>
+            <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center; width: 100%;">
+                <button id="cancel-password-btn" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+                <button id="submit-password-btn" class="btn btn-primary" style="flex: 1;">Join Room</button>
+            </div>
+            <div id="join-password-error" style="color: var(--danger); font-size: 0.85rem; margin-top: 10px; font-weight: 600; display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Room Not Found Modal -->
+    <div id="room-not-found-modal" class="modal">
+        <div class="modal-content glass-card animate-scaleUp">
+            <h3>Room Not Found</h3>
+            <p>The chat room you are trying to join does not exist or has expired.</p>
+            <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center; width: 100%; margin-top: 10px;">
+                <button id="room-not-found-home-btn" class="btn btn-primary" style="width: 100%;">Go to Homepage</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Nickname Modal -->
     <div id="nickname-modal" class="modal">
         <div class="modal-content glass-card">
@@ -255,6 +307,6 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/app.js?v=87"></script>
+    <script src="/app.js?v=89"></script>
 </body>
 </html>
