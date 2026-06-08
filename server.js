@@ -136,6 +136,11 @@ io.on('connection', (socket) => {
 
         // Send updated users list to all users in the room
         sendRoomUsers(cleanRoomID);
+
+        // Tell the admin directly that they are the admin (with password)
+        if (rooms[cleanRoomID] && rooms[cleanRoomID].adminSocketId === socket.id) {
+            socket.emit('you-are-admin', { password: rooms[cleanRoomID].password || null });
+        }
     });
 
     socket.on('check-room-id-available', ({ roomID }) => {
@@ -285,6 +290,9 @@ io.on('connection', (socket) => {
                     io.to(roomID).emit('system-message', {
                         message: `${nextAdmin.nickname} is now the room admin`
                     });
+
+                    // Tell the new admin directly
+                    io.to(remainingSockets[0]).emit('you-are-admin', { password: rooms[roomID].password || null });
                 } else {
                     delete rooms[roomID];
                 }

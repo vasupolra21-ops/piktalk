@@ -96,6 +96,13 @@
                     <div class="info-text">
                         <h3 id="room-display-id">Room: ...</h3>
                         <span id="online-status">Connecting...</span>
+                        <div id="admin-password-row" class="admin-password-row" style="display:none;">
+                            <span class="pwd-label">Password:</span>
+                            <span id="admin-password-text" class="pwd-value" data-visible="false">••••••</span>
+                            <button id="toggle-pwd-btn" class="pwd-eye-btn" title="Show/Hide Password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="header-actions">
@@ -121,6 +128,13 @@
                     <div class="link-input">
                         <input type="text" id="room-link" readonly>
                         <button id="copy-btn">Copy</button>
+                    </div>
+                    <div id="share-password-area" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--glass-border);">
+                        <p style="margin-bottom: 6px; font-size: 0.9rem; color: var(--text-muted); text-align: left;">Room Password:</p>
+                        <div class="link-input">
+                            <input type="text" id="share-password-input" readonly value="" style="margin-bottom: 0;">
+                            <button id="copy-password-btn">Copy</button>
+                        </div>
                     </div>
                 </div>
             </div>

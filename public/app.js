@@ -17,6 +17,8 @@ let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPrevie
 let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRoomBtn, cancelCreateRoomBtn, createRoomError, toggleCreatePasswordBtn;
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
 let roomNotFoundModal, roomNotFoundHomeBtn;
+let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
+let adminPasswordRow, adminPasswordText, togglePwdBtn;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -77,6 +79,16 @@ function initDOMElements() {
 
     roomNotFoundModal = document.getElementById('room-not-found-modal');
     roomNotFoundHomeBtn = document.getElementById('room-not-found-home-btn');
+
+    // Share password inputs
+    sharePasswordArea = document.getElementById('share-password-area');
+    sharePasswordInput = document.getElementById('share-password-input');
+    copyPasswordBtn = document.getElementById('copy-password-btn');
+
+    // Admin-only password row in header
+    adminPasswordRow = document.getElementById('admin-password-row');
+    adminPasswordText = document.getElementById('admin-password-text');
+    togglePwdBtn = document.getElementById('toggle-pwd-btn');
 }
 
 // State
@@ -86,6 +98,7 @@ let myProfilePic = null;
 let serverIP = null;
 let serverPort = null;
 let currentRoomPassword = null;
+let amIAdmin = false; // true only for the room creator / current admin
 
 // Persistent user identity — stored in sessionStorage (isolated per browser tab/window)
 function getOrCreateUserId() {
@@ -969,8 +982,56 @@ function showChat() {
         onlineStatus.textContent = 'Online';
         onlineStatus.style.color = 'var(--accent)';
     }
+    // Hide invite button by default — shown only once admin status is confirmed
+    if (inviteBtn) inviteBtn.style.display = 'none';
     updateInputsState();
     updateThemeColor();
+}
+
+// Show or hide admin-only UI elements based on current admin status
+function updateAdminUI() {
+    // Invite button (reveals room link + password) — admin only
+    if (inviteBtn) inviteBtn.style.display = amIAdmin ? '' : 'none';
+    // If we lost admin status while share section is open, close it
+    if (!amIAdmin && shareSection && !shareSection.classList.contains('hidden')) {
+        shareSection.classList.add('hidden');
+    }
+
+    // Admin password row in the header
+    if (adminPasswordRow) {
+        if (amIAdmin) {
+            const pwd = currentRoomPassword;
+            if (pwd) {
+                // Show dots by default, store real value in dataset
+                adminPasswordText.dataset.realPwd = pwd;
+                adminPasswordText.dataset.visible = 'false';
+                adminPasswordText.textContent = '\u2022'.repeat(Math.min(pwd.length, 8));
+                adminPasswordRow.style.display = 'flex';
+
+                // Wire eye toggle (only once)
+                if (togglePwdBtn && !togglePwdBtn._wired) {
+                    togglePwdBtn._wired = true;
+                    togglePwdBtn.addEventListener('click', () => {
+                        const isVisible = adminPasswordText.dataset.visible === 'true';
+                        if (isVisible) {
+                            adminPasswordText.textContent = '\u2022'.repeat(Math.min(adminPasswordText.dataset.realPwd.length, 8));
+                            adminPasswordText.dataset.visible = 'false';
+                            togglePwdBtn.innerHTML = '<i class="fas fa-eye"></i>';
+                        } else {
+                            adminPasswordText.textContent = adminPasswordText.dataset.realPwd;
+                            adminPasswordText.dataset.visible = 'true';
+                            togglePwdBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                        }
+                    });
+                }
+            } else {
+                // Room has no password
+                adminPasswordRow.style.display = 'none';
+            }
+        } else {
+            adminPasswordRow.style.display = 'none';
+        }
+    }
 }
 
 function showNicknameModal() {
@@ -1052,6 +1113,13 @@ if (socket) {
 
     socket.on('room-users', (usersList) => {
         updateMembersList(usersList);
+    });
+
+    // Server tells this socket directly that it is the admin
+    socket.on('you-are-admin', ({ password }) => {
+        amIAdmin = true;
+        if (password) currentRoomPassword = password;
+        updateAdminUI();
     });
 
     socket.on('kicked', () => {
@@ -1765,7 +1833,8 @@ function updateMembersList(usersList) {
     // Find the admin user to check if current socket is the admin
     const adminMember = usersList.find(u => u.isAdmin);
     const adminSocketId = adminMember ? adminMember.id : null;
-    const amIAdmin = (socket && socket.id === adminSocketId);
+    amIAdmin = (socket && socket.id === adminSocketId); // update global
+    updateAdminUI(); // show/hide invite btn + share section
 
     usersList.forEach(u => {
         const isMe = (socket && u.id === socket.id);

@@ -518,6 +518,56 @@ body.light-mode .btn-icon {
     color: var(--text-muted);
 }
 
+.admin-password-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 3px;
+}
+
+.pwd-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.pwd-value {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    font-family: monospace;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.2s;
+}
+
+.pwd-value[data-visible="true"] {
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+}
+
+.pwd-eye-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    color: var(--text-muted);
+    font-size: 0.65rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.pwd-eye-btn:hover {
+    color: var(--accent);
+    background: rgba(99, 102, 241, 0.12);
+}
+
 .header-actions {
     display: flex;
     gap: 10px;
