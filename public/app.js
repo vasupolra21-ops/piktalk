@@ -1563,7 +1563,7 @@ function appendMessage(data, isSentByMe) {
             e.stopPropagation();
             quickMenu.classList.remove('visible');
             msgDiv.classList.remove('action-visible');
-            showFullEmojiPanel(data.msgId, bubbleWrapper);
+            showEmojiBottomSheet(data.msgId);
         });
         quickMenu.appendChild(plusBtn);
         
@@ -1577,12 +1577,9 @@ function appendMessage(data, isSentByMe) {
         reactBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isOpen = quickMenu.classList.contains('visible');
-            // Close any open quick menus and full emoji panels first
+            // Close any open quick menus and bottom sheets first
             document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-            document.querySelectorAll('.full-emoji-panel.visible').forEach(m => {
-                m.classList.remove('visible');
-                m.remove();
-            });
+            document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
             if (!isOpen) quickMenu.classList.add('visible');
         });
 
@@ -1623,10 +1620,7 @@ function appendMessage(data, isSentByMe) {
     // Close any open menus when tapping elsewhere
     document.addEventListener('click', () => {
         document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-        document.querySelectorAll('.full-emoji-panel.visible').forEach(m => {
-            m.classList.remove('visible');
-            m.remove();
-        });
+        document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
         document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
     }, { once: false, capture: true, passive: true });
 
@@ -1635,116 +1629,330 @@ function appendMessage(data, isSentByMe) {
 }
 
 // ── EMOJI PICKER CATEGORIES ──
-const REACTION_EMOJI_CATEGORIES = {
-    smileys: {
-        icon: '😀',
-        label: 'Smileys & Hands',
+const EMOJI_KEYBOARD_CATEGORIES = [
+    {
+        id: 'frequent',
+        name: 'FREQUENTLY USED',
+        iconClass: 'far fa-clock',
+        emojis: ['❤️', '😍', '👍', '😂', '🔥', '👏', '🙏', '🥺', '😊', '🥰', '😘', '😮', '😢', '🙌', '🎉', '🌟']
+    },
+    {
+        id: 'smileys',
+        name: 'SMILEYS & PEOPLE',
+        iconClass: 'far fa-smile',
         emojis: [
             '😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫣','🤭','🤫','🤥','😶','😐','😑','😬','🫠','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','😵‍💫','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕',
             '👍','👎','👊','✊','🤛','🤜','🤞','✌️','🤟','🤘','👌','👈','👉','👆','👇','☝️','✋','🤚','🖐️','🖖','👋','🤙','💪','🦾','🖕','✍️','🙏','🤝','👏','🙌','👐','🤲','💅','🤳'
         ]
     },
-    hearts: {
-        icon: '❤️',
-        label: 'Hearts & Symbols',
+    {
+        id: 'animals',
+        name: 'ANIMALS & NATURE',
+        iconClass: 'fas fa-paw',
         emojis: [
-            '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔','❤️‍🔥','❤️‍🩹','❣️','💕','💞','💓','💗','💖','💘','💝','💟','💯','🔥','✨','🌟','⭐','🎉','🎊','🎈','🎂','🎁'
+            '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐽','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦢','🦉','🦚','🦜','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🕷️','🕸️','🦂','🐢','🐍','🦎','🐙','🦑','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐑','🐐','🦌','🐕','🐩','🐈','🐇','🦡','🦫','🦦','🦥','🌲','🌳','🌴','🌵','🌱','🌿','☘️','🍀','🍁','🍂','🍃','🌸','🌹','🌺','🌻','🌼','🌷'
         ]
     },
-    objects: {
-        icon: '🚀',
-        label: 'Objects & Food',
+    {
+        id: 'food',
+        name: 'FOOD & DRINK',
+        iconClass: 'fas fa-hamburger',
         emojis: [
-            '🚀','👑','💎','🍕','🍔','🍟','🍺','🍻','🍷','☕','🌮','🍣','🍿','🍩','🍪','🍧','🍦','🍰'
+            '🍏','🍎','🍐','🍊','🍋','🍌','🍉','🍇','🍓','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🍆','🥑','🥦','🥬','🥒','🌶️','🫑','🌽','🥕','🫒','🧄','🧅','🍄','🥜','🌰','🍞','🥐','🥖','🥨','🥯','🥞','🧀','🍖','🍗','🥩','🍔','🍟','🍕','🌭','🥪','🌮','🌯','🍳','🥘','🍲','🥣','🥗','🍿','🧈','🧂','🥫','🍱','🍘','🍙','🍚','🍛','🍜','🍝','🍠','🍢','🍣','🍤','🍥','🍨','🍧','🍦','🍩','🍪','🎂','🍰','🧁','🥧','🍫','🍬','🍭','🍮','🍯','🍼','🥛','☕','🫖','🍵','🍶','🍾','🍷','🍸','🍹','🍺','🍻','🥂','🥃','🥤','🧋','🧃','🧊'
+        ]
+    },
+    {
+        id: 'activity',
+        name: 'ACTIVITY',
+        iconClass: 'fas fa-running',
+        emojis: [
+            '👾','⚽','🏀','🏈','⚾','🥎','🎾','🏐','🏉','🎱','🏓','🏸','🥅','🏒','🥍','🏏','🪃','⛳','🪁','🏹','🎣','🤿','🥊','🥋','🎽','🛹','🛼','🛷','🎿','🏂','🪂','🏋️','🤼','🤸','⛹️','🤺','🤾','🏌️','🏇','🧘','🏄','🏊','🤽','🚣','🧗','🚴','🚵','🏆','🥇','🥈','🥉','🏅','🎖️','🎫','🎟️','🎭','🎨','🎬','🎤','🎧','🎼','🎹','🥁','🎸','🎺','🎻','🪕','🎲','🧩','🎳','🎯','🎮','🎰'
+        ]
+    },
+    {
+        id: 'travel',
+        name: 'TRAVEL & PLACES',
+        iconClass: 'fas fa-plane',
+        emojis: [
+            '🚗','🚕','🚙','🚌','🚎','🏎️','🚓','🚑','🚒','🚐','🛻','🚚','🚛','🚜','🛵','🚲','🛴','🛸','🚀','🚁','🛩️','✈️','🛫','🛬','⛵','🛥️','🚤','🚢','⚓','🛟','🚦','🚥','🚧','🗺️','🗿','🗽','🗼','🏰','🏯','⛰️','🏔️','🗻','🏕️','🏖️','🏜️','🏝️','🏡','🏢','🏥','🏫','🏛️','⛪','🕌','🕍','🌅','🌇','🌆','🌃','🌉','🪐','🌑','🌕','☀️','🌤️','⛈️','❄️','☔','🌀','🌈','🔥'
+        ]
+    },
+    {
+        id: 'objects',
+        name: 'OBJECTS',
+        iconClass: 'far fa-lightbulb',
+        emojis: [
+            '⌚','📱','💻','⌨️','🖥️','🖨️','🖱️','🖲️','🕹️','🗜️','💽','💾','💿','📀','📼','📷','📸','📹','🎥','📽️','🎞️','📞','📟','📠','📺','📻','🎙️','🎚️','🎛️','🧭','⏱️','⏳','📡','💡','🔦','🏮','🕯️','🪔','🗑️','🪞','🧳','🌂','☂️','🔑','🗝️','🔨','⛏️','🛠️','🗡️','🛡️','🔧','⚙️','🔩','⚖️','⛓️','🩹','🩺','🔬','🔭','🪛','🪚','🪜','🔗','📎','📌','📍','📝','💼','📁','📂','📅','📆','🗒️','📈','📉','📊','📋','📮','📫','📬','📦','📯','📜','📃','📑','🏷️','🎫','🎟️','🔍','🔎','✉️','📧','📨','📩','🧷','🧴','🧻','🧼','🧽','🪣','🧹','🧺','🧯','🛒','🚬'
+        ]
+    },
+    {
+        id: 'symbols',
+        name: 'SYMBOLS',
+        iconClass: 'fas fa-icons',
+        emojis: [
+            '💘','💖','💗','💓','💞','💕','💟','❣️','💔','❤️‍🔥','❤️‍🩹','❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💯','💯','💢','💬','👁️‍🗨️','🗯️','💭','💤','🌐','🌀','🛐','🎴','🃏','🀄','🔔','🔕','🔇','🔈','🔉','🔊','📢','📣','🚩','🏳️','🏴','🏴‍☠️','🕉️','✡️','☸️','☯️','✝️','☦️','☪️','☮️','🕎','♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓','🔀','🔁','🔂','▶️','⏩','⏭️','⏯️','◀️','⏪','⏮️','🔼','▼️','🔽','🎦','📶','📳','📴','🪬','🧿','🪙','🧱','🪵','🪨','🛢️'
+        ]
+    },
+    {
+        id: 'flags',
+        name: 'FLAGS',
+        iconClass: 'far fa-flag',
+        emojis: [
+            '🏁','🚩','🎌','🏴','🏳','🏳️‍🌈','🏳️‍⚧️','🏴‍☠️','🇦🇫','🇦🇱','🇩🇿','🇦🇩','🇦🇴','🇦🇷','🇦🇲','🇦🇺','🇦🇹','🇦🇿','🇧🇸','🇧🇭','🇧🇩','🇧🇪','🇧🇿','🇧🇯','🇧🇹','🇧🇴','🇧🇦','🇧🇷','🇧🇳','🇧🇬','🇰🇭','🇨🇲','🇨🇦','🇨🇱','🇨🇳','🇨🇴','🇨🇷','🇭🇷','🇨🇺','🇨🇾','🇨🇿','🇩🇰','🇩🇯','🇩🇴','🇪🇨','🇪🇬','🇸🇻','🇪🇪','🇪🇹','🇪🇺','🇫🇯','🇫🇮','🇫🇷','🇬🇦','🇬🇪','🇩🇪','🇬🇭','🇬🇷','🇬🇹','🇭🇹','🇭🇳','🇭🇰','🇭🇺','🇮🇸','🇮🇳','🇮🇩','🇮🇷','🇮🇶','🇮🇪','🇮🇱','🇮🇹','🇯🇲','🇯🇵','🇩🇪','🇰🇪','🇰🇼','🇰🇬','🇱🇦','🇱🇻','🇱🇧','🇱🇮','🇱🇹','🇱🇺','🇲🇾','🇲🇻','🇲🇱','🇲🇹','🇲🇽','🇲🇩','🇲🇨','🇲🇳','🇲🇪','🇲🇦','🇲🇿','🇲🇲'
         ]
     }
+];
+
+// ── EMOJI SEARCH KEYWORDS ──
+const EMOJI_KEYWORDS = {
+    '❤️': 'love heart red like', '😍': 'love eyes heart smile face happy', '👍': 'thumbs up ok yes like',
+    '😂': 'laugh tears joy face happy lol', '🔥': 'fire hot lit trend', '👏': 'clap hand praise',
+    '🙏': 'please pray thank you hands thanks', '🥺': 'pleading cry face sad beg', '😊': 'smile blush happy face',
+    '🥰': 'love hearts face happy blush', '😘': 'kiss face love blow', '😮': 'gasp mouth open surprise face wow',
+    '😢': 'cry tear sad face', '🙌': 'hooray hands high five celebrate', '🎉': 'party celebrate congrats',
+    '🌟': 'star shine bright', '😀': 'smile face happy', '😃': 'smile face happy open mouth',
+    '😄': 'smile face happy squint eyes', '😁': 'grin face happy teeth', '😆': 'laugh squint face happy',
+    '😅': 'sweat smile face happy relived', '🤣': 'lol roll floor laughing face', '😇': 'angel halo innocent face',
+    '🙂': 'slight smile face', '🙃': 'upside down face', '😉': 'wink face', '😌': 'relieved face calm',
+    '😋': 'yum delicious face food tongue', '😛': 'tongue face stick out', '😝': 'squint tongue face stick out',
+    '😜': 'wink tongue face stick out crazy', '🤪': 'zany face crazy goofy', '🤨': 'eyebrow face suspicious raise',
+    '🧐': 'monocle face class gentleman', '🤓': 'nerd geek face glasses', '😎': 'cool sunglasses face',
+    '🥸': 'disguise mask mustache face', '🤩': 'star eyes face wow', '🥳': 'party horn hat face celebrate',
+    '😏': 'smirk face sly grin', '😒': 'unamused face bored glare', '😞': 'disappointed sad face',
+    '😔': 'pensive sad face deep', '😟': 'worried face anxious', '😕': 'confused face unsure',
+    '🙁': 'slight frown face sad', '☹️': 'frown sad face', '😣': 'persevere face struggle stress',
+    '😖': 'confounded face stress', '😫': 'tired face exhausted yawn', '😩': 'weary face exhausted cry',
+    '😭': 'sob cry tears face heavy sad', '😤': 'triumph steam nose face angry', '😠': 'angry face mad',
+    '😡': 'pout angry red face mad', '🤬': 'swear curse symbols mouth face angry', '🤯': 'explode head mind blown face',
+    '😳': 'blush flushed wide eyes face embarrassed', '🥵': 'hot red sweat tongue face sun', '🥶': 'cold blue teeth ice face',
+    '😱': 'scream fear shock face gasp', '😨': 'fear scared face', '😰': 'sweat fear face anxious',
+    '😥': 'sad relieved sweat face cry', '😓': 'sweat face stress downcast', '🤗': 'hug hands face open',
+    '🤔': 'think hand chin face ponder', '🫣': 'peep eye hand face peek hide', '🤭': 'giggle hand mouth face',
+    '🤫': 'shh quiet finger mouth whisper', '🤥': 'lie nose grow long face liar', '😶': 'no mouth silent face',
+    '😐': 'neutral face flat straight', '😑': 'expressionless face flat closed eyes', '😬': 'grimace teeth face awkward',
+    '🫠': 'melt smile hot face', '🙄': 'roll eyes face bored dismiss', '😯': 'hushed surprise face',
+    '😦': 'frown open mouth face sad surprise', '😧': 'anguished face pain', '😲': 'astonished face shock gasp',
+    '🥱': 'yawn mouth open hand sleep face', '😴': 'sleep zzz face closed eyes', '🤤': 'drool face delicious sleep',
+    '😪': 'sleepy snot bubble face tired', '😵': 'dizzy eyes crossed face', '😵‍💫': 'dizzy spiral eyes face',
+    '🤐': 'zipper mouth face secret', '🥴': 'woozy drunk face sick uneven', '🤢': 'nauseated green face vomit sick',
+    '🤮': 'vomit spew face barf sick', '🤧': 'sneeze tissue face cold sick', '😷': 'mask medical face sick protection',
+    '🤒': 'thermometer sick face temperature', '🤕': 'bandage head hurt face injury', '👎': 'thumbs down no dislike',
+    '👊': 'fist punch hit face', '✊': 'fist raise power solid', '🤛': 'fist left punch', '🤜': 'fist right punch',
+    '🤞': 'fingers crossed luck hope', '✌️': 'peace victory sign fingers', '🤟': 'love you hand sign gesture',
+    '🤘': 'rock on horns hand sign gesture', '👌': 'ok hand sign okay perfect', '👈': 'point left finger hand',
+    '👉': 'point right finger hand', '👆': 'point up finger hand', '👇': 'point down finger hand',
+    '☝️': 'index point up hand', '✋': 'stop hand high five raise', '🤚': 'raised back of hand',
+    '🖐️': 'hand splayed fingers spread', '🖖': 'vulcan salute hand space', '👋': 'wave hello goodbye hand',
+    '🤙': 'call me hand phone sign', '💪': 'muscle flex power strong bicep', '🦾': 'robot arm power mechanical',
+    '🖕': 'middle finger flip off hand', '✍️': 'write pen hand pencil', '🤝': 'handshake shake hands agreement partners',
+    '👐': 'open hands hug reach', '🤲': 'palms up together request pray', '💅': 'nail polish manicure care',
+    '🤳': 'selfie photo phone camera'
 };
 
-// ── Show WhatsApp-style expanded emoji panel ──
-function showFullEmojiPanel(msgId, bubbleWrapper) {
+// ── Show WhatsApp-style expanded emoji sheet drawer ──
+function showEmojiBottomSheet(msgId) {
     currentReactionMsgId = msgId;
 
-    if (!globalFullEmojiPanel) {
-        globalFullEmojiPanel = document.createElement('div');
-        globalFullEmojiPanel.className = 'full-emoji-panel';
+    // Create overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'emoji-bottom-sheet-overlay';
 
-        const tabsContainer = document.createElement('div');
-        tabsContainer.className = 'emoji-panel-tabs';
+    // Create sheet
+    const sheet = document.createElement('div');
+    sheet.className = 'emoji-bottom-sheet';
 
-        const gridContainer = document.createElement('div');
-        gridContainer.className = 'emoji-panel-grid';
+    // Drag Handle
+    const handle = document.createElement('div');
+    handle.className = 'emoji-sheet-handle';
+    sheet.appendChild(handle);
 
-        const categories = [
-            { id: 'smileys', icon: '😀', label: 'Smileys & Hands' },
-            { id: 'hearts', icon: '❤️', label: 'Hearts & Symbols' },
-            { id: 'objects', icon: '🚀', label: 'Objects & Food' }
-        ];
+    // Header (Search Bar)
+    const header = document.createElement('div');
+    header.className = 'emoji-sheet-header';
+    
+    const searchContainer = document.createElement('div');
+    searchContainer.className = 'emoji-search-container';
+    
+    const searchIcon = document.createElement('i');
+    searchIcon.className = 'fas fa-search emoji-search-icon';
+    searchContainer.appendChild(searchIcon);
 
-        categories.forEach(cat => {
-            const tabBtn = document.createElement('button');
-            tabBtn.className = 'emoji-panel-tab-btn';
-            tabBtn.innerHTML = cat.icon;
-            tabBtn.title = cat.label;
-            tabBtn.addEventListener('click', (e) => {
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.id = 'emoji-search-input';
+    searchInput.placeholder = 'Search';
+    searchInput.autocomplete = 'off';
+    searchContainer.appendChild(searchInput);
+
+    header.appendChild(searchContainer);
+    sheet.appendChild(header);
+
+    // Content Area
+    const content = document.createElement('div');
+    content.className = 'emoji-sheet-content';
+
+    // Populate Categories
+    EMOJI_KEYBOARD_CATEGORIES.forEach(cat => {
+        const section = document.createElement('div');
+        section.className = 'emoji-category-section';
+        section.id = 'emoji-sec-' + cat.id;
+
+        const heading = document.createElement('div');
+        heading.className = 'emoji-category-title';
+        heading.textContent = cat.name;
+        section.appendChild(heading);
+
+        const grid = document.createElement('div');
+        grid.className = 'emoji-category-grid';
+
+        cat.emojis.forEach(em => {
+            const btn = document.createElement('button');
+            btn.className = 'emoji-sheet-btn';
+            btn.textContent = em;
+            btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                tabsContainer.querySelectorAll('.emoji-panel-tab-btn').forEach(btn => btn.classList.remove('active'));
-                tabBtn.classList.add('active');
-                renderCategoryEmojis(cat.id, gridContainer);
+                if (currentReactionMsgId) {
+                    const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
+                    if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
+                }
+                closeSheet();
             });
-            tabsContainer.appendChild(tabBtn);
+            grid.appendChild(btn);
         });
 
-        globalFullEmojiPanel.appendChild(tabsContainer);
-        globalFullEmojiPanel.appendChild(gridContainer);
+        section.appendChild(grid);
+        content.appendChild(section);
+    });
 
-        // Click inside the panel shouldn't close it
-        globalFullEmojiPanel.addEventListener('click', (e) => {
+    sheet.appendChild(content);
+
+    // Footer Navigation
+    const footer = document.createElement('div');
+    footer.className = 'emoji-sheet-footer';
+
+    EMOJI_KEYBOARD_CATEGORIES.forEach(cat => {
+        const footBtn = document.createElement('button');
+        footBtn.className = 'emoji-footer-icon-btn';
+        footBtn.innerHTML = `<i class="${cat.iconClass}"></i>`;
+        footBtn.title = cat.name;
+        footBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            // Scroll content area to category
+            const targetSec = content.querySelector('#emoji-sec-' + cat.id);
+            if (targetSec) {
+                content.scrollTo({
+                    top: targetSec.offsetTop - content.offsetTop,
+                    behavior: 'smooth'
+                });
+            }
+            // Toggle active footer button
+            footer.querySelectorAll('.emoji-footer-icon-btn').forEach(btn => btn.classList.remove('active'));
+            footBtn.classList.add('active');
         });
+        footer.appendChild(footBtn);
+    });
 
-        // Initialize active tab styling and render first category
-        tabsContainer.firstChild.classList.add('active');
-        renderCategoryEmojis('smileys', gridContainer);
-    }
+    // Default first footer button to active
+    footer.firstChild.classList.add('active');
+    sheet.appendChild(footer);
 
-    // Hide any other visible emoji panels
-    document.querySelectorAll('.full-emoji-panel.visible').forEach(panel => {
-        if (panel !== globalFullEmojiPanel) {
-            panel.classList.remove('visible');
-            panel.remove();
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+
+    // Close function
+    const closeSheet = () => {
+        overlay.classList.remove('active');
+        sheet.classList.remove('active');
+        setTimeout(() => {
+            overlay.remove();
+        }, 250);
+    };
+
+    // Close on overlay backdrop tap
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeSheet();
+    });
+
+    // Handle search input events
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase().trim();
+        const searchResultsId = 'emoji-sec-search-results';
+
+        // Remove previous search section if it exists
+        const prevSearchSec = content.querySelector('#' + searchResultsId);
+        if (prevSearchSec) prevSearchSec.remove();
+
+        if (!query) {
+            // Show all normal categories and footer
+            content.querySelectorAll('.emoji-category-section').forEach(sec => sec.style.display = 'flex');
+            footer.style.display = 'flex';
+        } else {
+            // Hide normal categories and footer
+            content.querySelectorAll('.emoji-category-section').forEach(sec => sec.style.display = 'none');
+            footer.style.display = 'none';
+
+            // Create Search Results section
+            const searchSection = document.createElement('div');
+            searchSection.className = 'emoji-category-section';
+            searchSection.id = searchResultsId;
+
+            const heading = document.createElement('div');
+            heading.className = 'emoji-category-title';
+            heading.textContent = 'Search Results';
+            searchSection.appendChild(heading);
+
+            const grid = document.createElement('div');
+            grid.className = 'emoji-category-grid';
+
+            const matched = [];
+            const seen = new Set();
+            EMOJI_KEYBOARD_CATEGORIES.forEach(cat => {
+                cat.emojis.forEach(em => {
+                    if (seen.has(em)) return;
+                    const keywords = EMOJI_KEYWORDS[em] || '';
+                    if (em.includes(query) || keywords.includes(query)) {
+                        matched.push(em);
+                        seen.add(em);
+                    }
+                });
+            });
+
+            if (matched.length > 0) {
+                matched.forEach(em => {
+                    const btn = document.createElement('button');
+                    btn.className = 'emoji-sheet-btn';
+                    btn.textContent = em;
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (currentReactionMsgId) {
+                            const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
+                            if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
+                        }
+                        closeSheet();
+                    });
+                    grid.appendChild(btn);
+                });
+            } else {
+                const noResults = document.createElement('div');
+                noResults.className = 'emoji-no-results';
+                noResults.textContent = 'No matching emojis found';
+                noResults.style.color = 'var(--text-muted)';
+                noResults.style.fontSize = '0.9rem';
+                noResults.style.padding = '20px 0';
+                searchSection.appendChild(noResults);
+            }
+
+            searchSection.appendChild(grid);
+            content.appendChild(searchSection);
         }
     });
 
-    bubbleWrapper.appendChild(globalFullEmojiPanel);
-    
-    // Smooth transition toggle
+    // Trigger animations
     setTimeout(() => {
-        globalFullEmojiPanel.classList.add('visible');
+        overlay.classList.add('active');
+        sheet.classList.add('active');
+        searchInput.focus();
     }, 10);
-}
-
-function renderCategoryEmojis(catId, gridEl) {
-    gridEl.innerHTML = '';
-    const category = REACTION_EMOJI_CATEGORIES[catId];
-    if (!category) return;
-    
-    category.emojis.forEach(em => {
-        const btn = document.createElement('button');
-        btn.className = 'emoji-panel-btn';
-        btn.textContent = em;
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (currentReactionMsgId) {
-                const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
-                if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
-            }
-            if (globalFullEmojiPanel) {
-                globalFullEmojiPanel.classList.remove('visible');
-                globalFullEmojiPanel.remove();
-            }
-        });
-        gridEl.appendChild(btn);
-    });
 }
 
 // ── Helper: find this user's current emoji on a message ──
