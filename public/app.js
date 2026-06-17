@@ -180,6 +180,7 @@ let previewPlaying = false;
 
 // Typing indicator state
 let typingTimeout = null;
+let isCurrentlyTyping = false;
 
 const EMOJI_CATEGORIES = {
     "Smileys": ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃'],
@@ -304,18 +305,22 @@ function initViewportHandler() {
 
     // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
     window.visualViewport.addEventListener('scroll', () => {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
+        if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        }
         updateActiveModalViewport();
     });
 
     // Also reset on any window scroll
     window.addEventListener('scroll', () => {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
-    }, { passive: false });
+        if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
+            window.scrollTo(0, 0);
+            document.body.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+        }
+    }, { passive: true });
 
     // Reset layout viewport position when message input receives focus/blur
     if (messageInput) {
@@ -787,11 +792,15 @@ function setupEventListeners() {
             messageInput.style.height = 'auto';
             messageInput.style.height = (messageInput.scrollHeight) + 'px';
 
-            // Emit typing event
+            // Emit typing event (optimized throttle)
             if (socket && currentRoomID && myNickname) {
-                socket.emit('typing', { nickname: myNickname });
+                if (!isCurrentlyTyping) {
+                    isCurrentlyTyping = true;
+                    socket.emit('typing', { nickname: myNickname });
+                }
                 clearTimeout(typingTimeout);
                 typingTimeout = setTimeout(() => {
+                    isCurrentlyTyping = false;
                     socket.emit('stop-typing');
                 }, 2000);
             }
@@ -802,6 +811,7 @@ function setupEventListeners() {
             if (!isMobile && e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 clearTimeout(typingTimeout);
+                isCurrentlyTyping = false;
                 if (socket) socket.emit('stop-typing');
                 sendMessage();
             }
@@ -1025,6 +1035,13 @@ function setupEventListeners() {
     if (discardAudioBtn)    discardAudioBtn.addEventListener('click',   discardPreview);
     if (playPreviewBtn)     playPreviewBtn.addEventListener('click',    togglePreviewPlayback);
     if (sendAudioBtn)       sendAudioBtn.addEventListener('click',      sendVoiceMessage);
+
+    // Close any open menus when tapping elsewhere (optimized: defined once globally)
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+        document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
+        document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
+    }, { once: false, capture: true, passive: true });
 }
 
 // ── Voice Recording Functions ──
@@ -1282,6 +1299,11 @@ function sendMessage() {
     const text = messageInput.value.trim();
     if (text && currentRoomID) {
         if (socket) {
+            // Stop typing indicator instantly upon sending
+            clearTimeout(typingTimeout);
+            isCurrentlyTyping = false;
+            socket.emit('stop-typing');
+
             socket.emit('send-message', {
                 roomID: currentRoomID,
                 message: text,
@@ -1773,12 +1795,7 @@ function appendMessage(data, isSentByMe) {
         msgDiv.addEventListener('touchmove', cancelLP);
     }
 
-    // Close any open menus when tapping elsewhere
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-        document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
-        document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
-    }, { once: false, capture: true, passive: true });
+    // (Global menu closing listener handled in setupEventListeners)
 
     messagesContainer.appendChild(msgDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;

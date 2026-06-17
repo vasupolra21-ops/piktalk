@@ -19,6 +19,15 @@ const PORT = process.env.PORT || 3000;
 // Enable gzip compression for faster load times
 app.use(compression());
 
+// Security and caching-friendly headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Vary', 'Accept-Encoding');
+    next();
+});
+
 // Health check endpoint for keep-alive and monitoring
 app.get('/ping', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date() });
