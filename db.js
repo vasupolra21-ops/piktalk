@@ -52,42 +52,60 @@ function writeJSON(data) {
     }
 }
 
+// ── Date / Time Helpers ──
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function getNowDate() {
+    const now = new Date();
+    const dd   = String(now.getDate()).padStart(2, '0');
+    const mon  = MONTHS[now.getMonth()];
+    const yyyy = now.getFullYear();
+    return `${dd} ${mon} ${yyyy}`;          // e.g. "17 Jun 2026"
+}
+
+function getNowTime() {
+    const now  = new Date();
+    let   hrs  = now.getHours();
+    const mins = String(now.getMinutes()).padStart(2, '0');
+    const secs = String(now.getSeconds()).padStart(2, '0');
+    const ampm = hrs >= 12 ? 'PM' : 'AM';
+    hrs = hrs % 12 || 12;
+    return `${String(hrs).padStart(2, '0')}:${mins}:${secs} ${ampm}`; // e.g. "08:48:07 PM"
+}
+
 // ── Exported Database API ──
 const db = {
     getProfile: async (userId) => {
         if (useMongo && mongoDb) {
             try {
                 const profile = await mongoDb.collection('profiles').findOne({ userId });
-                if (profile && profile.updatedAt instanceof Date) {
-                    profile.updatedAt = profile.updatedAt.toISOString();
-                }
-                return profile;
+                return profile || null;
             } catch (err) {
                 console.error("MongoDB getProfile error:", err.message);
             }
         }
-        
+
         // Fallback to JSON
         const data = readJSON();
         return data.profiles[userId] || null;
     },
 
     saveProfile: async (userId, nickname, profilePic, roomId = null, isAdmin = null) => {
-        const updatedAtStr = new Date().toISOString();
-        const updatedAtDate = new Date();
+        const date = getNowDate();
+        const time = getNowTime();
         const isAdminVal = isAdmin === true ? 'yes' : isAdmin === false ? 'no' : null;
 
         if (useMongo && mongoDb) {
             try {
-                const profile = { userId, nickname, profilePic, updatedAt: updatedAtDate };
-                if (roomId !== null)    profile.roomId  = roomId;
+                const profile = { userId, nickname, profilePic, date, time };
+                if (roomId !== null)     profile.roomId  = roomId;
                 if (isAdminVal !== null) profile.isAdmin = isAdminVal;
                 await mongoDb.collection('profiles').updateOne(
                     { userId },
                     { $set: profile },
                     { upsert: true }
                 );
-                return { ...profile, updatedAt: updatedAtStr };
+                return profile;
             } catch (err) {
                 console.error("MongoDB saveProfile error:", err.message);
             }
@@ -95,8 +113,8 @@ const db = {
 
         // Fallback to JSON
         const data = readJSON();
-        const entry = { nickname, profilePic, updatedAt: updatedAtStr };
-        if (roomId !== null)    entry.roomId  = roomId;
+        const entry = { nickname, profilePic, date, time };
+        if (roomId !== null)     entry.roomId  = roomId;
         if (isAdminVal !== null) entry.isAdmin = isAdminVal;
         data.profiles[userId] = entry;
         writeJSON(data);
@@ -107,11 +125,6 @@ const db = {
         if (useMongo && mongoDb) {
             try {
                 const list = await mongoDb.collection('rooms').find({}).toArray();
-                list.forEach(room => {
-                    if (room.updatedAt instanceof Date) {
-                        room.updatedAt = room.updatedAt.toISOString();
-                    }
-                });
                 return list;
             } catch (err) {
                 console.error("MongoDB getRooms error:", err.message);
@@ -123,26 +136,28 @@ const db = {
         if (!data.rooms) data.rooms = {};
         return Object.entries(data.rooms).map(([roomID, val]) => ({
             roomID,
-            adminSocketId: val.adminSocketId,
-            adminUserId: val.adminUserId || null,
-            adminNickname: val.adminNickname || null,
-            password: val.password
+            adminSocketId:  val.adminSocketId,
+            adminUserId:    val.adminUserId   || null,
+            adminNickname:  val.adminNickname || null,
+            password:       val.password,
+            date:           val.date || null,
+            time:           val.time || null
         }));
     },
 
     saveRoom: async (roomID, adminSocketId, password, adminUserId = null, adminNickname = null) => {
-        const updatedAtStr = new Date().toISOString();
-        const updatedAtDate = new Date();
+        const date = getNowDate();
+        const time = getNowTime();
 
         if (useMongo && mongoDb) {
             try {
-                const room = { roomID, adminSocketId, adminUserId, adminNickname, password, updatedAt: updatedAtDate };
+                const room = { roomID, adminSocketId, adminUserId, adminNickname, password, date, time };
                 await mongoDb.collection('rooms').updateOne(
                     { roomID },
                     { $set: room },
                     { upsert: true }
                 );
-                return { ...room, updatedAt: updatedAtStr };
+                return room;
             } catch (err) {
                 console.error("MongoDB saveRoom error:", err.message);
             }
@@ -151,13 +166,7 @@ const db = {
         // Fallback to JSON
         const data = readJSON();
         if (!data.rooms) data.rooms = {};
-        data.rooms[roomID] = {
-            adminSocketId,
-            adminUserId,
-            adminNickname,
-            password,
-            updatedAt: updatedAtStr
-        };
+        data.rooms[roomID] = { adminSocketId, adminUserId, adminNickname, password, date, time };
         writeJSON(data);
         return data.rooms[roomID];
     },
