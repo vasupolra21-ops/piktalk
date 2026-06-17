@@ -822,8 +822,16 @@ function setupEventListeners() {
                 return;
             }
 
-            // If all have been shown, reset the shown set (start fresh cycle)
-            if (shownIndices.size >= total) shownIndices.clear();
+            // If all have been shown, reset the shown set and re-shuffle (start fresh cycle)
+            if (shownIndices.size >= total) {
+                shownIndices.clear();
+                currentAISuggestionsIndex = 0;
+                // Re-shuffle so it feels fresh and new
+                for (let i = total - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [currentAISuggestions[i], currentAISuggestions[j]] = [currentAISuggestions[j], currentAISuggestions[i]];
+                }
+            }
 
             // Collect up to 3 suggestions that haven't been shown yet
             const batch = [];
@@ -859,9 +867,8 @@ function setupEventListeners() {
                 aiRepliesList.appendChild(chip);
             });
 
-            // Show More button if there are unseen suggestions
-            const remaining = total - shownIndices.size;
-            if (remaining > 0) {
+            // Always show More button if total > 3 to allow infinite cycling
+            if (total > 3) {
                 const moreChip = document.createElement('button');
                 moreChip.className = 'ai-reply-chip more-btn';
                 moreChip.innerHTML = '<i class="fas fa-arrows-rotate" style="margin-right: 4px; font-size: 0.75rem;"></i> More';
@@ -2813,7 +2820,7 @@ function generateAISmartReplies() {
     // Matches: "hii", "hii bro", "hey man", "hello there", "yo", "wassup dude" etc.
     // Uses \b word boundary — NOT ^...$, so extra words after greeting are fine
     if (!text ||
-        /^\s*(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|greetings|good\s*morning|good\s*evening|good\s*afternoon|namaste|howdy|hola|salut)\b/.test(text) ||
+        /^\s*(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|greetings|good\s*morning|good\s*evening|good\s*afternoon|namaste|howdy|hola|salut|salam|valakkam|vanakkam|heyya|heyyy|hiii|ahoy)\b/.test(text) ||
         /^(hi|hey|hello|yo|sup)\s+(bro|man|dude|buddy|guys|yaar|yar|jaan|bhai|sir|sis|there|all)/.test(text)
     ) {
         return [
@@ -2833,10 +2840,11 @@ function generateAISmartReplies() {
     }
 
     // ── 2. What are you doing / wyd / up to ──
-    if (/\b(wyd|wdyd)\b/.test(text) ||
-        /what.*(r u|are you|u\s+)(doing|up to|upto)/.test(text) ||
+    if (/\b(wyd|wdyd|wud|wut\s+doing)\b/.test(text) ||
+        /what.*(r\s+u|are\s+you|u\s+)(doing|up\s+to|upto)/.test(text) ||
         /watcha\s*doing|what\s+u\s+doing|what\s+r\s+u\s+doing/.test(text) ||
-        /kya\s*(kar\s*rahe|kr\s*rhe|chal\s*raha)/.test(text)
+        /kya\s*(kar|kr|chal|krta|krti)/.test(text) ||
+        /\b(kar\s*rha|kr\s*rha|kar\s*rahi|kr\s*rahi|kar\s*rhe|kr\s*rhe|chal\s*raha|chal\s*rha)\b/.test(text)
     ) {
         return [
             "Just chilling 😌 how about you?",
@@ -2858,7 +2866,9 @@ function generateAISmartReplies() {
     if (/how\s+(are\s+you|r\s+u|u\s+doing|have\s+you\s+been|is\s+life|is\s+everything)/.test(text) ||
         /how'?s?\s+(it\s+going|life|things|everything|\bu\b)/.test(text) ||
         /\b(you|u)\s+ok\??/.test(text) ||
-        /\b(kaisa|kaise)\s*(hai|ho|hain)?\b/.test(text) ||
+        /\b(kaisa|kaise|kese)\s*(hai|ho|hain|h)?\b/.test(text) ||
+        /\b(kya\s+haal|haal\s+kya)\b/.test(text) ||
+        /\b(hru|hows\s+u|how'?s\s+u)\b/.test(text) ||
         /\bhow\s+are\s+(u|ya)\b/.test(text)
     ) {
         return [
@@ -2973,7 +2983,7 @@ function generateAISmartReplies() {
 
     // ── 9. Agreement / OK / Yes ──
     // Fixed: uses \b word boundaries, NOT ^...$, so "ok bro", "yeah sure", "cool man" all match
-    if (/^\s*(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|alright|aight|bet|yup|yass|absolutely|haan|haa|ji|bilkul)\b/.test(text) ||
+    if (/^\s*(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|alright|aight|bet|yup|yass|absolutely|haan|haa|ji|bilkul|okey|okies|k|kk)\b/.test(text) ||
         /\b(sounds good|noted|got it)\b/.test(text)
     ) {
         return [
@@ -3034,7 +3044,7 @@ function generateAISmartReplies() {
     }
 
     // ── 12. Farewell / Bye ──
-    if (/\b(bye|goodbye|see\s+ya|see\s+you|talk\s+later|gn|goodnight|good\s+night|ttyl|take\s+care|cya|peace\s+out|alvida|ciao)\b/.test(text)) {
+    if (/\b(bye|goodbye|see\s+ya|see\s+you|talk\s+later|gn|goodnight|good\s+night|ttyl|take\s+care|cya|peace\s+out|alvida|ciao|tc|byee)\b/.test(text)) {
         return [
             "Goodbye! Take care 👋",
             "Talk to you later!",
