@@ -807,6 +807,53 @@ function setupEventListeners() {
     
     // AI smart replies trigger
     if (aiBtn) {
+        let currentAISuggestions = [];
+        let currentAISuggestionsIndex = 0;
+
+        const renderAISuggestionsBatch = () => {
+            if (!aiRepliesList) return;
+            aiRepliesList.innerHTML = '';
+            
+            const total = currentAISuggestions.length;
+            if (total === 0) {
+                aiRepliesBar.classList.add('hidden');
+                return;
+            }
+
+            // Get batch of up to 3 suggestions
+            const limit = Math.min(3, total);
+            for (let i = 0; i < limit; i++) {
+                const reply = currentAISuggestions[(currentAISuggestionsIndex + i) % total];
+                const chip = document.createElement('button');
+                chip.className = 'ai-reply-chip';
+                chip.textContent = reply;
+                chip.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    if (messageInput) {
+                        messageInput.value = reply;
+                        messageInput.focus();
+                        messageInput.style.height = 'auto';
+                        messageInput.style.height = (messageInput.scrollHeight) + 'px';
+                    }
+                    aiRepliesBar.classList.add('hidden');
+                });
+                aiRepliesList.appendChild(chip);
+            }
+
+            // If total suggestions is greater than 3, add the "More" button
+            if (total > 3) {
+                const moreChip = document.createElement('button');
+                moreChip.className = 'ai-reply-chip more-btn';
+                moreChip.innerHTML = '<i class="fas fa-arrows-rotate" style="margin-right: 4px; font-size: 0.75rem;"></i> More';
+                moreChip.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    currentAISuggestionsIndex = (currentAISuggestionsIndex + 3) % total;
+                    renderAISuggestionsBatch();
+                });
+                aiRepliesList.appendChild(moreChip);
+            }
+        };
+
         aiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isHidden = aiRepliesBar.classList.contains('hidden');
@@ -828,24 +875,9 @@ function setupEventListeners() {
             `;
             
             setTimeout(() => {
-                const replies = generateAISmartReplies();
-                aiRepliesList.innerHTML = '';
-                replies.forEach(reply => {
-                    const chip = document.createElement('button');
-                    chip.className = 'ai-reply-chip';
-                    chip.textContent = reply;
-                    chip.addEventListener('click', (ev) => {
-                        ev.stopPropagation();
-                        if (messageInput) {
-                            messageInput.value = reply;
-                            messageInput.focus();
-                            messageInput.style.height = 'auto';
-                            messageInput.style.height = (messageInput.scrollHeight) + 'px';
-                        }
-                        aiRepliesBar.classList.add('hidden');
-                    });
-                    aiRepliesList.appendChild(chip);
-                });
+                currentAISuggestions = generateAISmartReplies();
+                currentAISuggestionsIndex = 0;
+                renderAISuggestionsBatch();
             }, 450);
         });
     }
@@ -2713,100 +2745,148 @@ function generateAISmartReplies() {
         return [
             "Hey! How's it going?",
             "Hello! What are you up to?",
-            "Hey there, long time no see!"
+            "Hey there, long time no see!",
+            "What's new with you?",
+            "Hope you are having a great day!",
+            "Hey! Anything exciting happening?"
         ];
     }
 
     const text = lastReceived.toLowerCase();
 
-    // 1. Greetings
+    // 1. Specific question: "what are you doing" / "what are you up to"
+    if (text.includes("doing") || text.includes("up to") || text.includes("what r u doing") || text.includes("what u doing")) {
+        return [
+            "Just chilling, how about you?",
+            "Nothing much, just chatting here. You?",
+            "Reading messages, what are you up to?",
+            "Just getting some work done. You?",
+            "Not much, just relaxing at home.",
+            "Just surfing the web, how about you?"
+        ];
+    }
+
+    // 2. Greetings
     if (/\b(hi|hello|hey|yo|greetings|morning|afternoon|evening)\b/.test(text)) {
         return [
             "Hey! How's it going?",
             "Hello! Hope you're doing great.",
-            "Hi there! What's up?"
+            "Hi there! What's up?",
+            "Hey! What's new?",
+            "Hello! Good to hear from you.",
+            "Yo! How's your day going?"
         ];
     }
 
-    // 2. How are you
+    // 3. How are you
     if (text.includes("how are you") || text.includes("how's it going") || text.includes("how is it going") || text.includes("what's up") || text.includes("how u")) {
         return [
             "I'm doing great, thank you! How about you?",
             "All good here! What's new with you?",
-            "Pretty busy, but doing well. You?"
+            "Pretty busy, but doing well. You?",
+            "Can't complain! How have you been?",
+            "Doing great! What are you up to?",
+            "Everything is perfect, thank you!"
         ];
     }
 
-    // 3. Questions
+    // 4. Questions
     if (text.endsWith('?') || /\b(why|what|when|where|who|how|can you|are you|will you|do you|should we)\b/.test(text)) {
         if (text.includes("where")) {
             return [
                 "I'm at home right now.",
                 "On my way there!",
-                "Just heading out, you?"
+                "Just heading out, you?",
+                "I'm at work/school.",
+                "Still at the usual place.",
+                "I'll let you know when I arrive!"
             ];
         }
         if (text.includes("when") || text.includes("time") || text.includes("what clock")) {
             return [
                 "In a few minutes!",
                 "Let's do it in an hour.",
-                "Whenever works best for you."
+                "Whenever works best for you.",
+                "I'm free after 6 PM.",
+                "Let's decide tomorrow.",
+                "Right now, if you're ready!"
             ];
         }
         if (text.includes("free") || text.includes("busy") || text.includes("available")) {
             return [
                 "Yes, I'm free right now!",
                 "A bit busy, can we chat later?",
-                "Yeah, what's on your mind?"
+                "Yeah, what's on your mind?",
+                "I will be free in 10 minutes.",
+                "No, unfortunately I am quite busy.",
+                "Let me check my schedule."
             ];
         }
         return [
             "Yes, absolutely!",
             "I'm not quite sure, let me check.",
-            "No, I don't think so."
+            "No, I don't think so.",
+            "Definitely, count me in!",
+            "I'll think about it and let you know.",
+            "I don't think that's possible."
         ];
     }
 
-    // 4. Agreement / Ok
+    // 5. Agreement / Ok
     if (/\b(ok|okay|fine|agree|sure|yes|yeah|yep|cool|awesome|great|perfect)\b/.test(text)) {
         return [
             "Awesome, sounds like a plan!",
             "Great! Talk to you then.",
-            "Perfect. Let's do it."
+            "Perfect. Let's do it.",
+            "Cool, works for me!",
+            "Alright, noted.",
+            "Sounds wonderful!"
         ];
     }
 
-    // 5. Thanks
+    // 6. Thanks
     if (text.includes("thank") || text.includes("thanks") || text.includes("ty")) {
         return [
             "You're very welcome!",
             "Anytime!",
-            "No problem at all!"
+            "No problem at all!",
+            "My pleasure!",
+            "Glad I could help!",
+            "Don't mention it! 😊"
         ];
     }
 
-    // 6. Laughing
+    // 7. Laughing
     if (/\b(haha|haha|lol|lmao|xd|lmfao)\b/.test(text)) {
         return [
             "😂 absolutely hilarious!",
             "Haha, right?",
-            "Lol, too funny!"
+            "Lol, too funny!",
+            "I can't stop laughing!",
+            "Lmao, classic!",
+            "Haha, made my day!"
         ];
     }
 
-    // 7. Farewell
+    // 8. Farewell
     if (/\b(bye|goodbye|see ya|talk later|gn|goodnight|good night)\b/.test(text)) {
         return [
             "Goodbye! Take care.",
             "Talk to you later!",
-            "Good night! Sweet dreams. 😴"
+            "Good night! Sweet dreams. 😴",
+            "See you tomorrow!",
+            "Have a great rest of your day!",
+            "Bye! Let's chat soon."
         ];
     }
 
     return [
         "Sounds good to me!",
         "Alright, got it.",
-        "Could you tell me more about that?"
+        "Could you tell me more about that?",
+        "No problem!",
+        "Let's see what happens.",
+        "Oh, really?"
     ];
 }
 

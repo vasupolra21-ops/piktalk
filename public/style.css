@@ -3132,6 +3132,21 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     box-shadow: 0 4px 10px rgba(139, 92, 246, 0.12);
 }
 
+.ai-reply-chip.more-btn {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.ai-reply-chip.more-btn:hover {
+    background: rgba(99, 102, 241, 0.22);
+    border-color: rgba(99, 102, 241, 0.55);
+    color: var(--primary);
+    transform: translateY(-1.5px);
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+}
+
 /* Loading/sparkle state for AI */
 .ai-replies-loading {
     display: flex;
