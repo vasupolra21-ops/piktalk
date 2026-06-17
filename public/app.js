@@ -809,21 +809,39 @@ function setupEventListeners() {
     if (aiBtn) {
         let currentAISuggestions = [];
         let currentAISuggestionsIndex = 0;
+        let shownIndices = new Set();
 
         const renderAISuggestionsBatch = () => {
             if (!aiRepliesList) return;
             aiRepliesList.innerHTML = '';
-            
+
             const total = currentAISuggestions.length;
             if (total === 0) {
                 aiRepliesBar.classList.add('hidden');
                 return;
             }
 
-            // Get batch of up to 3 suggestions
-            const limit = Math.min(3, total);
-            for (let i = 0; i < limit; i++) {
-                const reply = currentAISuggestions[(currentAISuggestionsIndex + i) % total];
+            // If all have been shown, reset the shown set (start fresh cycle)
+            if (shownIndices.size >= total) shownIndices.clear();
+
+            // Collect up to 3 suggestions that haven't been shown yet
+            const batch = [];
+            let checked = 0;
+            let idx = currentAISuggestionsIndex;
+            while (batch.length < 3 && checked < total) {
+                if (!shownIndices.has(idx)) {
+                    batch.push({ idx, reply: currentAISuggestions[idx] });
+                }
+                idx = (idx + 1) % total;
+                checked++;
+            }
+
+            // Mark these as shown
+            batch.forEach(b => shownIndices.add(b.idx));
+            // Next "More" starts from where we left off
+            currentAISuggestionsIndex = idx;
+
+            batch.forEach(({ reply }) => {
                 const chip = document.createElement('button');
                 chip.className = 'ai-reply-chip';
                 chip.textContent = reply;
@@ -838,16 +856,16 @@ function setupEventListeners() {
                     aiRepliesBar.classList.add('hidden');
                 });
                 aiRepliesList.appendChild(chip);
-            }
+            });
 
-            // If total suggestions is greater than 3, add the "More" button
-            if (total > 3) {
+            // Show More button if there are unseen suggestions
+            const remaining = total - shownIndices.size;
+            if (remaining > 0) {
                 const moreChip = document.createElement('button');
                 moreChip.className = 'ai-reply-chip more-btn';
                 moreChip.innerHTML = '<i class="fas fa-arrows-rotate" style="margin-right: 4px; font-size: 0.75rem;"></i> More';
                 moreChip.addEventListener('click', (ev) => {
                     ev.stopPropagation();
-                    currentAISuggestionsIndex = (currentAISuggestionsIndex + 3) % total;
                     renderAISuggestionsBatch();
                 });
                 aiRepliesList.appendChild(moreChip);
@@ -861,7 +879,7 @@ function setupEventListeners() {
                 aiRepliesBar.classList.add('hidden');
                 return;
             }
-            
+
             aiRepliesBar.classList.remove('hidden');
             aiRepliesList.innerHTML = `
                 <div class="ai-replies-loading">
@@ -873,10 +891,16 @@ function setupEventListeners() {
                     Analyzing chat context...
                 </div>
             `;
-            
+
             setTimeout(() => {
                 currentAISuggestions = generateAISmartReplies();
+                // Shuffle so suggestions feel fresh each time AI button is pressed
+                for (let i = currentAISuggestions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [currentAISuggestions[i], currentAISuggestions[j]] = [currentAISuggestions[j], currentAISuggestions[i]];
+                }
                 currentAISuggestionsIndex = 0;
+                shownIndices = new Set();
                 renderAISuggestionsBatch();
             }, 450);
         });
@@ -2728,10 +2752,11 @@ function updateMembersList(usersList) {
 
 // ── Context-Aware AI Smart Reply Generator ──
 function generateAISmartReplies() {
-    let lastReceived = null;
-    let lastSent = null;
+    // Collect last 5 messages for full conversation context
+    const recentMsgs = chatHistory.slice(-5);
 
-    // Find last received message (from others)
+    // Primary: last message received from others
+    let lastReceived = null;
     for (let i = chatHistory.length - 1; i >= 0; i--) {
         if (!chatHistory[i].isSentByMe && chatHistory[i].message) {
             lastReceived = chatHistory[i].message.trim();
@@ -2739,7 +2764,8 @@ function generateAISmartReplies() {
         }
     }
 
-    // Find last message sent by me
+    // Fallback: last message I sent
+    let lastSent = null;
     for (let i = chatHistory.length - 1; i >= 0; i--) {
         if (chatHistory[i].isSentByMe && chatHistory[i].message) {
             lastSent = chatHistory[i].message.trim();
@@ -2747,180 +2773,325 @@ function generateAISmartReplies() {
         }
     }
 
-    // Primary context: last received. Fallback: last sent (for follow-up suggestions)
+    // Build a combined context string from last 5 messages for deeper pattern detection
+    const contextWindow = recentMsgs.map(m => m.message || '').join(' ').toLowerCase();
+
+    // Primary context for matching: last received msg, or last sent as fallback
     const contextMsg = lastReceived || lastSent || '';
     const text = contextMsg.toLowerCase().trim();
 
+    // ══════════════════════════════════════════════
+    // Smart pattern matching (checks both last msg
+    // and context window from last 5 messages)
+    // ══════════════════════════════════════════════
+
     // ── 1. Greetings ──
-    // Covers: hi, hii, hiii, hey, heyyy, hello, hellooo, yo, yoo, sup, wassup, namaste, howdy etc.
-    if (!text || /^(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|wazz+|greetings|good morning|good evening|good afternoon|morning|evening|afternoon|namaste|howdy)[\s!?.,]*$/.test(text)) {
+    if (!text || /^(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|wazz+|greetings|good morning|good evening|good afternoon|morning|evening|afternoon|namaste|howdy|hola|bonjour|salut)[\s!?.,]*$/.test(text)) {
         return [
             "Hey! 👋 How's it going?",
             "Hello! Hope you're doing great 😊",
             "Hi there! What's up?",
             "Hey! What's new with you?",
             "Hello! Good to hear from you 🙌",
-            "Yo! How's your day going?"
+            "Yo! How's your day going?",
+            "Hey hey! Long time no chat 😄",
+            "Heyy! How have you been?",
+            "Oh hey! What's the plan today?",
+            "Hi! Hope your day is going well 🌟",
+            "Hello there! What brings you here? 😄",
+            "Hey! Always great to hear from you 🙌"
         ];
     }
 
-    // ── 2. What are you doing / wyd / up to ──
-    if (/what.*(are you|r u|u).*(doing|up to|upto)|wyd|wdyd|watcha doing|what u doing|what r u doing|kya kar rahe|kya kr rhe/.test(text)) {
+    // ── 2. What are you doing / wyd ──
+    if (/what.*(are you|r u|u).*(doing|up to|upto)|wyd|wdyd|watcha doing|what u doing|what r u doing|kya kar rahe|kya kr rhe/.test(text) || contextWindow.includes('wyd') || contextWindow.includes('doing')) {
         return [
             "Just chilling 😌 how about you?",
             "Nothing much, just chatting. You?",
             "Reading messages, what are you up to?",
             "Getting some work done. You?",
             "Just relaxing at home 🏠",
-            "Surfing the web, how about you?"
+            "Surfing the web, how about you?",
+            "Working on something, you?",
+            "Just watching some videos 📺 you?",
+            "Listening to music 🎵 what about you?",
+            "Just about to eat, hbu?",
+            "Taking a break from work. You?",
+            "Not much! Just hanging 😄"
         ];
     }
 
     // ── 3. How are you ──
-    if (/how (are you|r u|u doing|have you been|is life|is everything)|how'?s? ?(it going|life|things|everything|u\b)|you ok\??|u ok\??/.test(text)) {
+    if (/how (are you|r u|u doing|have you been|is life|is everything)|how'?s? ?(it going|life|things|everything|u\b)|you ok\??|u ok\??|kaisa hai|kaise ho/.test(text)) {
         return [
             "I'm doing great, thank you! 😊 How about you?",
             "All good here! What's new with you?",
             "Pretty busy but doing well. You?",
             "Can't complain! How have you been?",
             "Doing great! What are you up to?",
-            "Everything is perfect, thank you!"
+            "Everything is perfect, thank you!",
+            "Feeling awesome today! 🌟 You?",
+            "A bit tired but managing. You?",
+            "Super! How are you doing?",
+            "Could be better, but still good 😊",
+            "Honestly, feeling fantastic! 🎉",
+            "Good thanks! Just staying busy 💪"
         ];
     }
 
     // ── 4. Where are you ──
-    if (/where.*(are you|r u|u\b|ya\b)|location|reached|arrived|coming/.test(text)) {
+    if (/where.*(are you|r u|u\b|ya\b)|location|reached|arrived|coming|kahan|kaha ho/.test(text)) {
         return [
             "I'm at home right now 🏠",
             "On my way there!",
             "Just heading out, you?",
             "I'm at work/school 📚",
             "Still at the usual place.",
-            "I'll let you know when I arrive!"
+            "I'll let you know when I arrive!",
+            "Just reached! 🎉",
+            "Stuck in traffic 😩",
+            "Almost there, 5 minutes!",
+            "At a café right now ☕",
+            "Still haven't left yet 😅",
+            "Just got back home actually!"
         ];
     }
 
     // ── 5. When / time ──
-    if (/when.*(are you|r u|u\b)|what time|how long|eta\b|be there|till when/.test(text)) {
+    if (/when.*(are you|r u|u\b|coming|free)|what time|how long|eta\b|be there|till when|kab/.test(text)) {
         return [
             "In a few minutes!",
             "Let's do it in an hour.",
             "Whenever works best for you.",
             "I'm free after 6 PM.",
             "Let's decide tomorrow.",
-            "Right now, if you're ready!"
+            "Right now, if you're ready!",
+            "Give me 10 minutes!",
+            "I'll be there by evening.",
+            "How about this weekend?",
+            "After I finish this task!",
+            "Should be there by 5 PM.",
+            "Soon! Just finishing something up."
         ];
     }
 
     // ── 6. Free / Busy / Available ──
-    if (/\b(free|busy|available|occupied|schedule)\b/.test(text)) {
+    if (/\b(free|busy|available|occupied|schedule|khali)\b/.test(text)) {
         return [
             "Yes, I'm free right now! 😊",
             "A bit busy, can we chat later?",
             "Yeah, what's on your mind?",
             "I'll be free in 10 minutes.",
             "Unfortunately quite busy right now.",
-            "Let me check my schedule."
+            "Let me check my schedule.",
+            "Totally free! What's up?",
+            "Half-busy, but go ahead!",
+            "Just finishing up, gimme 5 mins.",
+            "Free after lunch, works?",
+            "Mostly free today! Let's chat.",
+            "Busy till evening, sorry!"
         ];
     }
 
     // ── 7. Thanks / Thank you ──
-    if (/\b(thank(s| you)|ty|thx|thnx|tq|cheers|shukriya)\b/.test(text)) {
+    if (/\b(thank(s| you)|ty|thx|thnx|tq|cheers|shukriya|dhanyawad)\b/.test(text)) {
         return [
             "You're very welcome! 😊",
             "Anytime!",
             "No problem at all!",
             "My pleasure!",
             "Glad I could help!",
-            "Don't mention it! 😊"
+            "Don't mention it! 😊",
+            "Always happy to help 🙌",
+            "That's what I'm here for!",
+            "Of course, any time!",
+            "Happy to! Let me know if you need anything else.",
+            "Sure thing! 😄",
+            "It was nothing, really!"
         ];
     }
 
     // ── 8. Sorry / Apology ──
-    if (/\b(sorry|apolog|my bad|oops|excuse me|forgive|maaf)\b/.test(text)) {
+    if (/\b(sorry|apolog|my bad|oops|excuse me|forgive|maaf|pardon)\b/.test(text)) {
         return [
             "No worries! 😊",
             "It's totally fine, don't stress.",
             "All good, happens to everyone!",
             "Don't worry about it!",
             "That's okay, I understand.",
-            "No problem at all!"
+            "No problem at all!",
+            "It's all good, forget it! 😊",
+            "Hey, mistakes happen!",
+            "No hard feelings at all 🙌",
+            "You're forgiven! 😄",
+            "We all slip up sometimes!",
+            "It's fine, honestly!"
         ];
     }
 
     // ── 9. Agreement / OK / Yes ──
-    if (/^(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|sounds good|noted|got it|alright|aight|bet|k|yup|yass|absolutely|haan|haa)[\s!?.,]*$/.test(text)) {
+    if (/^(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|sounds good|noted|got it|alright|aight|bet|k|yup|yass|absolutely|haan|haa|ji|bilkul)[\s!?.,]*$/.test(text)) {
         return [
             "Awesome, sounds like a plan! 🎉",
             "Great! Talk to you then.",
             "Perfect. Let's do it.",
             "Cool, works for me!",
             "Alright, noted. 👍",
-            "Sounds wonderful!"
+            "Sounds wonderful!",
+            "Brilliant! Let's go 🚀",
+            "That settles it then!",
+            "Love it, let's make it happen!",
+            "Deal! 🤝",
+            "We're on the same page then!",
+            "Looking forward to it! 😄"
         ];
     }
 
     // ── 10. No / Disagree ──
-    if (/^(no|nope|nah|nay|not really|never|nahi|na)[\s!?.,]*$/.test(text)) {
+    if (/^(no|nope|nah|nay|not really|never|nahi|na|nope)[\s!?.,]*$/.test(text)) {
         return [
             "Oh okay, no problem.",
             "Got it, maybe next time!",
             "Alright, understood.",
             "No worries at all!",
             "Sure, that's fine 😊",
-            "Okay, let me know if you change your mind."
+            "Okay, let me know if you change your mind.",
+            "Fair enough!",
+            "That's okay! We'll figure it out.",
+            "No pressure at all 😊",
+            "Alright, respect that!",
+            "Cool, no biggie!",
+            "Okay, maybe another time then?"
         ];
     }
 
     // ── 11. Laughing ──
-    if (/\b(haha|hehe|lol|lmao|xd|lmfao|rofl|ikr)\b/.test(text)) {
+    if (/\b(haha|hehe|lol|lmao|xd|lmfao|rofl|ikr|😂|🤣)\b/.test(text) || text.includes('😂') || text.includes('🤣')) {
         return [
             "😂 Absolutely hilarious!",
             "Haha, right?! 😄",
             "Lol, too funny!",
             "I can't stop laughing! 🤣",
             "Lmao, classic!",
-            "Haha, made my day! 😂"
+            "Haha, made my day! 😂",
+            "Okay that was actually hilarious 💀",
+            "I'm deceased 😂🤣",
+            "Stop it, I'm crying laughing 😂",
+            "This is too much lmao!",
+            "Haha you're killing me 💀",
+            "Lol literally can't 😂"
         ];
     }
 
     // ── 12. Farewell / Bye ──
-    if (/\b(bye|goodbye|see ya|see you|talk later|gn|goodnight|good night|ttyl|take care|cya|peace out|alvida)\b/.test(text)) {
+    if (/\b(bye|goodbye|see ya|see you|talk later|gn|goodnight|good night|ttyl|take care|cya|peace out|alvida|chao|ciao)\b/.test(text)) {
         return [
             "Goodbye! Take care 👋",
             "Talk to you later!",
             "Good night! Sweet dreams 😴",
             "See you tomorrow!",
             "Have a great rest of your day!",
-            "Bye! Let's chat soon 😊"
+            "Bye! Let's chat soon 😊",
+            "Take care! Stay safe 🙌",
+            "Until next time! 👋",
+            "Miss you already! 😄",
+            "Bye bye! 👋😊",
+            "Catch you later!",
+            "Adios! Have a wonderful day 🌟"
         ];
     }
 
     // ── 13. Love / Affection ──
-    if (/\b(love|miss|cute|sweet|beautiful|amazing|wonderful|fantastic|wow)\b/.test(text)) {
+    if (/\b(love|miss|cute|sweet|beautiful|amazing|wonderful|fantastic|wow|gorgeous|adorable)\b/.test(text) || contextWindow.includes('❤') || contextWindow.includes('🥰')) {
         return [
             "Aww, that's so sweet! 🥰",
             "Thank you, that means a lot! ❤️",
             "You're amazing too! 😊",
             "That's really kind of you!",
             "Aww, I feel the same way! 💕",
-            "That's so lovely to hear! 😊"
+            "That's so lovely to hear! 😊",
+            "You always know what to say 🥹",
+            "Aw stop it, you're making me blush! 😊",
+            "Right back at you! ❤️",
+            "That just made my day! 🌟",
+            "You're too sweet! 🥰",
+            "Honestly, same! 💕"
         ];
     }
 
     // ── 14. Food / Eating ──
-    if (/\b(food|eat|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana)\b/.test(text)) {
+    if (/\b(food|eat|eating|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana|bhojan|biryani|noodles|sushi)\b/.test(text)) {
         return [
             "Ooh, that sounds delicious! 😋",
             "I'm hungry now just thinking about it!",
             "Let's grab food sometime! 🍕",
             "Yes! What are you having?",
             "I could go for some food right now! 😄",
-            "That sounds amazing, where from?"
+            "That sounds amazing, where from?",
+            "Send me some! 😂",
+            "Okay now I'm starving 😩",
+            "Is it good? Review please! 😄",
+            "Wish I was there to eat with you!",
+            "Save me some! 🍕",
+            "Yum! What's cooking? 👨‍🍳"
         ];
     }
 
-    // ── 15. General questions ──
+    // ── 15. Help / Support ──
+    if (/\b(help|assist|stuck|problem|issue|trouble|error|fix|solution|how do i|how to|guide|suggest)\b/.test(text)) {
+        return [
+            "Sure! What do you need help with?",
+            "I'll do my best to help! 😊",
+            "Tell me more, I'll figure it out.",
+            "Let's solve this together!",
+            "I've got you! What's the issue?",
+            "No problem, what's going on?",
+            "What's the problem? Let me know.",
+            "Happy to help! Explain the issue.",
+            "Sure thing, walk me through it.",
+            "Let me look into that for you!",
+            "We'll sort it out, don't worry! 💪",
+            "Explain the situation and I'll help!"
+        ];
+    }
+
+    // ── 16. Plans / Meeting ──
+    if (/\b(plan|meet|hang out|catch up|party|event|trip|outing|visit|come over|let'?s go|wanna|wana|shall we)\b/.test(text)) {
+        return [
+            "Sounds like a plan! 🎉",
+            "I'm in! When and where?",
+            "Let's do it! 🙌",
+            "Would love to! Count me in.",
+            "Oh yes, let's make it happen!",
+            "I'm totally down for that! 😄",
+            "Yes! Can't wait 🎉",
+            "When are we thinking?",
+            "Love the idea! Let's plan it.",
+            "I'll clear my schedule! 😄",
+            "Definitely! What's the plan?",
+            "100% in! Let's go 🚀"
+        ];
+    }
+
+    // ── 17. Sad / Not feeling well ──
+    if (/\b(sad|upset|depressed|crying|tired|exhausted|stressed|anxious|lonely|heartbroken|bored|dull|rough|not good|not okay|bad day)\b/.test(text)) {
+        return [
+            "Aww, I'm sorry to hear that 😢",
+            "I'm here for you! Talk to me 💙",
+            "That sounds really tough. Sending hugs! 🤗",
+            "You've got this, I believe in you! 💪",
+            "Things will get better, I promise 🌟",
+            "I'm always here if you need to talk 💙",
+            "Hope you feel better soon! 🌸",
+            "Take it easy, rest up 💙",
+            "That's rough, I'm sorry 😞",
+            "You're stronger than you think! 💪",
+            "Hang in there, it gets better!",
+            "Sending positive vibes your way 🌟"
+        ];
+    }
+
+    // ── 18. General questions ──
     if (text.endsWith('?') || /\b(why|what|when|where|who|how|can you|are you|will you|do you|should we|did you|have you)\b/.test(text)) {
         return [
             "Yes, absolutely! 😊",
@@ -2928,20 +3099,30 @@ function generateAISmartReplies() {
             "No, I don't think so.",
             "Definitely, count me in!",
             "I'll think about it and let you know.",
-            "That's a great point, let me think..."
+            "That's a great point, let me think...",
+            "Good question! I'll get back to you.",
+            "Hmm, not sure honestly 🤔",
+            "Yeah, probably!",
+            "Let me find out for you.",
+            "I think so, but let me confirm.",
+            "Most likely yes! 😊"
         ];
     }
 
-    // ── 16. Default fallback ──
+    // ── 19. Default fallback ──
     return [
         "Sounds good to me! 😊",
         "Alright, got it! 👍",
         "Could you tell me more about that?",
         "No problem!",
         "Oh, really? Tell me more!",
-        "That's interesting, go on..."
+        "That's interesting, go on...",
+        "I see, makes sense!",
+        "For sure! 😊",
+        "Interesting, keep going...",
+        "Okay, noted! What next?",
+        "Got it, what else? 😄",
+        "Makes total sense to me!"
     ];
 }
-
-
 
