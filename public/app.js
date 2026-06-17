@@ -27,6 +27,7 @@ let replyingTo = null;     // { msgId, nickname, preview } or null
 let replyBarEl = null;     // the reply preview bar DOM element
 let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
+let currentRoomUsersCount = 0;
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -1218,7 +1219,12 @@ if (socket) {
     });
 
     socket.on('room-users', (usersList) => {
+        currentRoomUsersCount = usersList.length;
         updateMembersList(usersList);
+        // Re-render reactions on all messages when user count changes
+        Object.keys(msgReactions).forEach(msgId => {
+            renderReactions(msgId);
+        });
     });
 
     // Server tells this socket directly that it is the admin
@@ -2065,7 +2071,11 @@ function renderReactions(msgId) {
         countSpan.textContent = map.size;
 
         pill.appendChild(emSpan);
-        pill.appendChild(countSpan);
+        
+        // Hide count only if total reactions on this emoji is 1 and room has 2 or fewer participants
+        if (map.size > 1 || currentRoomUsersCount > 2) {
+            pill.appendChild(countSpan);
+        }
 
         // Tap the pill → open the reactions sheet
         pill.addEventListener('click', (e) => {
