@@ -32,6 +32,11 @@ let currentRoomUsersCount = 0;
 // AI Smart Reply variables
 let aiBtn, aiRepliesBar, aiRepliesList, closeAiBtn;
 const chatHistory = [];
+let currentAISuggestions = [];
+let currentAISuggestionsIndex = 0;
+let shownIndices = new Set();
+let refreshAISuggestions = null;
+
 
 function initDOMElements() {
     homeView = document.getElementById('home-view');
@@ -807,10 +812,6 @@ function setupEventListeners() {
     
     // AI smart replies trigger
     if (aiBtn) {
-        let currentAISuggestions = [];
-        let currentAISuggestionsIndex = 0;
-        let shownIndices = new Set();
-
         const renderAISuggestionsBatch = () => {
             if (!aiRepliesList) return;
             aiRepliesList.innerHTML = '';
@@ -872,6 +873,18 @@ function setupEventListeners() {
             }
         };
 
+        refreshAISuggestions = () => {
+            currentAISuggestions = generateAISmartReplies();
+            // Shuffle so suggestions feel fresh each time
+            for (let i = currentAISuggestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentAISuggestions[i], currentAISuggestions[j]] = [currentAISuggestions[j], currentAISuggestions[i]];
+            }
+            currentAISuggestionsIndex = 0;
+            shownIndices = new Set();
+            renderAISuggestionsBatch();
+        };
+
         aiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const isHidden = aiRepliesBar.classList.contains('hidden');
@@ -893,15 +906,7 @@ function setupEventListeners() {
             `;
 
             setTimeout(() => {
-                currentAISuggestions = generateAISmartReplies();
-                // Shuffle so suggestions feel fresh each time AI button is pressed
-                for (let i = currentAISuggestions.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [currentAISuggestions[i], currentAISuggestions[j]] = [currentAISuggestions[j], currentAISuggestions[i]];
-                }
-                currentAISuggestionsIndex = 0;
-                shownIndices = new Set();
-                renderAISuggestionsBatch();
+                refreshAISuggestions();
             }, 450);
         });
     }
@@ -930,6 +935,7 @@ function setupEventListeners() {
                         replyTo: replyingTo || null
                     });
                     clearReply();
+                    if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
                 } else {
                     alert("Not connected to server. Image could not be sent.");
                 }
@@ -971,6 +977,7 @@ function setupEventListeners() {
                             replyTo: replyingTo || null
                         });
                         clearReply();
+                        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
                     } else {
                         alert("Not connected to server. Image could not be sent.");
                     }
@@ -985,6 +992,7 @@ function setupEventListeners() {
                             replyTo: replyingTo || null
                         });
                         clearReply();
+                        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
                     }
                 };
                 img.src = e.target.result;
@@ -1148,6 +1156,7 @@ function sendVoiceMessage() {
             });
             clearReply();
             discardPreview();
+            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
         } else {
             alert("Not connected to server. Voice message could not be sent.");
         }
@@ -1277,6 +1286,7 @@ function sendMessage() {
 
             const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
             if (emojiPicker) emojiPicker.classList.add('hidden');
+            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
             if (!isEmojiOpen) {
                 setTimeout(() => {
                     if (messageInput && !messageInput.disabled) messageInput.focus();
@@ -1294,6 +1304,11 @@ if (socket) {
         hideTyping();
         appendMessage(data, data.id === socket.id);
         if (msgSound) msgSound.play().catch(() => {});
+
+        // Auto-refresh smart replies in real time if suggestions bar is currently open
+        if (aiRepliesBar && !aiRepliesBar.classList.contains('hidden') && typeof refreshAISuggestions === 'function') {
+            refreshAISuggestions();
+        }
     });
 
     // Real-time reaction update
@@ -2753,30 +2768,42 @@ function updateMembersList(usersList) {
 
 // ── Context-Aware AI Smart Reply Generator ──
 function generateAISmartReplies() {
-    // Collect last 5 messages for conversation context
-    const recentMsgs = chatHistory.slice(-5);
-
-    // Primary: last message received from others
-    let lastReceived = null;
-    for (let i = chatHistory.length - 1; i >= 0; i--) {
-        if (!chatHistory[i].isSentByMe && chatHistory[i].message) {
-            lastReceived = chatHistory[i].message.trim();
-            break;
-        }
+    if (chatHistory.length === 0) {
+        return [
+            "Hey! 👋 How's it going?",
+            "Hello! Hope you're doing great 😊",
+            "Hi there! What's up?",
+            "Hey! What's new with you?",
+            "Hello! Good to hear from you 🙌",
+            "Yo! How's your day going?",
+            "Hey hey! Long time no chat 😄",
+            "Heyy! How have you been?",
+            "Oh hey! What's the plan today?",
+            "Hi! Hope your day is going well 🌟",
+            "Hello there! What brings you here? 😄",
+            "Hey! Always great to hear from you 🙌"
+        ];
     }
 
-    // Fallback: last message I sent
-    let lastSent = null;
-    for (let i = chatHistory.length - 1; i >= 0; i--) {
-        if (chatHistory[i].isSentByMe && chatHistory[i].message) {
-            lastSent = chatHistory[i].message.trim();
-            break;
-        }
+    const lastMsg = chatHistory[chatHistory.length - 1];
+    if (lastMsg.isSentByMe) {
+        return [
+            "Let me know when you're free! 😊",
+            "Talk to you soon!",
+            "Hope you're doing well! 🌟",
+            "No rush, reply when you can.",
+            "You there? 👀",
+            "Let me know what you think!",
+            "Catch you later!",
+            "Just checking in 😊",
+            "Have a great day!",
+            "Talk to you later! 👋",
+            "Whenever you get a chance 👍",
+            "Let's catch up soon!"
+        ];
     }
 
-    // Primary context for matching: last received msg, or last sent as fallback
-    const contextMsg = lastReceived || lastSent || '';
-    const text = contextMsg.toLowerCase().trim();
+    const text = (lastMsg.message || '').toLowerCase().trim();
 
     // Helper: checks if text STARTS WITH or IS one of the given words (ignores extra words like "bro", "man", "dude" etc.)
     const startsWith = (pattern) => pattern.test(text);
