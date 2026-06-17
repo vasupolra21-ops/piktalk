@@ -44,33 +44,48 @@ function readJSON() {
     }
 }
 
+// ── Date & Time Helper (IST Timezone) ──
+function getISTDateTime() {
+    const options = {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+    };
+    try {
+        const formatter = new Intl.DateTimeFormat('en-US', options);
+        const parts = formatter.formatToParts(new Date());
+        let day = '', month = '', year = '', hour = '', minute = '', second = '', dayPeriod = '';
+        parts.forEach(p => {
+            if (p.type === 'day') day = p.value;
+            if (p.type === 'month') month = p.value;
+            if (p.type === 'year') year = p.value;
+            if (p.type === 'hour') hour = p.value;
+            if (p.type === 'minute') minute = p.value;
+            if (p.type === 'second') second = p.value;
+            if (p.type === 'dayPeriod') dayPeriod = p.value.toUpperCase();
+        });
+        
+        hour = hour.padStart(2, '0');
+        day = day.padStart(2, '0');
+        
+        return `${day} ${month} ${year}, ${hour}:${minute}:${second} ${dayPeriod}`;
+    } catch (err) {
+        // Fallback to basic ISO conversion if Intl fails
+        return new Date().toISOString();
+    }
+}
+
 function writeJSON(data) {
     try {
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 4));
     } catch (e) {
         console.error("Error writing to JSON database:", e);
     }
-}
-
-// ── Date / Time Helpers ──
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-function getNowDate() {
-    const now = new Date();
-    const dd   = String(now.getDate()).padStart(2, '0');
-    const mon  = MONTHS[now.getMonth()];
-    const yyyy = now.getFullYear();
-    return `${dd} ${mon} ${yyyy}`;          // e.g. "17 Jun 2026"
-}
-
-function getNowTime() {
-    const now  = new Date();
-    let   hrs  = now.getHours();
-    const mins = String(now.getMinutes()).padStart(2, '0');
-    const secs = String(now.getSeconds()).padStart(2, '0');
-    const ampm = hrs >= 12 ? 'PM' : 'AM';
-    hrs = hrs % 12 || 12;
-    return `${String(hrs).padStart(2, '0')}:${mins}:${secs} ${ampm}`; // e.g. "08:48:07 PM"
 }
 
 // ── Exported Database API ──
@@ -91,13 +106,12 @@ const db = {
     },
 
     saveProfile: async (userId, nickname, profilePic, roomId = null, isAdmin = null) => {
-        const date = getNowDate();
-        const time = getNowTime();
+        const dateTime = getISTDateTime();
         const isAdminVal = isAdmin === true ? 'yes' : isAdmin === false ? 'no' : null;
 
         if (useMongo && mongoDb) {
             try {
-                const profile = { userId, nickname, profilePic, date, time };
+                const profile = { userId, nickname, profilePic, dateTime };
                 if (roomId !== null)     profile.roomId  = roomId;
                 if (isAdminVal !== null) profile.isAdmin = isAdminVal;
                 await mongoDb.collection('profiles').updateOne(
@@ -113,7 +127,7 @@ const db = {
 
         // Fallback to JSON
         const data = readJSON();
-        const entry = { nickname, profilePic, date, time };
+        const entry = { nickname, profilePic, dateTime };
         if (roomId !== null)     entry.roomId  = roomId;
         if (isAdminVal !== null) entry.isAdmin = isAdminVal;
         data.profiles[userId] = entry;
@@ -140,18 +154,16 @@ const db = {
             adminUserId:    val.adminUserId   || null,
             adminNickname:  val.adminNickname || null,
             password:       val.password,
-            date:           val.date || null,
-            time:           val.time || null
+            dateTime:       val.dateTime      || null
         }));
     },
 
     saveRoom: async (roomID, adminSocketId, password, adminUserId = null, adminNickname = null) => {
-        const date = getNowDate();
-        const time = getNowTime();
+        const dateTime = getISTDateTime();
 
         if (useMongo && mongoDb) {
             try {
-                const room = { roomID, adminSocketId, adminUserId, adminNickname, password, date, time };
+                const room = { roomID, adminSocketId, adminUserId, adminNickname, password, dateTime };
                 await mongoDb.collection('rooms').updateOne(
                     { roomID },
                     { $set: room },
@@ -166,7 +178,7 @@ const db = {
         // Fallback to JSON
         const data = readJSON();
         if (!data.rooms) data.rooms = {};
-        data.rooms[roomID] = { adminSocketId, adminUserId, adminNickname, password, date, time };
+        data.rooms[roomID] = { adminSocketId, adminUserId, adminNickname, password, dateTime };
         writeJSON(data);
         return data.rooms[roomID];
     },

@@ -119,11 +119,18 @@ io.on('connection', (socket) => {
 
         // Designate admin if room has no admin yet
         if (!rooms[cleanRoomID]) {
-            rooms[cleanRoomID] = { adminSocketId: socket.id, password: password || null };
+            rooms[cleanRoomID] = { 
+                adminSocketId: socket.id, 
+                password: password || null,
+                adminUserId: userId || null,
+                adminNickname: nickname || null
+            };
             await db.saveRoom(cleanRoomID, socket.id, password || null, userId || null, nickname || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id}) with password set: ${!!password}`);
         } else if (!rooms[cleanRoomID].adminSocketId) {
             rooms[cleanRoomID].adminSocketId = socket.id;
+            rooms[cleanRoomID].adminUserId = userId || null;
+            rooms[cleanRoomID].adminNickname = nickname || null;
             await db.saveRoom(cleanRoomID, socket.id, rooms[cleanRoomID].password || null, userId || null, nickname || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
         }
@@ -307,6 +314,8 @@ io.on('connection', (socket) => {
                 if (remainingSockets.length > 0) {
                     rooms[roomID].adminSocketId = remainingSockets[0];
                     const nextAdmin = users[remainingSockets[0]];
+                    rooms[roomID].adminUserId = nextAdmin.userId || null;
+                    rooms[roomID].adminNickname = nextAdmin.nickname || null;
                     await db.saveRoom(roomID, remainingSockets[0], rooms[roomID].password || null, nextAdmin.userId || null, nextAdmin.nickname || null);
                     console.log(`Admin transferred for room ${roomID} to: ${nextAdmin.nickname}`);
                     
@@ -317,8 +326,8 @@ io.on('connection', (socket) => {
                     // Tell the new admin directly
                     io.to(remainingSockets[0]).emit('you-are-admin', { password: rooms[roomID].password || null });
                 } else {
-                    delete rooms[roomID];
-                    await db.deleteRoom(roomID);
+                    rooms[roomID].adminSocketId = null;
+                    await db.saveRoom(roomID, null, rooms[roomID].password || null, rooms[roomID].adminUserId || null, rooms[roomID].adminNickname || null);
                 }
             }
 
@@ -334,7 +343,9 @@ async function initializeRooms() {
             dbRooms.forEach(room => {
                 rooms[room.roomID] = {
                     adminSocketId: null, // Reset socket ID on start/restart
-                    password: room.password || null
+                    password: room.password || null,
+                    adminUserId: room.adminUserId || null,
+                    adminNickname: room.adminNickname || null
                 };
             });
             console.log(`📂 Loaded ${dbRooms.length} rooms from database.`);
