@@ -95,6 +95,74 @@ const db = {
         };
         writeJSON(data);
         return data.profiles[userId];
+    },
+
+    getRooms: async () => {
+        if (useMongo && mongoDb) {
+            try {
+                const list = await mongoDb.collection('rooms').find({}).toArray();
+                return list;
+            } catch (err) {
+                console.error("MongoDB getRooms error:", err.message);
+            }
+        }
+
+        // Fallback to JSON
+        const data = readJSON();
+        if (!data.rooms) data.rooms = {};
+        return Object.entries(data.rooms).map(([roomID, val]) => ({
+            roomID,
+            adminSocketId: val.adminSocketId,
+            password: val.password
+        }));
+    },
+
+    saveRoom: async (roomID, adminSocketId, password) => {
+        const updatedAt = new Date().toISOString();
+
+        if (useMongo && mongoDb) {
+            try {
+                const room = { roomID, adminSocketId, password, updatedAt };
+                await mongoDb.collection('rooms').updateOne(
+                    { roomID },
+                    { $set: room },
+                    { upsert: true }
+                );
+                return room;
+            } catch (err) {
+                console.error("MongoDB saveRoom error:", err.message);
+            }
+        }
+
+        // Fallback to JSON
+        const data = readJSON();
+        if (!data.rooms) data.rooms = {};
+        data.rooms[roomID] = {
+            adminSocketId,
+            password,
+            updatedAt
+        };
+        writeJSON(data);
+        return data.rooms[roomID];
+    },
+
+    deleteRoom: async (roomID) => {
+        if (useMongo && mongoDb) {
+            try {
+                await mongoDb.collection('rooms').deleteOne({ roomID });
+                return true;
+            } catch (err) {
+                console.error("MongoDB deleteRoom error:", err.message);
+            }
+        }
+
+        // Fallback to JSON
+        const data = readJSON();
+        if (data.rooms && data.rooms[roomID]) {
+            delete data.rooms[roomID];
+            writeJSON(data);
+        }
+        return true;
     }
 };
 

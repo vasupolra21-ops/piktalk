@@ -125,9 +125,11 @@ io.on('connection', (socket) => {
         // Designate admin if room has no admin yet
         if (!rooms[cleanRoomID]) {
             rooms[cleanRoomID] = { adminSocketId: socket.id, password: password || null };
+            await db.saveRoom(cleanRoomID, socket.id, password || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id}) with password set: ${!!password}`);
         } else if (!rooms[cleanRoomID].adminSocketId) {
             rooms[cleanRoomID].adminSocketId = socket.id;
+            await db.saveRoom(cleanRoomID, socket.id, rooms[cleanRoomID].password || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
         }
 
@@ -285,7 +287,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
         const user = users[socket.id];
         if (user) {
             console.log(`${user.nickname} left room: ${user.roomID}`);
@@ -303,6 +305,7 @@ io.on('connection', (socket) => {
                 const remainingSockets = Object.keys(users).filter(id => users[id].roomID === roomID);
                 if (remainingSockets.length > 0) {
                     rooms[roomID].adminSocketId = remainingSockets[0];
+                    await db.saveRoom(roomID, remainingSockets[0], rooms[roomID].password || null);
                     const nextAdmin = users[remainingSockets[0]];
                     console.log(`Admin transferred for room ${roomID} to: ${nextAdmin.nickname}`);
                     
@@ -314,6 +317,7 @@ io.on('connection', (socket) => {
                     io.to(remainingSockets[0]).emit('you-are-admin', { password: rooms[roomID].password || null });
                 } else {
                     delete rooms[roomID];
+                    await db.deleteRoom(roomID);
                 }
             }
 
@@ -322,7 +326,25 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+async function initializeRooms() {
+    try {
+        const dbRooms = await db.getRooms();
+        if (dbRooms && Array.isArray(dbRooms)) {
+            dbRooms.forEach(room => {
+                rooms[room.roomID] = {
+                    adminSocketId: null, // Reset socket ID on start/restart
+                    password: room.password || null
+                };
+            });
+            console.log(`📂 Loaded ${dbRooms.length} rooms from database.`);
+        }
+    } catch (err) {
+        console.error("Error initializing rooms from database:", err.message);
+    }
+}
+
+server.listen(PORT, '0.0.0.0', async () => {
+    await initializeRooms();
     console.log(`\n🚀 PikTalk is running!`);
     console.log(`🏠 Local: http://localhost:${PORT}`);
     console.log(`📱 Network: http://${networkIP}:${PORT}\n`);
