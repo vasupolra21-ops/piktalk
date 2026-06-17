@@ -116,11 +116,6 @@ io.on('connection', (socket) => {
         socket.join(cleanRoomID);
         users[socket.id] = { roomID: cleanRoomID, nickname, profilePic, userId: userId || null };
         console.log(`${nickname} joined room: ${cleanRoomID}`);
-        
-        // Save profile if userId is provided
-        if (userId) {
-            await db.saveProfile(userId, nickname, profilePic);
-        }
 
         // Designate admin if room has no admin yet
         if (!rooms[cleanRoomID]) {
@@ -131,6 +126,12 @@ io.on('connection', (socket) => {
             rooms[cleanRoomID].adminSocketId = socket.id;
             await db.saveRoom(cleanRoomID, socket.id, rooms[cleanRoomID].password || null, userId || null, nickname || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
+        }
+
+        // Save profile with roomId and admin status now that we know the admin
+        if (userId) {
+            const isAdmin = rooms[cleanRoomID] && rooms[cleanRoomID].adminSocketId === socket.id;
+            await db.saveProfile(userId, nickname, profilePic, cleanRoomID, isAdmin);
         }
 
         // Notify others in the room
@@ -186,9 +187,9 @@ io.on('connection', (socket) => {
         socket.emit('profile-data', profile || null);
     });
 
-    socket.on('save-profile', async ({ userId, nickname, profilePic }) => {
+    socket.on('save-profile', async ({ userId, nickname, profilePic, roomId, isAdmin }) => {
         if (!userId || !nickname) return;
-        const saved = await db.saveProfile(userId, nickname, profilePic);
+        const saved = await db.saveProfile(userId, nickname, profilePic, roomId || null, isAdmin !== undefined ? isAdmin : null);
         socket.emit('profile-saved', saved);
     });
 

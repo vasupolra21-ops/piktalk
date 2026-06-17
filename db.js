@@ -72,13 +72,16 @@ const db = {
         return data.profiles[userId] || null;
     },
 
-    saveProfile: async (userId, nickname, profilePic) => {
+    saveProfile: async (userId, nickname, profilePic, roomId = null, isAdmin = null) => {
         const updatedAtStr = new Date().toISOString();
         const updatedAtDate = new Date();
+        const isAdminVal = isAdmin === true ? 'yes' : isAdmin === false ? 'no' : null;
 
         if (useMongo && mongoDb) {
             try {
                 const profile = { userId, nickname, profilePic, updatedAt: updatedAtDate };
+                if (roomId !== null)    profile.roomId  = roomId;
+                if (isAdminVal !== null) profile.isAdmin = isAdminVal;
                 await mongoDb.collection('profiles').updateOne(
                     { userId },
                     { $set: profile },
@@ -92,11 +95,10 @@ const db = {
 
         // Fallback to JSON
         const data = readJSON();
-        data.profiles[userId] = {
-            nickname,
-            profilePic,
-            updatedAt: updatedAtStr
-        };
+        const entry = { nickname, profilePic, updatedAt: updatedAtStr };
+        if (roomId !== null)    entry.roomId  = roomId;
+        if (isAdminVal !== null) entry.isAdmin = isAdminVal;
+        data.profiles[userId] = entry;
         writeJSON(data);
         return data.profiles[userId];
     },
