@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=111" as="style">
+    <link rel="preload" href="/style.css?v=112" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=111" as="script">
+    <link rel="preload" href="/app.js?v=112" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=111">
+    <link rel="stylesheet" href="/style.css?v=112">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -180,6 +180,15 @@
                     </button>
                 </div>
 
+                <!-- AI Smart Replies Bar -->
+                <div id="ai-replies-bar" class="ai-replies-bar hidden">
+                    <div class="ai-replies-header">
+                        <span><i class="fas fa-wand-magic-sparkles"></i> AI Smart Replies</span>
+                        <button id="close-ai-btn" class="close-ai-btn" title="Close Suggestions">&times;</button>
+                    </div>
+                    <div class="ai-replies-list" id="ai-replies-list"></div>
+                </div>
+
                 <div class="chat-input-row">
                     <div class="input-wrapper-chat">
                         <button id="attach-btn" class="btn-icon-small left">
@@ -191,6 +200,9 @@
                             <i class="far fa-smile"></i>
                         </button>
                     </div>
+                    <button id="ai-btn" class="btn btn-ai" title="Get AI Smart Reply">
+                        <i class="fas fa-wand-magic-sparkles" style="font-size: 0.8rem; margin-right: 2px;"></i>AI
+                    </button>
                     <button id="mic-btn" class="btn btn-mic" title="Hold to record voice">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -316,6 +328,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=111" defer></script>
+    <script src="/app.js?v=112" defer></script>
 </body>
 </html>

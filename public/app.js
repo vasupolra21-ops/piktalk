@@ -29,6 +29,10 @@ let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
 
+// AI Smart Reply variables
+let aiBtn, aiRepliesBar, aiRepliesList, closeAiBtn;
+const chatHistory = [];
+
 function initDOMElements() {
     homeView = document.getElementById('home-view');
     chatView = document.getElementById('chat-view');
@@ -69,6 +73,12 @@ function initDOMElements() {
     audioProgressBar = document.getElementById('audio-progress-bar');
     audioPreviewDuration = document.getElementById('audio-preview-duration');
     sendAudioBtn = document.getElementById('send-audio-btn');
+
+    // AI smart reply element initializations
+    aiBtn = document.getElementById('ai-btn');
+    aiRepliesBar = document.getElementById('ai-replies-bar');
+    aiRepliesList = document.getElementById('ai-replies-list');
+    closeAiBtn = document.getElementById('close-ai-btn');
 
     // Room ID & Password Modal Elements
     createRoomModal = document.getElementById('create-room-modal');
@@ -794,6 +804,59 @@ function setupEventListeners() {
     }
 
     if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
+    
+    // AI smart replies trigger
+    if (aiBtn) {
+        aiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = aiRepliesBar.classList.contains('hidden');
+            if (!isHidden) {
+                aiRepliesBar.classList.add('hidden');
+                return;
+            }
+            
+            aiRepliesBar.classList.remove('hidden');
+            aiRepliesList.innerHTML = `
+                <div class="ai-replies-loading">
+                    <div class="ai-sparkle-container">
+                        <div class="ai-sparkle-dot"></div>
+                        <div class="ai-sparkle-dot"></div>
+                        <div class="ai-sparkle-dot"></div>
+                    </div>
+                    Analyzing chat context...
+                </div>
+            `;
+            
+            setTimeout(() => {
+                const replies = generateAISmartReplies();
+                aiRepliesList.innerHTML = '';
+                replies.forEach(reply => {
+                    const chip = document.createElement('button');
+                    chip.className = 'ai-reply-chip';
+                    chip.textContent = reply;
+                    chip.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        if (messageInput) {
+                            messageInput.value = reply;
+                            messageInput.focus();
+                            messageInput.style.height = 'auto';
+                            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+                        }
+                        aiRepliesBar.classList.add('hidden');
+                    });
+                    aiRepliesList.appendChild(chip);
+                });
+            }, 450);
+        });
+    }
+
+    if (closeAiBtn) {
+        closeAiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            aiRepliesBar.classList.add('hidden');
+        });
+    }
+
     if (imgInput) imgInput.addEventListener('change', () => {
         const file = imgInput.files[0];
         if (!file) return;
@@ -1390,6 +1453,15 @@ function isSingleEmoji(str) {
 
 function appendMessage(data, isSentByMe) {
     if (!messagesContainer) return;
+
+    // Log chat history for AI Smart Reply context
+    chatHistory.push({
+        nickname: data.nickname || 'Anonymous',
+        message: data.message || '',
+        isSentByMe: isSentByMe
+    });
+    if (chatHistory.length > 20) chatHistory.shift();
+
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
@@ -2621,3 +2693,120 @@ function updateMembersList(usersList) {
         listWrap.appendChild(item);
     });
 }
+
+// ── Context-Aware AI Smart Reply Generator ──
+function generateAISmartReplies() {
+    let lastReceived = null;
+    for (let i = chatHistory.length - 1; i >= 0; i--) {
+        if (!chatHistory[i].isSentByMe && chatHistory[i].message) {
+            lastReceived = chatHistory[i].message.trim();
+            break;
+        }
+    }
+    
+    if (!lastReceived && chatHistory.length > 0) {
+        const lastMsg = chatHistory[chatHistory.length - 1].message;
+        if (lastMsg) lastReceived = lastMsg.trim();
+    }
+
+    if (!lastReceived) {
+        return [
+            "Hey! How's it going?",
+            "Hello! What are you up to?",
+            "Hey there, long time no see!"
+        ];
+    }
+
+    const text = lastReceived.toLowerCase();
+
+    // 1. Greetings
+    if (/\b(hi|hello|hey|yo|greetings|morning|afternoon|evening)\b/.test(text)) {
+        return [
+            "Hey! How's it going?",
+            "Hello! Hope you're doing great.",
+            "Hi there! What's up?"
+        ];
+    }
+
+    // 2. How are you
+    if (text.includes("how are you") || text.includes("how's it going") || text.includes("how is it going") || text.includes("what's up") || text.includes("how u")) {
+        return [
+            "I'm doing great, thank you! How about you?",
+            "All good here! What's new with you?",
+            "Pretty busy, but doing well. You?"
+        ];
+    }
+
+    // 3. Questions
+    if (text.endsWith('?') || /\b(why|what|when|where|who|how|can you|are you|will you|do you|should we)\b/.test(text)) {
+        if (text.includes("where")) {
+            return [
+                "I'm at home right now.",
+                "On my way there!",
+                "Just heading out, you?"
+            ];
+        }
+        if (text.includes("when") || text.includes("time") || text.includes("what clock")) {
+            return [
+                "In a few minutes!",
+                "Let's do it in an hour.",
+                "Whenever works best for you."
+            ];
+        }
+        if (text.includes("free") || text.includes("busy") || text.includes("available")) {
+            return [
+                "Yes, I'm free right now!",
+                "A bit busy, can we chat later?",
+                "Yeah, what's on your mind?"
+            ];
+        }
+        return [
+            "Yes, absolutely!",
+            "I'm not quite sure, let me check.",
+            "No, I don't think so."
+        ];
+    }
+
+    // 4. Agreement / Ok
+    if (/\b(ok|okay|fine|agree|sure|yes|yeah|yep|cool|awesome|great|perfect)\b/.test(text)) {
+        return [
+            "Awesome, sounds like a plan!",
+            "Great! Talk to you then.",
+            "Perfect. Let's do it."
+        ];
+    }
+
+    // 5. Thanks
+    if (text.includes("thank") || text.includes("thanks") || text.includes("ty")) {
+        return [
+            "You're very welcome!",
+            "Anytime!",
+            "No problem at all!"
+        ];
+    }
+
+    // 6. Laughing
+    if (/\b(haha|haha|lol|lmao|xd|lmfao)\b/.test(text)) {
+        return [
+            "😂 absolutely hilarious!",
+            "Haha, right?",
+            "Lol, too funny!"
+        ];
+    }
+
+    // 7. Farewell
+    if (/\b(bye|goodbye|see ya|talk later|gn|goodnight|good night)\b/.test(text)) {
+        return [
+            "Goodbye! Take care.",
+            "Talk to you later!",
+            "Good night! Sweet dreams. 😴"
+        ];
+    }
+
+    return [
+        "Sounds good to me!",
+        "Alright, got it.",
+        "Could you tell me more about that?"
+    ];
+}
+
