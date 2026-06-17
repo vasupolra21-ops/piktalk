@@ -58,6 +58,9 @@ const db = {
         if (useMongo && mongoDb) {
             try {
                 const profile = await mongoDb.collection('profiles').findOne({ userId });
+                if (profile && profile.updatedAt instanceof Date) {
+                    profile.updatedAt = profile.updatedAt.toISOString();
+                }
                 return profile;
             } catch (err) {
                 console.error("MongoDB getProfile error:", err.message);
@@ -70,17 +73,18 @@ const db = {
     },
 
     saveProfile: async (userId, nickname, profilePic) => {
-        const updatedAt = new Date().toISOString();
+        const updatedAtStr = new Date().toISOString();
+        const updatedAtDate = new Date();
 
         if (useMongo && mongoDb) {
             try {
-                const profile = { userId, nickname, profilePic, updatedAt };
+                const profile = { userId, nickname, profilePic, updatedAt: updatedAtDate };
                 await mongoDb.collection('profiles').updateOne(
                     { userId },
                     { $set: profile },
                     { upsert: true }
                 );
-                return profile;
+                return { ...profile, updatedAt: updatedAtStr };
             } catch (err) {
                 console.error("MongoDB saveProfile error:", err.message);
             }
@@ -91,7 +95,7 @@ const db = {
         data.profiles[userId] = {
             nickname,
             profilePic,
-            updatedAt
+            updatedAt: updatedAtStr
         };
         writeJSON(data);
         return data.profiles[userId];
@@ -101,6 +105,11 @@ const db = {
         if (useMongo && mongoDb) {
             try {
                 const list = await mongoDb.collection('rooms').find({}).toArray();
+                list.forEach(room => {
+                    if (room.updatedAt instanceof Date) {
+                        room.updatedAt = room.updatedAt.toISOString();
+                    }
+                });
                 return list;
             } catch (err) {
                 console.error("MongoDB getRooms error:", err.message);
@@ -118,17 +127,18 @@ const db = {
     },
 
     saveRoom: async (roomID, adminSocketId, password) => {
-        const updatedAt = new Date().toISOString();
+        const updatedAtStr = new Date().toISOString();
+        const updatedAtDate = new Date();
 
         if (useMongo && mongoDb) {
             try {
-                const room = { roomID, adminSocketId, password, updatedAt };
+                const room = { roomID, adminSocketId, password, updatedAt: updatedAtDate };
                 await mongoDb.collection('rooms').updateOne(
                     { roomID },
                     { $set: room },
                     { upsert: true }
                 );
-                return room;
+                return { ...room, updatedAt: updatedAtStr };
             } catch (err) {
                 console.error("MongoDB saveRoom error:", err.message);
             }
@@ -140,7 +150,7 @@ const db = {
         data.rooms[roomID] = {
             adminSocketId,
             password,
-            updatedAt
+            updatedAt: updatedAtStr
         };
         writeJSON(data);
         return data.rooms[roomID];
