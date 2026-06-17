@@ -114,7 +114,7 @@ io.on('connection', (socket) => {
         }
 
         socket.join(cleanRoomID);
-        users[socket.id] = { roomID: cleanRoomID, nickname, profilePic };
+        users[socket.id] = { roomID: cleanRoomID, nickname, profilePic, userId: userId || null };
         console.log(`${nickname} joined room: ${cleanRoomID}`);
         
         // Save profile if userId is provided
@@ -125,11 +125,11 @@ io.on('connection', (socket) => {
         // Designate admin if room has no admin yet
         if (!rooms[cleanRoomID]) {
             rooms[cleanRoomID] = { adminSocketId: socket.id, password: password || null };
-            await db.saveRoom(cleanRoomID, socket.id, password || null);
+            await db.saveRoom(cleanRoomID, socket.id, password || null, userId || null, nickname || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id}) with password set: ${!!password}`);
         } else if (!rooms[cleanRoomID].adminSocketId) {
             rooms[cleanRoomID].adminSocketId = socket.id;
-            await db.saveRoom(cleanRoomID, socket.id, rooms[cleanRoomID].password || null);
+            await db.saveRoom(cleanRoomID, socket.id, rooms[cleanRoomID].password || null, userId || null, nickname || null);
             console.log(`Admin designated for room ${cleanRoomID}: ${nickname} (${socket.id})`);
         }
 
@@ -305,8 +305,8 @@ io.on('connection', (socket) => {
                 const remainingSockets = Object.keys(users).filter(id => users[id].roomID === roomID);
                 if (remainingSockets.length > 0) {
                     rooms[roomID].adminSocketId = remainingSockets[0];
-                    await db.saveRoom(roomID, remainingSockets[0], rooms[roomID].password || null);
                     const nextAdmin = users[remainingSockets[0]];
+                    await db.saveRoom(roomID, remainingSockets[0], rooms[roomID].password || null, nextAdmin.userId || null, nextAdmin.nickname || null);
                     console.log(`Admin transferred for room ${roomID} to: ${nextAdmin.nickname}`);
                     
                     io.to(roomID).emit('system-message', {

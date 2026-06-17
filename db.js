@@ -122,17 +122,19 @@ const db = {
         return Object.entries(data.rooms).map(([roomID, val]) => ({
             roomID,
             adminSocketId: val.adminSocketId,
+            adminUserId: val.adminUserId || null,
+            adminNickname: val.adminNickname || null,
             password: val.password
         }));
     },
 
-    saveRoom: async (roomID, adminSocketId, password) => {
+    saveRoom: async (roomID, adminSocketId, password, adminUserId = null, adminNickname = null) => {
         const updatedAtStr = new Date().toISOString();
         const updatedAtDate = new Date();
 
         if (useMongo && mongoDb) {
             try {
-                const room = { roomID, adminSocketId, password, updatedAt: updatedAtDate };
+                const room = { roomID, adminSocketId, adminUserId, adminNickname, password, updatedAt: updatedAtDate };
                 await mongoDb.collection('rooms').updateOne(
                     { roomID },
                     { $set: room },
@@ -149,6 +151,8 @@ const db = {
         if (!data.rooms) data.rooms = {};
         data.rooms[roomID] = {
             adminSocketId,
+            adminUserId,
+            adminNickname,
             password,
             updatedAt: updatedAtStr
         };
