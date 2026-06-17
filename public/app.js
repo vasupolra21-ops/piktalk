@@ -2750,9 +2750,10 @@ function updateMembersList(usersList) {
     });
 }
 
+
 // ── Context-Aware AI Smart Reply Generator ──
 function generateAISmartReplies() {
-    // Collect last 5 messages for full conversation context
+    // Collect last 5 messages for conversation context
     const recentMsgs = chatHistory.slice(-5);
 
     // Primary: last message received from others
@@ -2773,20 +2774,21 @@ function generateAISmartReplies() {
         }
     }
 
-    // Build a combined context string from last 5 messages for deeper pattern detection
-    const contextWindow = recentMsgs.map(m => m.message || '').join(' ').toLowerCase();
-
     // Primary context for matching: last received msg, or last sent as fallback
     const contextMsg = lastReceived || lastSent || '';
     const text = contextMsg.toLowerCase().trim();
 
-    // ══════════════════════════════════════════════
-    // Smart pattern matching (checks both last msg
-    // and context window from last 5 messages)
-    // ══════════════════════════════════════════════
+    // Helper: checks if text STARTS WITH or IS one of the given words (ignores extra words like "bro", "man", "dude" etc.)
+    const startsWith = (pattern) => pattern.test(text);
+    const has = (pattern) => pattern.test(text);
 
     // ── 1. Greetings ──
-    if (!text || /^(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|wazz+|greetings|good morning|good evening|good afternoon|morning|evening|afternoon|namaste|howdy|hola|bonjour|salut)[\s!?.,]*$/.test(text)) {
+    // Matches: "hii", "hii bro", "hey man", "hello there", "yo", "wassup dude" etc.
+    // Uses \b word boundary — NOT ^...$, so extra words after greeting are fine
+    if (!text ||
+        /^\s*(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|greetings|good\s*morning|good\s*evening|good\s*afternoon|namaste|howdy|hola|salut)\b/.test(text) ||
+        /^(hi|hey|hello|yo|sup)\s+(bro|man|dude|buddy|guys|yaar|yar|jaan|bhai|sir|sis|there|all)/.test(text)
+    ) {
         return [
             "Hey! 👋 How's it going?",
             "Hello! Hope you're doing great 😊",
@@ -2803,8 +2805,12 @@ function generateAISmartReplies() {
         ];
     }
 
-    // ── 2. What are you doing / wyd ──
-    if (/what.*(are you|r u|u).*(doing|up to|upto)|wyd|wdyd|watcha doing|what u doing|what r u doing|kya kar rahe|kya kr rhe/.test(text) || contextWindow.includes('wyd') || contextWindow.includes('doing')) {
+    // ── 2. What are you doing / wyd / up to ──
+    if (/\b(wyd|wdyd)\b/.test(text) ||
+        /what.*(r u|are you|u\s+)(doing|up to|upto)/.test(text) ||
+        /watcha\s*doing|what\s+u\s+doing|what\s+r\s+u\s+doing/.test(text) ||
+        /kya\s*(kar\s*rahe|kr\s*rhe|chal\s*raha)/.test(text)
+    ) {
         return [
             "Just chilling 😌 how about you?",
             "Nothing much, just chatting. You?",
@@ -2822,7 +2828,12 @@ function generateAISmartReplies() {
     }
 
     // ── 3. How are you ──
-    if (/how (are you|r u|u doing|have you been|is life|is everything)|how'?s? ?(it going|life|things|everything|u\b)|you ok\??|u ok\??|kaisa hai|kaise ho/.test(text)) {
+    if (/how\s+(are\s+you|r\s+u|u\s+doing|have\s+you\s+been|is\s+life|is\s+everything)/.test(text) ||
+        /how'?s?\s+(it\s+going|life|things|everything|\bu\b)/.test(text) ||
+        /\b(you|u)\s+ok\??/.test(text) ||
+        /\b(kaisa|kaise)\s*(hai|ho|hain)?\b/.test(text) ||
+        /\bhow\s+are\s+(u|ya)\b/.test(text)
+    ) {
         return [
             "I'm doing great, thank you! 😊 How about you?",
             "All good here! What's new with you?",
@@ -2840,7 +2851,9 @@ function generateAISmartReplies() {
     }
 
     // ── 4. Where are you ──
-    if (/where.*(are you|r u|u\b|ya\b)|location|reached|arrived|coming|kahan|kaha ho/.test(text)) {
+    if (/\bwhere\b.*(are\s+you|r\s+u|\bu\b|ya)/.test(text) ||
+        /\b(kahan|kaha\s+ho|location|reached|arrived)\b/.test(text)
+    ) {
         return [
             "I'm at home right now 🏠",
             "On my way there!",
@@ -2858,7 +2871,9 @@ function generateAISmartReplies() {
     }
 
     // ── 5. When / time ──
-    if (/when.*(are you|r u|u\b|coming|free)|what time|how long|eta\b|be there|till when|kab/.test(text)) {
+    if (/\bwhen\b.*(are\s+you|r\s+u|\bu\b|coming|free)/.test(text) ||
+        /\b(what\s+time|how\s+long|\beta\b|be\s+there|till\s+when|\bkab\b)\b/.test(text)
+    ) {
         return [
             "In a few minutes!",
             "Let's do it in an hour.",
@@ -2876,7 +2891,7 @@ function generateAISmartReplies() {
     }
 
     // ── 6. Free / Busy / Available ──
-    if (/\b(free|busy|available|occupied|schedule|khali)\b/.test(text)) {
+    if (/\b(free|busy|available|occupied|khali)\b/.test(text)) {
         return [
             "Yes, I'm free right now! 😊",
             "A bit busy, can we chat later?",
@@ -2894,7 +2909,7 @@ function generateAISmartReplies() {
     }
 
     // ── 7. Thanks / Thank you ──
-    if (/\b(thank(s| you)|ty|thx|thnx|tq|cheers|shukriya|dhanyawad)\b/.test(text)) {
+    if (/\b(thanks?|thank\s+you|ty|thx|thnx|tq|cheers|shukriya|dhanyawad)\b/.test(text)) {
         return [
             "You're very welcome! 😊",
             "Anytime!",
@@ -2912,7 +2927,7 @@ function generateAISmartReplies() {
     }
 
     // ── 8. Sorry / Apology ──
-    if (/\b(sorry|apolog|my bad|oops|excuse me|forgive|maaf|pardon)\b/.test(text)) {
+    if (/\b(sorry|apologi|my\s+bad|oops|excuse\s+me|forgive|maaf|pardon)\b/.test(text)) {
         return [
             "No worries! 😊",
             "It's totally fine, don't stress.",
@@ -2930,7 +2945,10 @@ function generateAISmartReplies() {
     }
 
     // ── 9. Agreement / OK / Yes ──
-    if (/^(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|sounds good|noted|got it|alright|aight|bet|k|yup|yass|absolutely|haan|haa|ji|bilkul)[\s!?.,]*$/.test(text)) {
+    // Fixed: uses \b word boundaries, NOT ^...$, so "ok bro", "yeah sure", "cool man" all match
+    if (/^\s*(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|alright|aight|bet|yup|yass|absolutely|haan|haa|ji|bilkul)\b/.test(text) ||
+        /\b(sounds good|noted|got it)\b/.test(text)
+    ) {
         return [
             "Awesome, sounds like a plan! 🎉",
             "Great! Talk to you then.",
@@ -2948,7 +2966,10 @@ function generateAISmartReplies() {
     }
 
     // ── 10. No / Disagree ──
-    if (/^(no|nope|nah|nay|not really|never|nahi|na|nope)[\s!?.,]*$/.test(text)) {
+    // Fixed: uses flexible matching, NOT ^...$
+    if (/^\s*(no|nope|nah|nay|never|nahi|na)\b/.test(text) ||
+        /\bnot\s+really\b/.test(text)
+    ) {
         return [
             "Oh okay, no problem.",
             "Got it, maybe next time!",
@@ -2966,7 +2987,9 @@ function generateAISmartReplies() {
     }
 
     // ── 11. Laughing ──
-    if (/\b(haha|hehe|lol|lmao|xd|lmfao|rofl|ikr|😂|🤣)\b/.test(text) || text.includes('😂') || text.includes('🤣')) {
+    if (/\b(haha|hehe|lol|lmao|lmfao|rofl|ikr|xd)\b/.test(text) ||
+        text.includes('😂') || text.includes('🤣')
+    ) {
         return [
             "😂 Absolutely hilarious!",
             "Haha, right?! 😄",
@@ -2984,7 +3007,7 @@ function generateAISmartReplies() {
     }
 
     // ── 12. Farewell / Bye ──
-    if (/\b(bye|goodbye|see ya|see you|talk later|gn|goodnight|good night|ttyl|take care|cya|peace out|alvida|chao|ciao)\b/.test(text)) {
+    if (/\b(bye|goodbye|see\s+ya|see\s+you|talk\s+later|gn|goodnight|good\s+night|ttyl|take\s+care|cya|peace\s+out|alvida|ciao)\b/.test(text)) {
         return [
             "Goodbye! Take care 👋",
             "Talk to you later!",
@@ -3002,7 +3025,9 @@ function generateAISmartReplies() {
     }
 
     // ── 13. Love / Affection ──
-    if (/\b(love|miss|cute|sweet|beautiful|amazing|wonderful|fantastic|wow|gorgeous|adorable)\b/.test(text) || contextWindow.includes('❤') || contextWindow.includes('🥰')) {
+    if (/\b(love|miss\s+you|cute|sweet|beautiful|amazing|wonderful|fantastic|gorgeous|adorable)\b/.test(text) ||
+        text.includes('❤') || text.includes('🥰') || text.includes('💕')
+    ) {
         return [
             "Aww, that's so sweet! 🥰",
             "Thank you, that means a lot! ❤️",
@@ -3020,7 +3045,7 @@ function generateAISmartReplies() {
     }
 
     // ── 14. Food / Eating ──
-    if (/\b(food|eat|eating|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana|bhojan|biryani|noodles|sushi)\b/.test(text)) {
+    if (/\b(food|eating|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana|biryani|noodles|sushi)\b/.test(text)) {
         return [
             "Ooh, that sounds delicious! 😋",
             "I'm hungry now just thinking about it!",
@@ -3038,7 +3063,9 @@ function generateAISmartReplies() {
     }
 
     // ── 15. Help / Support ──
-    if (/\b(help|assist|stuck|problem|issue|trouble|error|fix|solution|how do i|how to|guide|suggest)\b/.test(text)) {
+    if (/\b(help|assist|stuck|problem|issue|trouble|error|fix|solution|guide|suggest)\b/.test(text) ||
+        /\bhow\s+(do\s+i|to)\b/.test(text)
+    ) {
         return [
             "Sure! What do you need help with?",
             "I'll do my best to help! 😊",
@@ -3056,7 +3083,9 @@ function generateAISmartReplies() {
     }
 
     // ── 16. Plans / Meeting ──
-    if (/\b(plan|meet|hang out|catch up|party|event|trip|outing|visit|come over|let'?s go|wanna|wana|shall we)\b/.test(text)) {
+    if (/\b(plan|meet|hang\s*out|catch\s*up|party|event|trip|outing|visit|come\s*over|wanna|shall\s+we)\b/.test(text) ||
+        /\blet'?s\s+go\b/.test(text)
+    ) {
         return [
             "Sounds like a plan! 🎉",
             "I'm in! When and where?",
@@ -3074,7 +3103,9 @@ function generateAISmartReplies() {
     }
 
     // ── 17. Sad / Not feeling well ──
-    if (/\b(sad|upset|depressed|crying|tired|exhausted|stressed|anxious|lonely|heartbroken|bored|dull|rough|not good|not okay|bad day)\b/.test(text)) {
+    if (/\b(sad|upset|depressed|crying|tired|exhausted|stressed|anxious|lonely|heartbroken|bored|rough)\b/.test(text) ||
+        /\b(not\s+good|not\s+okay|bad\s+day|not\s+well|feeling\s+low)\b/.test(text)
+    ) {
         return [
             "Aww, I'm sorry to hear that 😢",
             "I'm here for you! Talk to me 💙",
@@ -3092,7 +3123,9 @@ function generateAISmartReplies() {
     }
 
     // ── 18. General questions ──
-    if (text.endsWith('?') || /\b(why|what|when|where|who|how|can you|are you|will you|do you|should we|did you|have you)\b/.test(text)) {
+    if (text.endsWith('?') ||
+        /\b(why|what|when|where|who|how|can you|will you|do you|should we|did you|have you)\b/.test(text)
+    ) {
         return [
             "Yes, absolutely! 😊",
             "I'm not quite sure, let me check.",
