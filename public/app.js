@@ -505,6 +505,13 @@ function closeLightbox() {
 
 function renderEmojiPicker() {
     if (!emojiPicker) return;
+
+    // Prevent focus loss when clicking background/scrollbars on desktop
+    emojiPicker.addEventListener('mousedown', (e) => {
+        if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+        }
+    });
     
     emojiPicker.innerHTML = `
         <div class="emoji-tabs">
@@ -530,15 +537,29 @@ function renderEmojiPicker() {
         EMOJI_CATEGORIES[catName].forEach(emoji => {
             const span = document.createElement('span');
             span.textContent = emoji;
+            
+            // Prevent focus steal and maintain keyboard on touch/click
+            span.addEventListener('mousedown', (e) => e.preventDefault());
+            span.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (messageInput) {
+                    messageInput.value += emoji;
+                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(() => {
+                        if (messageInput && !messageInput.disabled) messageInput.focus();
+                    }, 50);
+                }
+            }, { passive: false });
+
             span.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (messageInput) {
                     messageInput.value += emoji;
-                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    if (!isMobile) {
-                        messageInput.focus();
-                    }
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    setTimeout(() => {
+                        if (messageInput && !messageInput.disabled) messageInput.focus();
+                    }, 50);
                 }
             });
             container.appendChild(span);
@@ -546,11 +567,27 @@ function renderEmojiPicker() {
     }
 
     tabs.forEach(tab => {
+        // Prevent focus steal and maintain keyboard on tab switches
+        tab.addEventListener('mousedown', (e) => e.preventDefault());
+        tab.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            loadCategory(tab.dataset.cat);
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
+        }, { passive: false });
+
         tab.addEventListener('click', (e) => {
             e.stopPropagation();
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             loadCategory(tab.dataset.cat);
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
         });
     });
 
@@ -742,17 +779,25 @@ function setupEventListeners() {
         window.location.href = '/';
     });
 
-    if (emojiBtn) emojiBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const willShow = emojiPicker.classList.contains('hidden');
-        emojiPicker.classList.toggle('hidden');
-        if (willShow) {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            if (isMobile && messageInput) {
-                messageInput.blur();
-            }
-        }
-    });
+    if (emojiBtn) {
+        // Prevent focus steal (keyboard close) on mobile
+        emojiBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        emojiBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            emojiPicker.classList.toggle('hidden');
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
+        }, { passive: false });
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            emojiPicker.classList.toggle('hidden');
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
+        });
+    }
 
     document.addEventListener('click', (e) => {
         if (emojiPicker && !emojiPicker.contains(e.target) && e.target !== emojiBtn) {
@@ -818,7 +863,15 @@ function setupEventListeners() {
         });
     }
 
-    if (attachBtn) attachBtn.addEventListener('click', () => imgInput.click());
+    if (attachBtn) {
+        // Prevent keyboard dismissal on mobile
+        attachBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        attachBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            imgInput.click();
+        }, { passive: false });
+        attachBtn.addEventListener('click', () => imgInput.click());
+    }
     
     // AI smart replies trigger
     if (aiBtn) {
@@ -987,6 +1040,9 @@ function setupEventListeners() {
                     });
                     clearReply();
                     if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                    setTimeout(() => {
+                        if (messageInput && !messageInput.disabled) messageInput.focus();
+                    }, 50);
                 } else {
                     alert("Not connected to server. Image could not be sent.");
                 }
@@ -1029,6 +1085,9 @@ function setupEventListeners() {
                         });
                         clearReply();
                         if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                        setTimeout(() => {
+                            if (messageInput && !messageInput.disabled) messageInput.focus();
+                        }, 50);
                     } else {
                         alert("Not connected to server. Image could not be sent.");
                     }
@@ -1044,6 +1103,9 @@ function setupEventListeners() {
                         });
                         clearReply();
                         if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                        setTimeout(() => {
+                            if (messageInput && !messageInput.disabled) messageInput.focus();
+                        }, 50);
                     }
                 };
                 img.src = e.target.result;
@@ -1065,10 +1127,21 @@ function setupEventListeners() {
         micBtn.addEventListener('touchend',   (e) => { e.preventDefault(); stopRecording(); },  { passive: false });
     }
 
-    if (cancelRecordingBtn) cancelRecordingBtn.addEventListener('click', cancelRecording);
-    if (discardAudioBtn)    discardAudioBtn.addEventListener('click',   discardPreview);
-    if (playPreviewBtn)     playPreviewBtn.addEventListener('click',    togglePreviewPlayback);
-    if (sendAudioBtn)       sendAudioBtn.addEventListener('click',      sendVoiceMessage);
+    // Voice bar buttons: prevent focus steal so keyboard stays open
+    const noFocusSteal = (btn, handler) => {
+        if (!btn) return;
+        btn.addEventListener('mousedown', (e) => e.preventDefault());
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (handler) handler();
+        }, { passive: false });
+        btn.addEventListener('click', (e) => { if (handler) handler(); });
+    };
+
+    noFocusSteal(cancelRecordingBtn, cancelRecording);
+    noFocusSteal(discardAudioBtn,    discardPreview);
+    noFocusSteal(playPreviewBtn,     togglePreviewPlayback);
+    noFocusSteal(sendAudioBtn,       sendVoiceMessage);
 
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
     document.addEventListener('click', () => {
@@ -1141,6 +1214,9 @@ function stopRecording() {
     voiceRecordingBar.classList.add('hidden');
     recordingTimerEl.textContent = '0:00';
     if (socket) socket.emit('voice-recording-stop');
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function cancelRecording() {
@@ -1157,6 +1233,9 @@ function cancelRecording() {
     audioChunks = [];
     recordedAudioBlob = null;
     if (socket) socket.emit('voice-recording-stop');
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function showAudioPreview(blob, durationSec) {
@@ -1189,6 +1268,9 @@ function togglePreviewPlayback() {
         previewPlaying = true;
         playPreviewBtn.innerHTML = '<i class="fas fa-pause"></i>';
     }
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function discardPreview() {
@@ -1197,6 +1279,9 @@ function discardPreview() {
     audioPreviewBar.classList.add('hidden');
     audioProgressBar.style.width = '0%';
     recordedAudioBlob = null;
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function sendVoiceMessage() {
@@ -1215,6 +1300,9 @@ function sendVoiceMessage() {
             clearReply();
             discardPreview();
             if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
         } else {
             alert("Not connected to server. Voice message could not be sent.");
         }
@@ -1620,11 +1708,25 @@ function appendMessage(data, isSentByMe) {
         const playBtn = document.createElement('button');
         playBtn.className = 'voice-bubble-play';
         playBtn.innerHTML = '<i class="fas fa-play"></i>';
+        
+        // Prevent focus stealing
+        playBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        playBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            toggleVoiceBubble(bubbleId);
+        }, { passive: false });
         playBtn.addEventListener('click', () => toggleVoiceBubble(bubbleId));
 
         const progressWrap = document.createElement('div');
         progressWrap.className = 'voice-bubble-progress';
         progressWrap.id = 'waveform-container-' + bubbleId;
+        
+        // Prevent focus stealing
+        progressWrap.addEventListener('mousedown', (e) => e.preventDefault());
+        progressWrap.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            seekVoiceBubble(e, bubbleId);
+        }, { passive: false });
         progressWrap.addEventListener('click', (e) => seekVoiceBubble(e, bubbleId));
 
         const barCount = 28;
@@ -2238,6 +2340,7 @@ function showReactionSheet(msgId) {
                 e.stopPropagation();
                 if (socket) socket.emit('toggle-reaction', { msgId, emoji, previousEmoji: null });
                 overlay.remove();
+                if (messageInput) messageInput.focus();
             });
             rowEl.appendChild(removeBtn);
         }
@@ -2250,7 +2353,10 @@ function showReactionSheet(msgId) {
 
     // Close on overlay background tap
     overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) {
+            overlay.remove();
+            if (messageInput) messageInput.focus();
+        }
     });
 }
 
@@ -2391,6 +2497,11 @@ function toggleVoiceBubble(bubbleId) {
         audio.pause();
         if (playBtnI) playBtnI.className = 'fas fa-play';
     }
+
+    // Maintain keyboard focus!
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function seekVoiceBubble(event, bubbleId) {
@@ -2398,9 +2509,20 @@ function seekVoiceBubble(event, bubbleId) {
     if (!_voiceAudios[bubbleId]) toggleVoiceBubble(bubbleId);
     const audio = _voiceAudios[bubbleId];
     if (!audio || !audio.duration) return;
-    const rect  = event.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    
+    const target = event.currentTarget || event.target;
+    if (!target) return;
+    const rect  = target.getBoundingClientRect();
+    
+    // Extract clientX from touch or mouse event
+    const clientX = (event.touches && event.touches[0]) ? event.touches[0].clientX : event.clientX;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     audio.currentTime = ratio * audio.duration;
+
+    // Maintain keyboard focus!
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 function updateWaveformProgress(bubbleId, pct) {
