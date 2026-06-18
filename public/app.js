@@ -982,9 +982,13 @@ function setupEventListeners() {
     }
 
     if (closeAiBtn) {
+        closeAiBtn.addEventListener('mousedown', (e) => e.preventDefault());
         closeAiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             aiRepliesBar.classList.add('hidden');
+            setTimeout(() => {
+                if (messageInput && !messageInput.disabled) messageInput.focus();
+            }, 50);
         });
     }
 
@@ -2383,6 +2387,7 @@ function setReply({ msgId, nickname, preview }) {
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'reply-cancel-btn';
     cancelBtn.innerHTML = '&times;';
+    cancelBtn.addEventListener('mousedown', (e) => e.preventDefault());
     cancelBtn.addEventListener('click', clearReply);
 
     replyBarEl.appendChild(inner);
@@ -2398,6 +2403,9 @@ function setReply({ msgId, nickname, preview }) {
 function clearReply() {
     replyingTo = null;
     if (replyBarEl) { replyBarEl.remove(); replyBarEl = null; }
+    setTimeout(() => {
+        if (messageInput && !messageInput.disabled) messageInput.focus();
+    }, 50);
 }
 
 // ── Scroll to quoted message and flash it ──
