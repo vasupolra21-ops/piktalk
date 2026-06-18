@@ -540,17 +540,6 @@ function renderEmojiPicker() {
             
             // Prevent focus steal and maintain keyboard on touch/click
             span.addEventListener('mousedown', (e) => e.preventDefault());
-            span.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (messageInput) {
-                    messageInput.value += emoji;
-                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    setTimeout(() => {
-                        if (messageInput && !messageInput.disabled) messageInput.focus();
-                    }, 50);
-                }
-            }, { passive: false });
 
             span.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -569,16 +558,6 @@ function renderEmojiPicker() {
     tabs.forEach(tab => {
         // Prevent focus steal and maintain keyboard on tab switches
         tab.addEventListener('mousedown', (e) => e.preventDefault());
-        tab.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            loadCategory(tab.dataset.cat);
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) messageInput.focus();
-            }, 50);
-        }, { passive: false });
 
         tab.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -782,14 +761,6 @@ function setupEventListeners() {
     if (emojiBtn) {
         // Prevent focus steal (keyboard close) on mobile
         emojiBtn.addEventListener('mousedown', (e) => e.preventDefault());
-        emojiBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            emojiPicker.classList.toggle('hidden');
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) messageInput.focus();
-            }, 50);
-        }, { passive: false });
         emojiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             emojiPicker.classList.toggle('hidden');
@@ -931,10 +902,6 @@ function setupEventListeners() {
 
                 // Prevent keyboard dismissal on click/tap
                 chip.addEventListener('mousedown', (ev) => ev.preventDefault());
-                chip.addEventListener('touchstart', (ev) => {
-                    ev.preventDefault();
-                    handleSelect(ev);
-                }, { passive: false });
                 chip.addEventListener('click', handleSelect);
 
                 aiRepliesList.appendChild(chip);
@@ -949,14 +916,13 @@ function setupEventListeners() {
                 const handleMore = (ev) => {
                     if (ev) ev.stopPropagation();
                     renderAISuggestionsBatch();
+                    setTimeout(() => {
+                        if (messageInput && !messageInput.disabled) messageInput.focus();
+                    }, 50);
                 };
 
                 // Prevent keyboard dismissal on click/tap
                 moreChip.addEventListener('mousedown', (ev) => ev.preventDefault());
-                moreChip.addEventListener('touchstart', (ev) => {
-                    ev.preventDefault();
-                    handleMore(ev);
-                }, { passive: false });
                 moreChip.addEventListener('click', handleMore);
 
                 aiRepliesList.appendChild(moreChip);
@@ -1711,10 +1677,6 @@ function appendMessage(data, isSentByMe) {
         
         // Prevent focus stealing
         playBtn.addEventListener('mousedown', (e) => e.preventDefault());
-        playBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            toggleVoiceBubble(bubbleId);
-        }, { passive: false });
         playBtn.addEventListener('click', () => toggleVoiceBubble(bubbleId));
 
         const progressWrap = document.createElement('div');
@@ -1723,10 +1685,6 @@ function appendMessage(data, isSentByMe) {
         
         // Prevent focus stealing
         progressWrap.addEventListener('mousedown', (e) => e.preventDefault());
-        progressWrap.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            seekVoiceBubble(e, bubbleId);
-        }, { passive: false });
         progressWrap.addEventListener('click', (e) => seekVoiceBubble(e, bubbleId));
 
         const barCount = 28;
