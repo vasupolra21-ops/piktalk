@@ -864,8 +864,9 @@ function setupEventListeners() {
                 const chip = document.createElement('button');
                 chip.className = 'ai-reply-chip';
                 chip.textContent = reply;
-                chip.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
+
+                const handleSelect = (ev) => {
+                    if (ev) ev.stopPropagation();
                     if (messageInput) {
                         messageInput.value = reply;
                         messageInput.focus();
@@ -873,7 +874,16 @@ function setupEventListeners() {
                         messageInput.style.height = (messageInput.scrollHeight) + 'px';
                     }
                     aiRepliesBar.classList.add('hidden');
-                });
+                };
+
+                // Prevent keyboard dismissal on click/tap
+                chip.addEventListener('mousedown', (ev) => ev.preventDefault());
+                chip.addEventListener('touchstart', (ev) => {
+                    ev.preventDefault();
+                    handleSelect(ev);
+                }, { passive: false });
+                chip.addEventListener('click', handleSelect);
+
                 aiRepliesList.appendChild(chip);
             });
 
@@ -882,10 +892,20 @@ function setupEventListeners() {
                 const moreChip = document.createElement('button');
                 moreChip.className = 'ai-reply-chip more-btn';
                 moreChip.innerHTML = '<i class="fas fa-arrows-rotate" style="margin-right: 4px; font-size: 0.75rem;"></i> More';
-                moreChip.addEventListener('click', (ev) => {
-                    ev.stopPropagation();
+
+                const handleMore = (ev) => {
+                    if (ev) ev.stopPropagation();
                     renderAISuggestionsBatch();
-                });
+                };
+
+                // Prevent keyboard dismissal on click/tap
+                moreChip.addEventListener('mousedown', (ev) => ev.preventDefault());
+                moreChip.addEventListener('touchstart', (ev) => {
+                    ev.preventDefault();
+                    handleMore(ev);
+                }, { passive: false });
+                moreChip.addEventListener('click', handleMore);
+
                 aiRepliesList.appendChild(moreChip);
             }
         };
@@ -902,8 +922,8 @@ function setupEventListeners() {
             renderAISuggestionsBatch();
         };
 
-        aiBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        const toggleAISuggestions = (e) => {
+            if (e) e.stopPropagation();
             const isHidden = aiRepliesBar.classList.contains('hidden');
             if (!isHidden) {
                 aiRepliesBar.classList.add('hidden');
@@ -925,6 +945,20 @@ function setupEventListeners() {
             setTimeout(() => {
                 refreshAISuggestions();
             }, 450);
+        };
+
+        // Prevent keyboard from closing when tapping the AI suggestions button
+        aiBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+
+        aiBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            toggleAISuggestions(e);
+        }, { passive: false });
+
+        aiBtn.addEventListener('click', (e) => {
+            toggleAISuggestions(e);
         });
     }
 
