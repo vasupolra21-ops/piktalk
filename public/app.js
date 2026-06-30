@@ -3536,8 +3536,8 @@ function processLivenessFrame(video) {
 // Main RequestAnimationFrame loop for Face ID scan
 function runFaceScanLoop() {
     if (!faceScanActive) return;
-    // Guard: if profile setup is already visible, stop scanning
-    if (profileSetupSection && !profileSetupSection.classList.contains('hidden')) {
+    // Guard: if profile setup is already visible AND we are NOT in settings, stop scanning
+    if (!faceScanIsSettings && profileSetupSection && !profileSetupSection.classList.contains('hidden')) {
         stopFaceScanFlow();
         return;
     }
@@ -4062,10 +4062,27 @@ function removeFaceCredentials() {
 }
 
 function startSettingsFaceRegistration() {
-    if (settingsScanContainer) {
-        settingsScanContainer.classList.remove('hidden');
-        startFaceScanFlow(true); // true = registering from Settings
+    if (!settingsScanContainer) return;
+
+    // Stop any currently running scan first
+    stopFaceScanFlow();
+
+    // Re-query elements in case they weren't ready at init time
+    settingsVideo  = document.getElementById('settings-video');
+    settingsCanvas = document.getElementById('settings-canvas');
+    settingsScanStatus = document.getElementById('settings-scan-status');
+
+    // Show the scanner container
+    settingsScanContainer.classList.remove('hidden');
+
+    if (settingsScanStatus) {
+        settingsScanStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting camera...';
     }
+
+    // Small delay to allow the container to render before camera starts
+    setTimeout(() => {
+        startFaceScanFlow(true); // true = registering from Settings
+    }, 150);
 }
 
 
