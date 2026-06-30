@@ -3566,6 +3566,43 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     color: var(--primary);
 }
 
+.settings-nickname-form {
+    width: 100%;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--glass-border);
+    animation: lbFadeIn 0.3s ease;
+}
+
+.settings-nickname-label {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.settings-nickname-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1.5px solid var(--glass-border);
+    background: var(--input-bg, rgba(255,255,255,0.06));
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.settings-nickname-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+
 @keyframes laserScan {
     0%, 100% { top: 0%; }
     50% { top: 100%; }

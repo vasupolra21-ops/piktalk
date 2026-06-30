@@ -394,6 +394,14 @@
                     <button id="settings-scan-demo-btn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%; font-size: 0.8rem; padding: 4px 8px;">
                         Simulate Scan
                     </button>
+                    <!-- Nickname input shown after face scan succeeds -->
+                    <div id="settings-nickname-form" class="settings-nickname-form hidden">
+                        <p class="settings-nickname-label"><i class="fas fa-circle-check" style="color:#10b981"></i> Face registered! Enter your name:</p>
+                        <input type="text" id="settings-nickname-input" class="settings-nickname-input" placeholder="Enter nickname..." maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false">
+                        <button id="settings-save-name-btn" class="btn btn-primary" style="width:100%; margin-top:8px;">
+                            <i class="fas fa-check"></i> Save & Done
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -406,6 +414,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=127" defer></script>
+    <script src="/app.js?v=128" defer></script>
 </body>
 </html>

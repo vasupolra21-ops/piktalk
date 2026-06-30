@@ -18,6 +18,7 @@ let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPrevie
 // Settings DOM Elements
 let settingsBtn, settingsModal, settingsCloseBtn, settingsNickname, settingsBioStatus, settingsRemoveFaceBtn, settingsRegisterFaceBtn;
 let settingsScanContainer, settingsVideo, settingsCanvas, settingsScanStatus, settingsScanDemoBtn;
+let settingsNicknameForm, settingsNicknameInput, settingsSaveNameBtn;
 
 // Face ID Modal DOM Elements
 let faceScanSection, profileSetupSection, faceVideo, faceCanvas, faceStatus, faceDetail, faceDemoBtn;
@@ -129,6 +130,9 @@ function initDOMElements() {
     settingsCanvas = document.getElementById('settings-canvas');
     settingsScanStatus = document.getElementById('settings-scan-status');
     settingsScanDemoBtn = document.getElementById('settings-scan-demo-btn');
+    settingsNicknameForm  = document.getElementById('settings-nickname-form');
+    settingsNicknameInput = document.getElementById('settings-nickname-input');
+    settingsSaveNameBtn   = document.getElementById('settings-save-name-btn');
 
     // Face ID Modal DOM Elements
     faceScanSection = document.getElementById('face-scan-section');
@@ -646,6 +650,11 @@ function setupEventListeners() {
     // Face ID Modal buttons
     if (faceDemoBtn) {
         faceDemoBtn.addEventListener('click', simulateFaceScan);
+    }
+
+    // Settings nickname save button
+    if (settingsSaveNameBtn) {
+        settingsSaveNameBtn.addEventListener('click', saveSettingsNickname);
     }
 
     // Password toggles
@@ -3777,8 +3786,18 @@ function handleScanSuccess(statusText) {
     
     setTimeout(() => {
         if (faceScanIsSettings) {
-            if (settingsScanContainer) settingsScanContainer.classList.add('hidden');
-            updateSettingsUI();
+            if (settingsScanStatus) {
+                settingsScanStatus.className = 'settings-scan-status';
+                settingsScanStatus.style.color = '#10b981';
+                settingsScanStatus.innerHTML = '<i class="fas fa-circle-check"></i> Face Registered!';
+            }
+            // Show nickname input form
+            if (settingsNicknameForm) {
+                const savedProfile = JSON.parse(localStorage.getItem('piktalk_profile') || '{}');
+                if (settingsNicknameInput) settingsNicknameInput.value = savedProfile.nickname || '';
+                settingsNicknameForm.classList.remove('hidden');
+                setTimeout(() => { if (settingsNicknameInput) settingsNicknameInput.focus(); }, 100);
+            }
             return;
         }
         
@@ -4079,10 +4098,51 @@ function startSettingsFaceRegistration() {
         settingsScanStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting camera...';
     }
 
+    // Hide and reset nickname form for fresh scan
+    if (settingsNicknameForm) settingsNicknameForm.classList.add('hidden');
+    if (settingsNicknameInput) settingsNicknameInput.value = '';
+    if (settingsScanStatus) settingsScanStatus.style.color = '';
+
     // Small delay to allow the container to render before camera starts
     setTimeout(() => {
         startFaceScanFlow(true); // true = registering from Settings
     }, 150);
 }
 
+function saveSettingsNickname() {
+    const newName = settingsNicknameInput ? settingsNicknameInput.value.trim() : '';
+    if (!newName) {
+        if (settingsNicknameInput) {
+            settingsNicknameInput.focus();
+            settingsNicknameInput.style.borderColor = 'var(--danger)';
+            setTimeout(() => { settingsNicknameInput.style.borderColor = ''; }, 1500);
+        }
+        return;
+    }
 
+    // Save to localStorage profile
+    const profile = JSON.parse(localStorage.getItem('piktalk_profile') || '{}');
+    profile.nickname = newName;
+    localStorage.setItem('piktalk_profile', JSON.stringify(profile));
+
+    // Update live session nickname if user is already in chat
+    myNickname = newName;
+
+    // Hide scanner and name form, refresh settings panel
+    if (settingsScanContainer) settingsScanContainer.classList.add('hidden');
+    if (settingsNicknameForm) settingsNicknameForm.classList.add('hidden');
+
+    // Show a brief success flash on the save button
+    if (settingsSaveNameBtn) {
+        const origHTML = settingsSaveNameBtn.innerHTML;
+        settingsSaveNameBtn.innerHTML = '<i class="fas fa-circle-check"></i> Saved!';
+        settingsSaveNameBtn.disabled = true;
+        setTimeout(() => {
+            settingsSaveNameBtn.innerHTML = origHTML;
+            settingsSaveNameBtn.disabled = false;
+            updateSettingsUI();
+        }, 1000);
+    } else {
+        updateSettingsUI();
+    }
+}
