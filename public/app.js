@@ -1438,34 +1438,32 @@ function updateAdminUI() {
 function showNicknameModal() {
     [homeView, chatView, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (nicknameModal) nicknameModal.classList.add('active');
-    
-    // Reset scanner UI sections
-    if (faceScanSection) faceScanSection.classList.remove('hidden');
-    if (profileSetupSection) profileSetupSection.classList.add('hidden');
-    
-    // Check if biometric face profile exists
-    const hasRegisteredFace = localStorage.getItem('piktalk_face_signature');
-    if (hasRegisteredFace) {
-        if (faceDetail) faceDetail.textContent = 'Scanning for registered credentials';
+
+    // Only start the scan if we are not already on the profile setup step
+    const alreadyOnSetup = profileSetupSection && !profileSetupSection.classList.contains('hidden');
+    if (!alreadyOnSetup) {
+        // Show scanner, hide profile form
+        if (faceScanSection) faceScanSection.classList.remove('hidden');
+        if (profileSetupSection) profileSetupSection.classList.add('hidden');
+
+        // Set initial status
         if (faceStatus) {
             faceStatus.className = 'face-status';
             faceStatus.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
         }
+        if (faceDetail) faceDetail.textContent = 'Blink/head movement slowly';
+
+        // Load saved profile pic
+        loadSavedProfile();
+        updateInputsState();
+        updateThemeColor();
+
+        // Start face scan scanner
+        startFaceScanFlow(false);
     } else {
-        if (faceDetail) faceDetail.textContent = 'No biometrics found. Align face to register.';
-        if (faceStatus) {
-            faceStatus.className = 'face-status';
-            faceStatus.innerHTML = '<i class="fas fa-expand-alt animate-pulse"></i> Prepare first-time scan...';
-        }
+        updateInputsState();
+        updateThemeColor();
     }
-
-    // Load profile directly from THIS browser's localStorage.
-    loadSavedProfile();
-    updateInputsState();
-    updateThemeColor();
-
-    // Start face scan scanner
-    startFaceScanFlow(false); // false = not registering-only from Settings
 }
 
 function sendMessage() {
@@ -3538,6 +3536,11 @@ function processLivenessFrame(video) {
 // Main RequestAnimationFrame loop for Face ID scan
 function runFaceScanLoop() {
     if (!faceScanActive) return;
+    // Guard: if profile setup is already visible, stop scanning
+    if (profileSetupSection && !profileSetupSection.classList.contains('hidden')) {
+        stopFaceScanFlow();
+        return;
+    }
     
     const video = faceScanVideoEl;
     const canvas = faceScanCanvasEl;
@@ -3566,20 +3569,14 @@ function runFaceScanLoop() {
         
         const livenessResult = processLivenessFrame(video);
         
+        // Static liveness hint always shown during scan
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+
         if (livenessResult.isLive) {
             if (livenessResult.diff > 1.8) {
-                // Blink or large shift detected
                 faceScanLivenessProgress += 4;
-                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head gesture detected!';
             } else {
                 faceScanLivenessProgress += 0.8;
-                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Verifying liveness... please blink or turn slightly';
-            }
-        } else {
-            if (livenessResult.diff === 0) {
-                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Static input detected. Biometrics require active camera.';
-            } else {
-                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold still, align face in frame...';
             }
         }
         
