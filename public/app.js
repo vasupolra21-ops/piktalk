@@ -3750,9 +3750,9 @@ async function runFaceScanLoop() {
     facePrevLandmarks = detection.landmarks;
     faceMotionSum += motion;
 
-    // Progress: require motion + consecutive detections
-    if (motion > 0.3) faceScanLivenessProgress += 4;  // blink/head movement
-    else              faceScanLivenessProgress += 1.5; // just visible face
+    // Progress: require motion + consecutive detections (faster scan)
+    if (motion > 0.3) faceScanLivenessProgress += 15;  // blink/head movement
+    else              faceScanLivenessProgress += 8; // just visible face
     faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
     // Update status UI
@@ -3798,6 +3798,8 @@ function _onFaceScanComplete() {
     } else {
         // Returning user — match
         if (descriptor && faceDescriptorMatch(descriptor)) {
+            // Update to latest profile picture on successful match scan!
+            saveBiometrics(descriptor, faceScanVideoEl);
             handleScanSuccess('Access Granted!');
         } else {
             handleScanFailure('Biometric mismatch!');
