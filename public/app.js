@@ -23,6 +23,9 @@ let settingsNicknameForm, settingsNicknameInput, settingsSaveNameBtn;
 // Face ID Modal DOM Elements
 let faceScanSection, profileSetupSection, faceVideo, faceCanvas, faceStatus, faceDetail, faceDemoBtn;
 
+// Start loading AI models in background immediately
+loadFaceModels();
+
 // Custom Room & Password DOM Elements
 let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRoomBtn, cancelCreateRoomBtn, createRoomError, toggleCreatePasswordBtn;
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
@@ -225,8 +228,7 @@ const EMOJI_CATEGORIES = {
 // Initialization
 window.addEventListener('DOMContentLoaded', () => {
     initDOMElements();
-    loadFaceModels(); // Start loading AI models in background immediately
-
+    
     const path = window.location.pathname;
     if (path.startsWith('/chat/')) {
         currentRoomID = path.split('/chat/')[1];
@@ -3469,6 +3471,7 @@ let faceScanLivenessProgress = 0;
 let faceScanLivenessVerified = false;
 let faceScanIsSettings  = false;
 let faceScanDemoRunning = false;
+let faceScanLastFrameData = null; // Uint8Array for motion tracking
 
 // face-api.js state
 let faceModelsLoaded  = false;
@@ -3597,6 +3600,11 @@ function extractFaceSignature(video, width = 32, height = 32) {
     return Array.from(grayscale);
 }
 
+// Helper: rgb to grayscale
+function rgbToGrayscale(r, g, b) {
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 // Helper to check for frozen stream/static image and track motion/liveness
 function processLivenessFrame(video) {
     const size = 64;
@@ -3698,8 +3706,8 @@ async function runFaceScanLoop() {
 
     // Show models-loading state
     if (!faceModelsLoaded) {
-        if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading AI models...';
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'One-time model download (~2 MB)...';
+        if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing AI Engine...';
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Downloading neural network models...';
         if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 500);
         return;
     }
@@ -3718,7 +3726,7 @@ async function runFaceScanLoop() {
             stopFaceScanFlow();
             if (faceScanStatusEl) {
                 faceScanStatusEl.className = 'face-status error';
-                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-xmark"></i> Face Not Found';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-xmark"></i> Face Not Detected';
             }
             if (faceScanDetailEl) faceScanDetailEl.textContent = '';
             if (faceNotFoundEl)   faceNotFoundEl.classList.remove('hidden');
@@ -3726,9 +3734,9 @@ async function runFaceScanLoop() {
         }
         if (faceScanStatusEl) {
             faceScanStatusEl.className = 'face-status';
-            faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
+            faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Align your face...';
         }
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Please look directly at camera';
         if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 300);
         return;
     }
@@ -3751,9 +3759,9 @@ async function runFaceScanLoop() {
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
         faceScanStatusEl.innerHTML =
-            `<i class="fas fa-spinner fa-spin"></i> Biometric Scan (${Math.floor(faceScanLivenessProgress)}%)`;
+            `<i class="fas fa-spinner fa-spin"></i> Scanning (${Math.floor(faceScanLivenessProgress)}%)`;
     }
-    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Keep face steady, blink slowly';
 
     // Store latest descriptor for capture
     faceCapturedDescriptor = detection.descriptor;
@@ -3877,16 +3885,20 @@ function startFaceScanFlow(isSettings = false) {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
     if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-    navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 320, facingMode: 'user' } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
         .then(stream => {
             faceScanStream = stream;
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.play().then(() => {
+                    if (faceScanStatusEl) {
+                        faceScanStatusEl.className = 'face-status';
+                        faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
+                    }
                     // Start overlay draw loop (rAF)
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
-                    // Start async detection loop
-                    faceScanTimerId = setTimeout(runFaceScanLoop, 600);
+                    // Start async detection loop immediately (100ms)
+                    faceScanTimerId = setTimeout(runFaceScanLoop, 100);
                 }).catch(e => console.error('Video play failed:', e));
             }
         })
@@ -4302,3 +4314,7 @@ function saveSettingsNickname() {
         updateSettingsUI();
     }
 }
+
+// Pre-load AI models immediately on script execution
+loadFaceModels();
+
