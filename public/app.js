@@ -3794,15 +3794,6 @@ function handleScanSuccess(statusText) {
             // Transition view
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
-            
-            if (faceScanDetailEl) {
-                faceScanDetailEl.textContent = `Welcome back, ${savedProfile.nickname || 'User'}! Joining chat...`;
-            }
-            
-            // Auto join chat after 1.5s delay
-            setTimeout(() => {
-                if (joinChatBtn) joinChatBtn.click();
-            }, 1500);
         } else {
             // First time login - show nickname setup fields
             if (faceScanSection) faceScanSection.classList.add('hidden');
