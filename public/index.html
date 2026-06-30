@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=121" as="style">
+    <link rel="preload" href="/style.css?v=129" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=121" as="script">
+    <link rel="preload" href="/app.js?v=129" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=121">
+    <link rel="stylesheet" href="/style.css?v=129">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
@@ -305,9 +305,11 @@
                     <label for="profile-pic-input" id="avatar-preview-container" class="avatar-preview">
                         <img id="avatar-preview-img" src="" alt="" class="hidden">
                         <i class="fas fa-user-plus"></i>
+                        <div class="avatar-edit-badge" title="Change photo">
+                            <i class="fas fa-pencil"></i>
+                        </div>
                     </label>
                     <input type="file" id="profile-pic-input" accept="image/*" hidden>
-                    <p>Click to change profile picture (Optional)</p>
                 </div>
                 <input type="text" id="nickname-input" placeholder="Enter Nickname..." maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-form-type="other">
                 <button id="join-chat-btn" class="btn btn-primary">Join Chat</button>
@@ -414,6 +416,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=128" defer></script>
+    <script src="/app.js?v=129" defer></script>
 </body>
 </html>
