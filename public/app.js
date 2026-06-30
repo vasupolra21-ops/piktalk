@@ -15,6 +15,13 @@ try {
 let homeView, chatView, createRoomBtn, nicknameModal, nicknameInput, joinChatBtn, roomDisplayId, onlineStatus, messagesContainer, messageInput, sendBtn, inviteBtn, shareSection, roomLinkInput, copyBtn, leaveBtn, msgSound, emojiBtn, themeToggle, homeThemeToggle, attachBtn, imgInput, joinRoomInput, joinRoomBtn, emojiPicker, profilePicInput, avatarPreviewContainer, avatarPreviewImg, avatarPreviewIcon;
 let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPreviewBar, discardAudioBtn, playPreviewBtn, audioProgressBar, audioPreviewDuration, sendAudioBtn;
 
+// Settings DOM Elements
+let settingsBtn, settingsModal, settingsCloseBtn, settingsNickname, settingsBioStatus, settingsRemoveFaceBtn, settingsRegisterFaceBtn;
+let settingsScanContainer, settingsVideo, settingsCanvas, settingsScanStatus, settingsScanDemoBtn;
+
+// Face ID Modal DOM Elements
+let faceScanSection, profileSetupSection, faceVideo, faceCanvas, faceStatus, faceDetail, faceDemoBtn;
+
 // Custom Room & Password DOM Elements
 let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRoomBtn, cancelCreateRoomBtn, createRoomError, toggleCreatePasswordBtn;
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
@@ -108,6 +115,29 @@ function initDOMElements() {
     sharePasswordArea = document.getElementById('share-password-area');
     sharePasswordInput = document.getElementById('share-password-input');
     copyPasswordBtn = document.getElementById('copy-password-btn');
+
+    // Settings DOM Elements
+    settingsBtn = document.getElementById('settings-btn');
+    settingsModal = document.getElementById('settings-modal');
+    settingsCloseBtn = document.getElementById('settings-close-btn');
+    settingsNickname = document.getElementById('settings-nickname');
+    settingsBioStatus = document.getElementById('settings-bio-status');
+    settingsRemoveFaceBtn = document.getElementById('settings-remove-face-btn');
+    settingsRegisterFaceBtn = document.getElementById('settings-register-face-btn');
+    settingsScanContainer = document.getElementById('settings-scan-container');
+    settingsVideo = document.getElementById('settings-video');
+    settingsCanvas = document.getElementById('settings-canvas');
+    settingsScanStatus = document.getElementById('settings-scan-status');
+    settingsScanDemoBtn = document.getElementById('settings-scan-demo-btn');
+
+    // Face ID Modal DOM Elements
+    faceScanSection = document.getElementById('face-scan-section');
+    profileSetupSection = document.getElementById('profile-setup-section');
+    faceVideo = document.getElementById('face-video');
+    faceCanvas = document.getElementById('face-canvas');
+    faceStatus = document.getElementById('face-status');
+    faceDetail = document.getElementById('face-detail');
+    faceDemoBtn = document.getElementById('face-demo-btn');
 }
 
 // State
@@ -139,12 +169,10 @@ let myUserId = getOrCreateUserId();
 // This is isolated per tab: opening a new tab to test will start with a fresh, empty profile.
 function loadSavedProfile() {
     try {
-        const raw = sessionStorage.getItem('piktalk_profile');
+        const raw = localStorage.getItem('piktalk_profile');
         if (!raw) return;
         const profile = JSON.parse(raw);
         if (!profile) return;
-        // Always clear nickname input so user types a fresh name each time
-        if (nicknameInput) nicknameInput.value = '';
         // Restore profile picture preview
         if (profile.profilePic) {
             myProfilePic = profile.profilePic;
@@ -156,16 +184,16 @@ function loadSavedProfile() {
             if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
         }
     } catch(e) {
-        console.warn('Could not load saved profile from sessionStorage:', e);
+        console.warn('Could not load saved profile from localStorage:', e);
     }
 }
 
-// Save this user's profile locally so it is remembered on THIS tab session.
+// Save this user's profile locally so it is remembered on next login.
 function saveProfileLocally(nickname, profilePic) {
     try {
-        sessionStorage.setItem('piktalk_profile', JSON.stringify({ nickname, profilePic: profilePic || null }));
+        localStorage.setItem('piktalk_profile', JSON.stringify({ nickname, profilePic: profilePic || null }));
     } catch(e) {
-        console.warn('Could not save profile to sessionStorage:', e);
+        console.warn('Could not save profile to localStorage:', e);
     }
 }
 
@@ -589,6 +617,37 @@ function initPasswordToggle(inputEl, btnEl) {
 }
 
 function setupEventListeners() {
+    // Settings toggles
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', openSettings);
+    }
+    if (settingsCloseBtn) {
+        settingsCloseBtn.addEventListener('click', closeSettings);
+    }
+    if (settingsRemoveFaceBtn) {
+        settingsRemoveFaceBtn.addEventListener('click', removeFaceCredentials);
+    }
+    if (settingsRegisterFaceBtn) {
+        settingsRegisterFaceBtn.addEventListener('click', startSettingsFaceRegistration);
+    }
+    if (settingsScanDemoBtn) {
+        settingsScanDemoBtn.addEventListener('click', simulateSettingsFaceScan);
+    }
+
+    // Settings backdrop click to close settings modal
+    if (settingsModal) {
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                closeSettings();
+            }
+        });
+    }
+
+    // Face ID Modal buttons
+    if (faceDemoBtn) {
+        faceDemoBtn.addEventListener('click', simulateFaceScan);
+    }
+
     // Password toggles
     initPasswordToggle(createRoomPasswordInput, toggleCreatePasswordBtn);
     initPasswordToggle(joinRoomPasswordInput, toggleJoinPasswordBtn);
@@ -1379,12 +1438,34 @@ function updateAdminUI() {
 function showNicknameModal() {
     [homeView, chatView, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     if (nicknameModal) nicknameModal.classList.add('active');
+    
+    // Reset scanner UI sections
+    if (faceScanSection) faceScanSection.classList.remove('hidden');
+    if (profileSetupSection) profileSetupSection.classList.add('hidden');
+    
+    // Check if biometric face profile exists
+    const hasRegisteredFace = localStorage.getItem('piktalk_face_signature');
+    if (hasRegisteredFace) {
+        if (faceDetail) faceDetail.textContent = 'Scanning for registered credentials';
+        if (faceStatus) {
+            faceStatus.className = 'face-status';
+            faceStatus.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+        }
+    } else {
+        if (faceDetail) faceDetail.textContent = 'No biometrics found. Align face to register.';
+        if (faceStatus) {
+            faceStatus.className = 'face-status';
+            faceStatus.innerHTML = '<i class="fas fa-expand-alt animate-pulse"></i> Prepare first-time scan...';
+        }
+    }
+
     // Load profile directly from THIS browser's localStorage.
-    // This is fully isolated per browser app — different browsers on the same
-    // device will never see each other's nickname or profile picture.
     loadSavedProfile();
     updateInputsState();
     updateThemeColor();
+
+    // Start face scan scanner
+    startFaceScanFlow(false); // false = not registering-only from Settings
 }
 
 function sendMessage() {
@@ -3334,4 +3415,669 @@ function generateAISmartReplies() {
         "Makes total sense to me!"
     ];
 }
+
+// ── Biometric Face ID Auth State & Logic ──
+let faceScanVideoEl = null;
+let faceScanCanvasEl = null;
+let faceScanStatusEl = null;
+let faceScanDetailEl = null;
+let faceScanStream = null;
+let faceScanActive = false;
+let faceScanAnimationId = null;
+
+let faceScanLivenessProgress = 0;
+let faceScanLivenessVerified = false;
+let faceScanLastFrameData = null;
+let faceScanSignature = null;
+let faceScanIsSettings = false;
+let faceScanDemoRunning = false;
+
+// Convert RGB pixels to grayscale value
+function rgbToGrayscale(r, g, b) {
+    return 0.299 * r + 0.587 * g + 0.114 * b;
+}
+
+// Extract a normalized 32x32 grayscale array from video/canvas
+function extractFaceSignature(video, width = 32, height = 32) {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Crop center 60% square of video (where face is placed)
+    const size = Math.min(video.videoWidth, video.videoHeight || 300) || 300;
+    const sx = ((video.videoWidth || 300) - size) / 2 + size * 0.2;
+    const sy = ((video.videoHeight || 300) - size) / 2 + size * 0.2;
+    const sWidth = size * 0.6;
+    const sHeight = size * 0.6;
+    
+    try {
+        tempCtx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, width, height);
+    } catch(e) {
+        // Fallback if drawImage fails
+        tempCtx.fillStyle = '#000';
+        tempCtx.fillRect(0, 0, width, height);
+    }
+    
+    const imgData = tempCtx.getImageData(0, 0, width, height);
+    const pixels = imgData.data;
+    
+    const grayscale = new Float32Array(width * height);
+    let min = 255;
+    let max = 0;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+        const val = rgbToGrayscale(pixels[i], pixels[i+1], pixels[i+2]);
+        grayscale[i/4] = val;
+        if (val < min) min = val;
+        if (val > max) max = val;
+    }
+    
+    // Normalize pixel values to [0, 1] to reduce lighting variations
+    const range = max - min || 1;
+    for (let i = 0; i < grayscale.length; i++) {
+        grayscale[i] = (grayscale[i] - min) / range;
+    }
+    
+    return Array.from(grayscale);
+}
+
+// Helper to check for frozen stream/static image and track motion/liveness
+function processLivenessFrame(video) {
+    const size = 64;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = size;
+    tempCanvas.height = size;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    // Grab center area
+    const vSize = Math.min(video.videoWidth, video.videoHeight || 300) || 300;
+    const sx = ((video.videoWidth || 300) - vSize) / 2 + vSize * 0.25;
+    const sy = ((video.videoHeight || 300) - vSize) / 2 + vSize * 0.25;
+    const sSize = vSize * 0.5;
+    
+    try {
+        tempCtx.drawImage(video, sx, sy, sSize, sSize, 0, 0, size, size);
+    } catch(e) {
+        return { isLive: false, diff: 0 };
+    }
+    
+    const imgData = tempCtx.getImageData(0, 0, size, size).data;
+    
+    const currentFrame = new Uint8Array(size * size);
+    for (let i = 0; i < imgData.length; i += 4) {
+        currentFrame[i/4] = rgbToGrayscale(imgData[i], imgData[i+1], imgData[i+2]);
+    }
+    
+    let isLive = false;
+    let diff = 0;
+    
+    if (faceScanLastFrameData) {
+        let absoluteDiffSum = 0;
+        for (let i = 0; i < currentFrame.length; i++) {
+            absoluteDiffSum += Math.abs(currentFrame[i] - faceScanLastFrameData[i]);
+        }
+        // Mean absolute frame difference
+        diff = absoluteDiffSum / currentFrame.length;
+        
+        // Motion thresholds:
+        // diff === 0 -> frozen video
+        // diff > 0.1 -> normal human movement
+        if (diff > 12) {
+            // Camera moving too much
+            isLive = false;
+        } else if (diff > 0.1) {
+            isLive = true;
+        }
+    }
+    
+    faceScanLastFrameData = currentFrame;
+    return { isLive, diff };
+}
+
+// Main RequestAnimationFrame loop for Face ID scan
+function runFaceScanLoop() {
+    if (!faceScanActive) return;
+    
+    const video = faceScanVideoEl;
+    const canvas = faceScanCanvasEl;
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (canvas) {
+            if (canvas.width !== video.videoWidth) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw alignment guide (oval)
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+            ctx.lineWidth = 4;
+            if (faceScanLivenessProgress > 99) {
+                ctx.strokeStyle = '#10b981';
+            }
+            ctx.beginPath();
+            const rx = canvas.width / 2;
+            const ry = canvas.height / 2;
+            ctx.ellipse(rx, ry, canvas.width * 0.28, canvas.height * 0.38, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+        
+        const livenessResult = processLivenessFrame(video);
+        
+        if (livenessResult.isLive) {
+            if (livenessResult.diff > 1.8) {
+                // Blink or large shift detected
+                faceScanLivenessProgress += 4;
+                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head gesture detected!';
+            } else {
+                faceScanLivenessProgress += 0.8;
+                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Verifying liveness... please blink or turn slightly';
+            }
+        } else {
+            if (livenessResult.diff === 0) {
+                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Static input detected. Biometrics require active camera.';
+            } else {
+                if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold still, align face in frame...';
+            }
+        }
+        
+        faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
+        
+        const scanner = video.closest('.circular-scanner');
+        if (scanner) {
+            scanner.className = 'circular-scanner scanning';
+            if (faceScanLivenessProgress < 100) {
+                const glow = faceScanLivenessProgress;
+                scanner.style.borderColor = `rgba(16, 185, 129, ${0.3 + (glow / 100) * 0.7})`;
+                if (faceScanStatusEl) {
+                    faceScanStatusEl.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Biometric Scan (${Math.floor(faceScanLivenessProgress)}%)`;
+                }
+            }
+        }
+        
+        if (faceScanLivenessProgress >= 100) {
+            faceScanLivenessVerified = true;
+        }
+        
+        if (faceScanLivenessVerified) {
+            const currentSig = extractFaceSignature(video);
+            const savedSigRaw = localStorage.getItem('piktalk_face_signature');
+            
+            if (faceScanIsSettings) {
+                saveBiometrics(currentSig, video);
+                handleScanSuccess("Face ID registered successfully!");
+                return;
+            }
+            
+            if (!savedSigRaw) {
+                // Registering for first time
+                saveBiometrics(currentSig, video);
+                handleScanSuccess("Biometrics Registered!");
+                return;
+            } else {
+                // Verify returning user
+                const savedSig = JSON.parse(savedSigRaw);
+                const matchError = compareFaceSignatures(currentSig, savedSig);
+                
+                if (matchError < 0.16) {
+                    handleScanSuccess("Access Granted!");
+                    return;
+                } else {
+                    handleScanFailure("Biometric mismatch!");
+                    return;
+                }
+            }
+        }
+    }
+    
+    faceScanAnimationId = requestAnimationFrame(runFaceScanLoop);
+}
+
+// Compare two signatures using Mean Absolute Error (MAE)
+function compareFaceSignatures(sig1, sig2) {
+    if (!sig1 || !sig2 || sig1.length !== sig2.length) return 999;
+    let sum = 0;
+    for (let i = 0; i < sig1.length; i++) {
+        sum += Math.abs(sig1[i] - sig2[i]);
+    }
+    return sum / sig1.length;
+}
+
+// Save signature and snapshot avatar thumbnail
+function saveBiometrics(signature, video) {
+    try {
+        localStorage.setItem('piktalk_face_signature', JSON.stringify(signature));
+        
+        const thumbCanvas = document.createElement('canvas');
+        thumbCanvas.width = 150;
+        thumbCanvas.height = 150;
+        const thumbCtx = thumbCanvas.getContext('2d');
+        
+        const size = Math.min(video.videoWidth || 300, video.videoHeight || 300) || 300;
+        const sx = ((video.videoWidth || 300) - size) / 2;
+        const sy = ((video.videoHeight || 300) - size) / 2;
+        
+        try {
+            thumbCtx.drawImage(video, sx, sy, size, size, 0, 0, 150, 150);
+        } catch(e) {
+            // Mock if drawImage fails
+            thumbCtx.fillStyle = '#10b981';
+            thumbCtx.fillRect(0, 0, 150, 150);
+        }
+        
+        const avatarDataURL = thumbCanvas.toDataURL('image/jpeg', 0.85);
+        myProfilePic = avatarDataURL;
+        
+        // Update nickname modal avatar preview
+        if (avatarPreviewImg) {
+            avatarPreviewImg.src = avatarDataURL;
+            avatarPreviewImg.classList.remove('hidden');
+            avatarPreviewImg.style.objectFit = 'cover';
+        }
+        if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        
+        // Update local profile pic
+        const currentProfile = JSON.parse(localStorage.getItem('piktalk_profile') || '{}');
+        currentProfile.profilePic = avatarDataURL;
+        localStorage.setItem('piktalk_profile', JSON.stringify(currentProfile));
+    } catch(e) {
+        console.error("Error saving biometrics:", e);
+    }
+}
+
+// Open camera stream and kick off scan loops
+function startFaceScanFlow(isSettings = false) {
+    faceScanIsSettings = isSettings;
+    faceScanActive = true;
+    faceScanLivenessProgress = 0;
+    faceScanLivenessVerified = false;
+    faceScanLastFrameData = null;
+    faceScanDemoRunning = false;
+    
+    if (isSettings) {
+        faceScanVideoEl = settingsVideo;
+        faceScanCanvasEl = settingsCanvas;
+        faceScanStatusEl = settingsScanStatus;
+        faceScanDetailEl = null;
+    } else {
+        faceScanVideoEl = faceVideo;
+        faceScanCanvasEl = faceCanvas;
+        faceScanStatusEl = faceStatus;
+        faceScanDetailEl = faceDetail;
+    }
+    
+    if (!faceScanVideoEl) return;
+    
+    const scanner = faceScanVideoEl.closest('.circular-scanner');
+    if (scanner) {
+        scanner.className = 'circular-scanner scanning';
+        scanner.style.borderColor = '';
+    }
+    
+    if (faceScanStatusEl) {
+        faceScanStatusEl.className = 'face-status';
+        faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing camera...';
+    }
+    
+    navigator.mediaDevices.getUserMedia({ video: { width: 300, height: 300, facingMode: 'user' } })
+        .then(stream => {
+            faceScanStream = stream;
+            if (faceScanVideoEl) {
+                faceScanVideoEl.srcObject = stream;
+                faceScanVideoEl.play().then(() => {
+                    faceScanAnimationId = requestAnimationFrame(runFaceScanLoop);
+                }).catch(e => console.error("Video play failed:", e));
+            }
+        })
+        .catch(err => {
+            console.error("Webcam blocked:", err);
+            if (faceScanStatusEl) {
+                faceScanStatusEl.className = 'face-status error';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Camera Blocked';
+            }
+            if (faceScanDetailEl) {
+                faceScanDetailEl.textContent = 'Please allow camera permissions or click Demo Mode to proceed.';
+            }
+        });
+}
+
+function stopFaceScanFlow() {
+    faceScanActive = false;
+    if (faceScanAnimationId) {
+        cancelAnimationFrame(faceScanAnimationId);
+        faceScanAnimationId = null;
+    }
+    if (faceScanStream) {
+        faceScanStream.getTracks().forEach(t => t.stop());
+        faceScanStream = null;
+    }
+    if (faceScanVideoEl) {
+        faceScanVideoEl.srcObject = null;
+    }
+}
+
+// Success feedback state transition
+function handleScanSuccess(statusText) {
+    stopFaceScanFlow();
+    
+    if (faceScanStatusEl) {
+        faceScanStatusEl.className = 'face-status success';
+        faceScanStatusEl.innerHTML = `<i class="fas fa-circle-check"></i> ${statusText}`;
+    }
+    if (faceScanDetailEl) {
+        faceScanDetailEl.textContent = 'Biometric signature matched.';
+    }
+    
+    if (faceScanVideoEl) {
+        const scanner = faceScanVideoEl.closest('.circular-scanner');
+        if (scanner) {
+            scanner.className = 'circular-scanner success';
+            scanner.style.borderColor = '';
+        }
+    }
+    
+    setTimeout(() => {
+        if (faceScanIsSettings) {
+            if (settingsScanContainer) settingsScanContainer.classList.add('hidden');
+            updateSettingsUI();
+            return;
+        }
+        
+        const savedProfile = JSON.parse(localStorage.getItem('piktalk_profile') || '{}');
+        
+        if (statusText === "Access Granted!") {
+            // Autofill nickname
+            if (nicknameInput) nicknameInput.value = savedProfile.nickname || '';
+            
+            // Transition view
+            if (faceScanSection) faceScanSection.classList.add('hidden');
+            if (profileSetupSection) profileSetupSection.classList.remove('hidden');
+            
+            if (faceScanDetailEl) {
+                faceScanDetailEl.textContent = `Welcome back, ${savedProfile.nickname || 'User'}! Joining chat...`;
+            }
+            
+            // Auto join chat after 1.5s delay
+            setTimeout(() => {
+                if (joinChatBtn) joinChatBtn.click();
+            }, 1500);
+        } else {
+            // First time login - show nickname setup fields
+            if (faceScanSection) faceScanSection.classList.add('hidden');
+            if (profileSetupSection) profileSetupSection.classList.remove('hidden');
+        }
+    }, 1200);
+}
+
+// Failure feedback flow
+function handleScanFailure(statusText) {
+    stopFaceScanFlow();
+    
+    if (faceScanStatusEl) {
+        faceScanStatusEl.className = 'face-status error';
+        faceScanStatusEl.innerHTML = `<i class="fas fa-circle-xmark"></i> ${statusText}`;
+    }
+    if (faceScanDetailEl) {
+        faceScanDetailEl.textContent = 'Redirecting to register new profile...';
+    }
+    
+    if (faceScanVideoEl) {
+        const scanner = faceScanVideoEl.closest('.circular-scanner');
+        if (scanner) {
+            scanner.className = 'circular-scanner error';
+            scanner.style.borderColor = '';
+        }
+    }
+    
+    setTimeout(() => {
+        // Mismatch -> Consider as new user, clear saved data, and repeat scan flow
+        localStorage.removeItem('piktalk_face_signature');
+        localStorage.removeItem('piktalk_profile');
+        myNickname = '';
+        myProfilePic = '';
+        if (nicknameInput) nicknameInput.value = '';
+        if (avatarPreviewImg) avatarPreviewImg.classList.add('hidden');
+        if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
+        
+        if (faceScanSection) faceScanSection.classList.remove('hidden');
+        if (profileSetupSection) profileSetupSection.classList.add('hidden');
+        
+        if (faceScanDetailEl) {
+            faceScanDetailEl.textContent = 'Biometric mismatch. Creating a new profile...';
+        }
+        
+        setTimeout(() => {
+            startFaceScanFlow(false);
+        }, 1200);
+    }, 1500);
+}
+
+// Simulates Face scan for modal step
+function simulateFaceScan() {
+    if (faceScanDemoRunning) return;
+    faceScanDemoRunning = true;
+    stopFaceScanFlow();
+    
+    faceScanLivenessProgress = 0;
+    
+    const scanner = faceVideo ? faceVideo.closest('.circular-scanner') : null;
+    if (scanner) {
+        scanner.className = 'circular-scanner scanning';
+        scanner.style.borderColor = '';
+    }
+    
+    let interval = setInterval(() => {
+        faceScanLivenessProgress += 10;
+        if (faceStatus) {
+            faceStatus.className = 'face-status';
+            faceStatus.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Simulating Biometrics (${faceScanLivenessProgress}%)`;
+        }
+        if (faceDetail) {
+            faceDetail.textContent = 'Demo Mode: Simulating eye blink & head orientation check...';
+        }
+        
+        if (faceScanLivenessProgress >= 100) {
+            clearInterval(interval);
+            
+            const hasRegisteredFace = localStorage.getItem('piktalk_face_signature');
+            if (hasRegisteredFace) {
+                handleScanSuccess("Access Granted!");
+            } else {
+                // Register mock signature
+                const mockSignature = Array(1024).fill(0).map(() => Math.random());
+                localStorage.setItem('piktalk_face_signature', JSON.stringify(mockSignature));
+                
+                // Create mock colored avatar
+                const mockCanvas = document.createElement('canvas');
+                mockCanvas.width = 150;
+                mockCanvas.height = 150;
+                const mockCtx = mockCanvas.getContext('2d');
+                const gradient = mockCtx.createLinearGradient(0, 0, 150, 150);
+                gradient.addColorStop(0, '#10b981');
+                gradient.addColorStop(1, '#3b82f6');
+                mockCtx.fillStyle = gradient;
+                mockCtx.fillRect(0, 0, 150, 150);
+                
+                mockCtx.fillStyle = '#ffffff';
+                mockCtx.beginPath();
+                mockCtx.arc(75, 75, 45, 0, 2*Math.PI);
+                mockCtx.fill();
+                mockCtx.fillStyle = '#10b981';
+                mockCtx.beginPath();
+                mockCtx.arc(60, 65, 5, 0, 2*Math.PI);
+                mockCtx.arc(90, 65, 5, 0, 2*Math.PI);
+                mockCtx.fill();
+                mockCtx.strokeStyle = '#10b981';
+                mockCtx.lineWidth = 4;
+                mockCtx.beginPath();
+                mockCtx.arc(75, 75, 25, 0.1 * Math.PI, 0.9 * Math.PI);
+                mockCtx.stroke();
+                
+                const mockAvatarDataURL = mockCanvas.toDataURL();
+                myProfilePic = mockAvatarDataURL;
+                
+                if (avatarPreviewImg) {
+                    avatarPreviewImg.src = mockAvatarDataURL;
+                    avatarPreviewImg.classList.remove('hidden');
+                    avatarPreviewImg.style.objectFit = 'cover';
+                }
+                if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                
+                const profile = { nickname: '', profilePic: mockAvatarDataURL };
+                localStorage.setItem('piktalk_profile', JSON.stringify(profile));
+                
+                handleScanSuccess("Biometrics Registered!");
+            }
+        }
+    }, 150);
+}
+
+// Simulates Face scan for Settings step
+function simulateSettingsFaceScan() {
+    if (faceScanDemoRunning) return;
+    faceScanDemoRunning = true;
+    stopFaceScanFlow();
+    
+    faceScanLivenessProgress = 0;
+    
+    const scanner = settingsVideo ? settingsVideo.closest('.circular-scanner') : null;
+    if (scanner) {
+        scanner.className = 'circular-scanner scanning';
+        scanner.style.borderColor = '';
+    }
+    
+    let interval = setInterval(() => {
+        faceScanLivenessProgress += 10;
+        if (settingsScanStatus) {
+            settingsScanStatus.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Simulating Biometrics (${faceScanLivenessProgress}%)`;
+        }
+        
+        if (faceScanLivenessProgress >= 100) {
+            clearInterval(interval);
+            
+            const mockSignature = Array(1024).fill(0).map(() => Math.random());
+            localStorage.setItem('piktalk_face_signature', JSON.stringify(mockSignature));
+            
+            const mockCanvas = document.createElement('canvas');
+            mockCanvas.width = 150;
+            mockCanvas.height = 150;
+            const mockCtx = mockCanvas.getContext('2d');
+            const gradient = mockCtx.createLinearGradient(0, 0, 150, 150);
+            gradient.addColorStop(0, '#10b981');
+            gradient.addColorStop(1, '#8b5cf6');
+            mockCtx.fillStyle = gradient;
+            mockCtx.fillRect(0, 0, 150, 150);
+            
+            mockCtx.fillStyle = '#ffffff';
+            mockCtx.beginPath();
+            mockCtx.arc(75, 75, 45, 0, 2*Math.PI);
+            mockCtx.fill();
+            mockCtx.fillStyle = '#10b981';
+            mockCtx.beginPath();
+            mockCtx.arc(60, 65, 5, 0, 2*Math.PI);
+            mockCtx.arc(90, 65, 5, 0, 2*Math.PI);
+            mockCtx.fill();
+            mockCtx.strokeStyle = '#10b981';
+            mockCtx.lineWidth = 4;
+            mockCtx.beginPath();
+            mockCtx.arc(75, 75, 25, 0.1 * Math.PI, 0.9 * Math.PI);
+            mockCtx.stroke();
+            
+            const mockAvatarDataURL = mockCanvas.toDataURL();
+            myProfilePic = mockAvatarDataURL;
+            
+            const currentProfile = JSON.parse(localStorage.getItem('piktalk_profile') || '{}');
+            currentProfile.profilePic = mockAvatarDataURL;
+            localStorage.setItem('piktalk_profile', JSON.stringify(currentProfile));
+            
+            handleScanSuccess("Face ID registered successfully!");
+        }
+    }, 150);
+}
+
+// Settings modal operations
+function openSettings() {
+    if (settingsModal) {
+        settingsModal.classList.add('open');
+        updateSettingsUI();
+    }
+}
+
+function closeSettings() {
+    if (settingsModal) {
+        settingsModal.classList.remove('open');
+    }
+    stopFaceScanFlow();
+    if (settingsScanContainer) settingsScanContainer.classList.add('hidden');
+}
+
+function updateSettingsUI() {
+    const rawProfile = localStorage.getItem('piktalk_profile');
+    let nickname = "Not Logged In";
+    let profilePic = null;
+    
+    if (myNickname) {
+        nickname = myNickname;
+        profilePic = myProfilePic;
+    } else if (rawProfile) {
+        const profile = JSON.parse(rawProfile);
+        nickname = profile.nickname || "User";
+        profilePic = profile.profilePic;
+    }
+    
+    if (settingsNickname) settingsNickname.textContent = nickname;
+    
+    const settingsAvatarImg = document.getElementById('settings-avatar-img');
+    const settingsAvatarPlaceholder = document.getElementById('settings-avatar-placeholder');
+    
+    if (profilePic && settingsAvatarImg && settingsAvatarPlaceholder) {
+        settingsAvatarImg.src = profilePic;
+        settingsAvatarImg.classList.remove('hidden');
+        settingsAvatarPlaceholder.classList.add('hidden');
+    } else if (settingsAvatarImg && settingsAvatarPlaceholder) {
+        settingsAvatarImg.classList.add('hidden');
+        settingsAvatarPlaceholder.classList.remove('hidden');
+    }
+    
+    const hasFace = localStorage.getItem('piktalk_face_signature');
+    if (hasFace) {
+        if (settingsBioStatus) {
+            settingsBioStatus.className = 'biometric-value status-registered';
+            settingsBioStatus.innerHTML = '<i class="fas fa-circle-check"></i> Face Registered';
+        }
+        if (settingsRemoveFaceBtn) settingsRemoveFaceBtn.classList.remove('hidden');
+    } else {
+        if (settingsBioStatus) {
+            settingsBioStatus.className = 'biometric-value status-unregistered';
+            settingsBioStatus.innerHTML = '<i class="fas fa-circle-xmark"></i> Unregistered';
+        }
+        if (settingsRemoveFaceBtn) settingsRemoveFaceBtn.classList.add('hidden');
+    }
+}
+
+function removeFaceCredentials() {
+    if (confirm("Are you sure you want to remove your Face ID profile? This will delete your stored biometrics and nickname.")) {
+        localStorage.removeItem('piktalk_face_signature');
+        localStorage.removeItem('piktalk_profile');
+        myNickname = '';
+        myProfilePic = '';
+        
+        if (avatarPreviewImg) avatarPreviewImg.classList.add('hidden');
+        if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
+        if (nicknameInput) nicknameInput.value = '';
+        
+        updateSettingsUI();
+        alert("Face ID credentials removed successfully.");
+    }
+}
+
+function startSettingsFaceRegistration() {
+    if (settingsScanContainer) {
+        settingsScanContainer.classList.remove('hidden');
+        startFaceScanFlow(true); // true = registering from Settings
+    }
+}
+
 

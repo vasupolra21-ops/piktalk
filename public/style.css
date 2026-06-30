@@ -3220,3 +3220,350 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     }
 }
 
+/* ── Biometric Face ID Auth Styling ── */
+
+.face-logo-wrap {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.face-logo {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-size: 1.6rem;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+}
+
+.face-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, var(--primary) 0%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+}
+
+.face-subtitle {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 25px;
+}
+
+.scanner-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.circular-scanner {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    border: 3px dashed var(--primary);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.circular-scanner.scanning {
+    border-style: solid;
+    animation: scannerGlow 2s infinite ease-in-out;
+}
+
+.circular-scanner.success {
+    border-color: #10b981;
+    border-style: solid;
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
+}
+
+.circular-scanner.error {
+    border-color: var(--danger);
+    border-style: solid;
+    box-shadow: 0 0 40px rgba(239, 68, 68, 0.4);
+}
+
+.circular-scanner video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.circular-scanner canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.scan-laser {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #10b981, transparent);
+    box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
+    z-index: 3;
+    animation: laserScan 2.5s infinite ease-in-out;
+    pointer-events: none;
+    display: none;
+}
+
+.circular-scanner.scanning .scan-laser {
+    display: block;
+}
+
+.face-status {
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: color 0.3s ease;
+}
+
+.face-status.success {
+    color: #10b981;
+}
+
+.face-status.error {
+    color: var(--danger);
+}
+
+.face-detail {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 25px;
+    min-height: 1.2rem;
+}
+
+.face-demo-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    transition: all 0.2s ease;
+}
+
+.face-demo-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Settings Modal ── */
+.settings-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.88);
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    animation: lbFadeIn 0.2s ease;
+}
+
+.settings-modal-overlay.open {
+    display: flex;
+}
+
+.settings-modal-box {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 0;
+    width: min(380px, 90vw);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.settings-modal-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.settings-cancel-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: var(--text-main);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.settings-cancel-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.settings-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-profile-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+}
+
+.settings-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1.4rem;
+    overflow: hidden;
+}
+
+.settings-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.settings-profile-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.details-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.details-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.settings-biometric-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 12px;
+    font-size: 0.9rem;
+}
+
+.biometric-label {
+    color: var(--text-muted);
+}
+
+.biometric-value {
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-registered {
+    color: #10b981;
+}
+
+.status-unregistered {
+    color: var(--danger);
+}
+
+.settings-scan-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    border: 1px dashed var(--glass-border);
+    animation: lbFadeIn 0.3s ease;
+}
+
+.mini-scanner {
+    width: 110px !important;
+    height: 110px !important;
+    border-width: 2px !important;
+}
+
+.settings-scan-status {
+    margin-top: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+@keyframes laserScan {
+    0%, 100% { top: 0%; }
+    50% { top: 100%; }
+}
+
+@keyframes scannerGlow {
+    0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.1); }
+    50% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.35); }
+}
+
+.animate-pulse {
+    animation: logoPulse 2s infinite ease-in-out;
+}
+
+@keyframes logoPulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+

@@ -99,6 +99,9 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button id="settings-btn" class="btn-icon" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
                     <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
                         <i class="fas fa-sun"></i>
                     </button>
@@ -266,20 +269,53 @@
         </div>
     </div>
 
-    <!-- Nickname Modal -->
+    <!-- Nickname / Biometric Face ID Modal -->
     <div id="nickname-modal" class="modal">
         <div class="modal-content glass-card">
-            <h3>Set Your Profile</h3>
-            <div class="profile-setup">
-                <label for="profile-pic-input" id="avatar-preview-container" class="avatar-preview">
-                    <img id="avatar-preview-img" src="" alt="" class="hidden">
-                    <i class="fas fa-user-plus"></i>
-                </label>
-                <input type="file" id="profile-pic-input" accept="image/*" hidden>
-                <p>Click to upload a profile picture (Optional)</p>
+            <!-- STEP 1: Biometric Face Scan -->
+            <div id="face-scan-section">
+                <div class="face-logo-wrap">
+                    <div class="face-logo">
+                        <i class="fas fa-expand-alt animate-pulse"></i>
+                    </div>
+                </div>
+                <h2 class="face-title">PikTalk</h2>
+                <p class="face-subtitle">Biometric Face ID Authentication</p>
+                
+                <div class="scanner-container">
+                    <div class="circular-scanner">
+                        <video id="face-video" autoplay playsinline muted></video>
+                        <canvas id="face-canvas"></canvas>
+                        <div class="scan-laser"></div>
+                    </div>
+                </div>
+                
+                <div id="face-status" class="face-status">
+                    <i class="fas fa-camera"></i> Align face in camera frame...
+                </div>
+                <div id="face-detail" class="face-detail">
+                    Scanning for registered credentials
+                </div>
+                
+                <button id="face-demo-btn" class="btn btn-secondary face-demo-btn">
+                    <i class="fas fa-face-smile"></i> Simulate Scan (Demo Mode)
+                </button>
             </div>
-            <input type="text" id="nickname-input" placeholder="Enter Nickname..." maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-form-type="other">
-            <button id="join-chat-btn" class="btn btn-primary">Join Chat</button>
+
+            <!-- STEP 2: Profile Setup (displayed after scan completes) -->
+            <div id="profile-setup-section" class="hidden">
+                <h3>Set Your Profile</h3>
+                <div class="profile-setup">
+                    <label for="profile-pic-input" id="avatar-preview-container" class="avatar-preview">
+                        <img id="avatar-preview-img" src="" alt="" class="hidden">
+                        <i class="fas fa-user-plus"></i>
+                    </label>
+                    <input type="file" id="profile-pic-input" accept="image/*" hidden>
+                    <p>Click to change profile picture (Optional)</p>
+                </div>
+                <input type="text" id="nickname-input" placeholder="Enter Nickname..." maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" data-form-type="other">
+                <button id="join-chat-btn" class="btn btn-primary">Join Chat</button>
+            </div>
         </div>
     </div>
 
@@ -321,6 +357,52 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="settings-modal-overlay" role="dialog" aria-modal="true" aria-label="Settings">
+        <div class="settings-modal-box glass-card">
+            <div class="settings-modal-header">
+                <span class="settings-modal-title"><i class="fas fa-cog"></i> Settings</span>
+                <button class="settings-cancel-btn" id="settings-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-profile-info">
+                    <div id="settings-avatar-wrap" class="settings-avatar">
+                        <img id="settings-avatar-img" src="" alt="Profile Avatar" class="hidden">
+                        <i id="settings-avatar-placeholder" class="fas fa-user"></i>
+                    </div>
+                    <div class="settings-profile-details">
+                        <span class="details-label">Registered Nickname</span>
+                        <span id="settings-nickname" class="details-value">Not Registered</span>
+                    </div>
+                </div>
+                <div class="settings-biometric-status">
+                    <span class="biometric-label">Biometric Status</span>
+                    <span id="settings-bio-status" class="biometric-value status-unregistered"><i class="fas fa-circle-xmark"></i> Unregistered</span>
+                </div>
+                <div class="settings-actions">
+                    <button id="settings-remove-face-btn" class="btn btn-danger hidden" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px;">
+                        <i class="fas fa-trash-can"></i> Remove Face
+                    </button>
+                    <button id="settings-register-face-btn" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                        <i class="fas fa-face-smile"></i> Face Detection
+                    </button>
+                </div>
+                <!-- Inline mini scanner for Settings registration -->
+                <div id="settings-scan-container" class="settings-scan-container hidden">
+                    <div class="circular-scanner mini-scanner">
+                        <video id="settings-video" autoplay playsinline muted></video>
+                        <canvas id="settings-canvas"></canvas>
+                        <div class="scan-laser"></div>
+                    </div>
+                    <div id="settings-scan-status" class="settings-scan-status">Align face in frame...</div>
+                    <button id="settings-scan-demo-btn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%; font-size: 0.8rem; padding: 4px 8px;">
+                        Simulate Scan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Lightbox -->
     <div class="img-lightbox" id="img-lightbox" role="dialog" aria-modal="true">
         <button class="img-lightbox-close" id="img-lightbox-close" aria-label="Close">&times;</button>
@@ -328,6 +410,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=124" defer></script>
+    <script src="/app.js?v=125" defer></script>
 </body>
 </html>
