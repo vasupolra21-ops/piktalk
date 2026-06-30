@@ -225,7 +225,8 @@ const EMOJI_CATEGORIES = {
 // Initialization
 window.addEventListener('DOMContentLoaded', () => {
     initDOMElements();
-    
+    loadFaceModels(); // Start loading AI models in background immediately
+
     const path = window.location.pathname;
     if (path.startsWith('/chat/')) {
         currentRoomID = path.split('/chat/')[1];
@@ -655,6 +656,37 @@ function setupEventListeners() {
     // Settings nickname save button
     if (settingsSaveNameBtn) {
         settingsSaveNameBtn.addEventListener('click', saveSettingsNickname);
+    }
+
+    // Face-not-found retry button
+    const faceRetryBtn = document.getElementById('face-retry-btn');
+    if (faceRetryBtn) {
+        faceRetryBtn.addEventListener('click', () => {
+            const faceNotFoundEl = document.getElementById('face-not-found');
+            if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+            if (faceScanStatusEl) {
+                faceScanStatusEl.className = 'face-status';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+            }
+            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+            stopFaceScanFlow();
+            setTimeout(() => startFaceScanFlow(faceScanIsSettings), 300);
+        });
+    }
+
+    // Settings Face-not-found retry button
+    const settingsFaceRetryBtn = document.getElementById('settings-face-retry-btn');
+    if (settingsFaceRetryBtn) {
+        settingsFaceRetryBtn.addEventListener('click', () => {
+            const settingsFaceNotFoundEl = document.getElementById('settings-face-not-found');
+            if (settingsFaceNotFoundEl) settingsFaceNotFoundEl.classList.add('hidden');
+            if (faceScanStatusEl) {
+                faceScanStatusEl.className = 'face-status';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+            }
+            stopFaceScanFlow();
+            setTimeout(() => startFaceScanFlow(faceScanIsSettings), 300);
+        });
     }
 
     // Password toggles
@@ -3424,24 +3456,100 @@ function generateAISmartReplies() {
 }
 
 // ── Biometric Face ID Auth State & Logic ──
-let faceScanVideoEl = null;
-let faceScanCanvasEl = null;
-let faceScanStatusEl = null;
-let faceScanDetailEl = null;
-let faceScanStream = null;
-let faceScanActive = false;
-let faceScanAnimationId = null;
+let faceScanVideoEl   = null;
+let faceScanCanvasEl  = null;
+let faceScanStatusEl  = null;
+let faceScanDetailEl  = null;
+let faceScanStream    = null;
+let faceScanActive    = false;
+let faceScanTimerId   = null;   // setTimeout-based loop
+let faceScanAnimationId = null; // rAF overlay draw loop
 
 let faceScanLivenessProgress = 0;
 let faceScanLivenessVerified = false;
-let faceScanLastFrameData = null;
-let faceScanSignature = null;
-let faceScanIsSettings = false;
+let faceScanIsSettings  = false;
 let faceScanDemoRunning = false;
 
-// Convert RGB pixels to grayscale value
-function rgbToGrayscale(r, g, b) {
-    return 0.299 * r + 0.587 * g + 0.114 * b;
+// face-api.js state
+let faceModelsLoaded  = false;
+let faceModelsLoading = false;
+let faceNoFaceCount   = 0;          // consecutive frames without a face
+let facePrevLandmarks = null;        // previous frame landmarks for liveness
+let faceMotionSum     = 0;           // accumulated motion score
+let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
+
+const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+const FACE_MATCH_DIST  = 0.50;   // euclidean distance threshold (lower = stricter)
+const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
+const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
+
+// ── Load face-api.js neural network models ──
+async function loadFaceModels() {
+    if (faceModelsLoaded || faceModelsLoading) return;
+    faceModelsLoading = true;
+    try {
+        await Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL),
+            faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
+        ]);
+        faceModelsLoaded = true;
+        console.log('[FaceID] Models loaded ✓');
+    } catch (e) {
+        console.warn('[FaceID] Model load failed, will use demo mode only:', e);
+    }
+    faceModelsLoading = false;
+}
+
+// Run neural-net face detection on a video frame → returns detection or null
+async function detectFaceNN(video) {
+    if (!faceModelsLoaded || !video || video.readyState < 2) return null;
+    try {
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.45 });
+        const det  = await faceapi
+            .detectSingleFace(video, opts)
+            .withFaceLandmarks(true)
+            .withFaceDescriptor();
+        return det || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Measure movement between two sets of face landmarks (for liveness)
+function landmarkMotion(prev, curr) {
+    if (!prev || !curr) return 0;
+    const pts  = curr.positions;
+    const ppts = prev.positions;
+    if (!pts || pts.length !== ppts.length) return 0;
+    let sum = 0;
+    for (let i = 0; i < pts.length; i++) {
+        sum += Math.abs(pts[i].x - ppts[i].x) + Math.abs(pts[i].y - ppts[i].y);
+    }
+    return sum / pts.length;
+}
+
+// Save 128-dim face descriptor to localStorage (permanent)
+function saveFaceDescriptor(descriptor) {
+    localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+    // keep legacy key in sync for demo-mode compatibility
+    localStorage.setItem('piktalk_face_signature', JSON.stringify([1]));
+}
+
+// Load saved descriptor from localStorage
+function loadFaceDescriptor() {
+    const raw = localStorage.getItem('piktalk_face_descriptor');
+    if (!raw) return null;
+    try { return new Float32Array(JSON.parse(raw)); } catch (e) { return null; }
+}
+
+// Compare new descriptor against stored one; returns true if same person
+function faceDescriptorMatch(newDesc) {
+    const stored = loadFaceDescriptor();
+    if (!stored) return false;
+    const dist = faceapi.euclideanDistance(stored, newDesc);
+    console.log('[FaceID] distance:', dist.toFixed(4));
+    return dist < FACE_MATCH_DIST;
 }
 
 // Extract a normalized 32x32 grayscale array from video/canvas
@@ -3542,113 +3650,151 @@ function processLivenessFrame(video) {
     return { isLive, diff };
 }
 
-// Main RequestAnimationFrame loop for Face ID scan
-function runFaceScanLoop() {
+// ── rAF overlay draw loop (oval guide + glow) ──
+function runFaceScanOverlay() {
     if (!faceScanActive) return;
-    // Guard: if profile setup is already visible AND we are NOT in settings, stop scanning
+    const video  = faceScanVideoEl;
+    const canvas = faceScanCanvasEl;
+    const ctx    = canvas ? canvas.getContext('2d') : null;
+
+    if (canvas && video && video.readyState >= 2) {
+        if (canvas.width !== video.videoWidth && video.videoWidth) {
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Oval alignment guide
+        const pct = faceScanLivenessProgress / 100;
+        ctx.strokeStyle = `rgba(16,185,129,${0.35 + pct * 0.65})`;
+        ctx.lineWidth   = 3 + pct * 2;
+        ctx.beginPath();
+        ctx.ellipse(
+            canvas.width / 2, canvas.height / 2,
+            canvas.width * 0.28, canvas.height * 0.38,
+            0, 0, 2 * Math.PI
+        );
+        ctx.stroke();
+    }
+    faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
+}
+
+// ── Main async detection loop (runs every ~300 ms) ──
+async function runFaceScanLoop() {
+    if (!faceScanActive) return;
+    // Guard: stop if profile setup is visible (login scan only)
     if (!faceScanIsSettings && profileSetupSection && !profileSetupSection.classList.contains('hidden')) {
         stopFaceScanFlow();
         return;
     }
-    
-    const video = faceScanVideoEl;
-    const canvas = faceScanCanvasEl;
-    const ctx = canvas ? canvas.getContext('2d') : null;
-    
-    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
-        if (canvas) {
-            if (canvas.width !== video.videoWidth) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-            }
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw alignment guide (oval)
-            ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
-            ctx.lineWidth = 4;
-            if (faceScanLivenessProgress > 99) {
-                ctx.strokeStyle = '#10b981';
-            }
-            ctx.beginPath();
-            const rx = canvas.width / 2;
-            const ry = canvas.height / 2;
-            ctx.ellipse(rx, ry, canvas.width * 0.28, canvas.height * 0.38, 0, 0, 2 * Math.PI);
-            ctx.stroke();
-        }
-        
-        const livenessResult = processLivenessFrame(video);
-        
-        // Static liveness hint always shown during scan
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
 
-        if (livenessResult.isLive) {
-            if (livenessResult.diff > 1.8) {
-                faceScanLivenessProgress += 4;
-            } else {
-                faceScanLivenessProgress += 0.8;
-            }
-        }
-        
-        faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
-        
-        const scanner = video.closest('.circular-scanner');
-        if (scanner) {
-            scanner.className = 'circular-scanner scanning';
-            if (faceScanLivenessProgress < 100) {
-                const glow = faceScanLivenessProgress;
-                scanner.style.borderColor = `rgba(16, 185, 129, ${0.3 + (glow / 100) * 0.7})`;
-                if (faceScanStatusEl) {
-                    faceScanStatusEl.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Biometric Scan (${Math.floor(faceScanLivenessProgress)}%)`;
-                }
-            }
-        }
-        
-        if (faceScanLivenessProgress >= 100) {
-            faceScanLivenessVerified = true;
-        }
-        
-        if (faceScanLivenessVerified) {
-            const currentSig = extractFaceSignature(video);
-            const savedSigRaw = localStorage.getItem('piktalk_face_signature');
-            
-            if (faceScanIsSettings) {
-                saveBiometrics(currentSig, video);
-                handleScanSuccess("Face ID registered successfully!");
-                return;
-            }
-            
-            if (!savedSigRaw) {
-                // Registering for first time
-                saveBiometrics(currentSig, video);
-                handleScanSuccess("Biometrics Registered!");
-                return;
-            } else {
-                // Verify returning user
-                const savedSig = JSON.parse(savedSigRaw);
-                const matchError = compareFaceSignatures(currentSig, savedSig);
-                
-                if (matchError < 0.16) {
-                    handleScanSuccess("Access Granted!");
-                    return;
-                } else {
-                    handleScanFailure("Biometric mismatch!");
-                    return;
-                }
-            }
-        }
+    const video = faceScanVideoEl;
+
+    // Wait for video to be ready
+    if (!video || video.readyState < 2) {
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 300);
+        return;
     }
-    
-    faceScanAnimationId = requestAnimationFrame(runFaceScanLoop);
+
+    // Show models-loading state
+    if (!faceModelsLoaded) {
+        if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading AI models...';
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'One-time model download (~2 MB)...';
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 500);
+        return;
+    }
+
+    const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
+
+    // Run neural-net detection
+    const detection = await detectFaceNN(video);
+
+    if (!faceScanActive) return; // may have been stopped while awaiting
+
+    if (!detection) {
+        faceNoFaceCount++;
+        if (faceNoFaceCount >= FACE_NO_FACE_MAX) {
+            // Show face-not-found UI
+            stopFaceScanFlow();
+            if (faceScanStatusEl) {
+                faceScanStatusEl.className = 'face-status error';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-xmark"></i> Face Not Found';
+            }
+            if (faceScanDetailEl) faceScanDetailEl.textContent = '';
+            if (faceNotFoundEl)   faceNotFoundEl.classList.remove('hidden');
+            return;
+        }
+        if (faceScanStatusEl) {
+            faceScanStatusEl.className = 'face-status';
+            faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
+        }
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 300);
+        return;
+    }
+
+    // Face detected — reset no-face counter
+    faceNoFaceCount = 0;
+    if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+
+    // Liveness: measure landmark movement between frames
+    const motion = landmarkMotion(facePrevLandmarks, detection.landmarks);
+    facePrevLandmarks = detection.landmarks;
+    faceMotionSum += motion;
+
+    // Progress: require motion + consecutive detections
+    if (motion > 0.3) faceScanLivenessProgress += 4;  // blink/head movement
+    else              faceScanLivenessProgress += 1.5; // just visible face
+    faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
+
+    // Update status UI
+    if (faceScanStatusEl) {
+        faceScanStatusEl.className = 'face-status';
+        faceScanStatusEl.innerHTML =
+            `<i class="fas fa-spinner fa-spin"></i> Biometric Scan (${Math.floor(faceScanLivenessProgress)}%)`;
+    }
+    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
+
+    // Store latest descriptor for capture
+    faceCapturedDescriptor = detection.descriptor;
+
+    // Scan complete?
+    if (faceScanLivenessProgress >= 100) {
+        faceScanLivenessVerified = true;
+        _onFaceScanComplete();
+        return;
+    }
+
+    if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 300);
 }
 
-// Compare two signatures using Mean Absolute Error (MAE)
-function compareFaceSignatures(sig1, sig2) {
-    if (!sig1 || !sig2 || sig1.length !== sig2.length) return 999;
-    let sum = 0;
-    for (let i = 0; i < sig1.length; i++) {
-        sum += Math.abs(sig1[i] - sig2[i]);
+// Called when liveness + face verification is complete
+function _onFaceScanComplete() {
+    const descriptor = faceCapturedDescriptor;
+
+    if (faceScanIsSettings) {
+        // Settings re-registration
+        if (descriptor) saveFaceDescriptor(descriptor);
+        saveBiometrics(descriptor, faceScanVideoEl);
+        handleScanSuccess('Face ID registered successfully!');
+        return;
     }
-    return sum / sig1.length;
+
+    const hasStored = !!loadFaceDescriptor();
+
+    if (!hasStored) {
+        // First-time registration
+        if (descriptor) saveFaceDescriptor(descriptor);
+        saveBiometrics(descriptor, faceScanVideoEl);
+        handleScanSuccess('Biometrics Registered!');
+    } else {
+        // Returning user — match
+        if (descriptor && faceDescriptorMatch(descriptor)) {
+            handleScanSuccess('Access Granted!');
+        } else {
+            handleScanFailure('Biometric mismatch!');
+        }
+    }
 }
 
 // Save signature and snapshot avatar thumbnail
@@ -3696,49 +3842,56 @@ function saveBiometrics(signature, video) {
 // Open camera stream and kick off scan loops
 function startFaceScanFlow(isSettings = false) {
     faceScanIsSettings = isSettings;
-    faceScanActive = true;
+    faceScanActive     = true;
     faceScanLivenessProgress = 0;
     faceScanLivenessVerified = false;
-    faceScanLastFrameData = null;
     faceScanDemoRunning = false;
-    
+    faceNoFaceCount     = 0;
+    facePrevLandmarks   = null;
+    faceMotionSum       = 0;
+    faceCapturedDescriptor = null;
+
     if (isSettings) {
-        faceScanVideoEl = settingsVideo;
+        faceScanVideoEl  = settingsVideo;
         faceScanCanvasEl = settingsCanvas;
         faceScanStatusEl = settingsScanStatus;
         faceScanDetailEl = null;
     } else {
-        faceScanVideoEl = faceVideo;
+        faceScanVideoEl  = faceVideo;
         faceScanCanvasEl = faceCanvas;
         faceScanStatusEl = faceStatus;
         faceScanDetailEl = faceDetail;
     }
-    
+
     if (!faceScanVideoEl) return;
-    
+
     const scanner = faceScanVideoEl.closest('.circular-scanner');
-    if (scanner) {
-        scanner.className = 'circular-scanner scanning';
-        scanner.style.borderColor = '';
-    }
-    
+    if (scanner) { scanner.className = 'circular-scanner scanning'; scanner.style.borderColor = ''; }
+
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
         faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing camera...';
     }
-    
-    navigator.mediaDevices.getUserMedia({ video: { width: 300, height: 300, facingMode: 'user' } })
+
+    // Hide face-not-found overlay
+    const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
+    if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+
+    navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 320, facingMode: 'user' } })
         .then(stream => {
             faceScanStream = stream;
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.play().then(() => {
-                    faceScanAnimationId = requestAnimationFrame(runFaceScanLoop);
-                }).catch(e => console.error("Video play failed:", e));
+                    // Start overlay draw loop (rAF)
+                    faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
+                    // Start async detection loop
+                    faceScanTimerId = setTimeout(runFaceScanLoop, 600);
+                }).catch(e => console.error('Video play failed:', e));
             }
         })
         .catch(err => {
-            console.error("Webcam blocked:", err);
+            console.error('Webcam blocked:', err);
             if (faceScanStatusEl) {
                 faceScanStatusEl.className = 'face-status error';
                 faceScanStatusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Camera Blocked';
@@ -3751,10 +3904,8 @@ function startFaceScanFlow(isSettings = false) {
 
 function stopFaceScanFlow() {
     faceScanActive = false;
-    if (faceScanAnimationId) {
-        cancelAnimationFrame(faceScanAnimationId);
-        faceScanAnimationId = null;
-    }
+    if (faceScanTimerId) { clearTimeout(faceScanTimerId); faceScanTimerId = null; }
+    if (faceScanAnimationId) { cancelAnimationFrame(faceScanAnimationId); faceScanAnimationId = null; }
     if (faceScanStream) {
         faceScanStream.getTracks().forEach(t => t.stop());
         faceScanStream = null;
@@ -3840,6 +3991,7 @@ function handleScanFailure(statusText) {
     
     setTimeout(() => {
         // Mismatch -> Consider as new user, clear saved data, and repeat scan flow
+        localStorage.removeItem('piktalk_face_descriptor');
         localStorage.removeItem('piktalk_face_signature');
         localStorage.removeItem('piktalk_profile');
         myNickname = '';
@@ -3888,13 +4040,14 @@ function simulateFaceScan() {
         if (faceScanLivenessProgress >= 100) {
             clearInterval(interval);
             
-            const hasRegisteredFace = localStorage.getItem('piktalk_face_signature');
+            const hasRegisteredFace = localStorage.getItem('piktalk_face_descriptor') || localStorage.getItem('piktalk_face_signature');
             if (hasRegisteredFace) {
                 handleScanSuccess("Access Granted!");
             } else {
                 // Register mock signature
-                const mockSignature = Array(1024).fill(0).map(() => Math.random());
-                localStorage.setItem('piktalk_face_signature', JSON.stringify(mockSignature));
+                const mockSignature = Array(128).fill(0).map(() => Math.random());
+                localStorage.setItem('piktalk_face_descriptor', JSON.stringify(mockSignature));
+                localStorage.setItem('piktalk_face_signature', JSON.stringify([1]));
                 
                 // Create mock colored avatar
                 const mockCanvas = document.createElement('canvas');
@@ -3964,8 +4117,9 @@ function simulateSettingsFaceScan() {
         if (faceScanLivenessProgress >= 100) {
             clearInterval(interval);
             
-            const mockSignature = Array(1024).fill(0).map(() => Math.random());
-            localStorage.setItem('piktalk_face_signature', JSON.stringify(mockSignature));
+            const mockSignature = Array(128).fill(0).map(() => Math.random());
+            localStorage.setItem('piktalk_face_descriptor', JSON.stringify(mockSignature));
+            localStorage.setItem('piktalk_face_signature', JSON.stringify([1]));
             
             const mockCanvas = document.createElement('canvas');
             mockCanvas.width = 150;
@@ -4048,7 +4202,8 @@ function updateSettingsUI() {
         settingsAvatarPlaceholder.classList.remove('hidden');
     }
     
-    const hasFace = localStorage.getItem('piktalk_face_signature');
+    // Check for real neural-net descriptor first, fall back to legacy key
+    const hasFace = localStorage.getItem('piktalk_face_descriptor') || localStorage.getItem('piktalk_face_signature');
     if (hasFace) {
         if (settingsBioStatus) {
             settingsBioStatus.className = 'biometric-value status-registered';
@@ -4066,15 +4221,16 @@ function updateSettingsUI() {
 
 function removeFaceCredentials() {
     if (confirm("Are you sure you want to remove your Face ID profile? This will delete your stored biometrics and nickname.")) {
-        localStorage.removeItem('piktalk_face_signature');
+        localStorage.removeItem('piktalk_face_descriptor');  // new neural-net key
+        localStorage.removeItem('piktalk_face_signature');   // legacy key
         localStorage.removeItem('piktalk_profile');
-        myNickname = '';
+        myNickname   = '';
         myProfilePic = '';
-        
-        if (avatarPreviewImg) avatarPreviewImg.classList.add('hidden');
+
+        if (avatarPreviewImg)  avatarPreviewImg.classList.add('hidden');
         if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
-        if (nicknameInput) nicknameInput.value = '';
-        
+        if (nicknameInput)     nicknameInput.value = '';
+
         updateSettingsUI();
         alert("Face ID credentials removed successfully.");
     }

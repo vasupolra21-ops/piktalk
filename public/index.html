@@ -26,15 +26,17 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=129" as="style">
+    <link rel="preload" href="/style.css?v=130" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=129" as="script">
+    <link rel="preload" href="/app.js?v=130" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=129">
+    <link rel="stylesheet" href="/style.css?v=130">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <!-- Face Recognition Library (neural-network based) -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 </head>
 <body>
     <div class="animated-bg"></div>
@@ -292,7 +294,16 @@
                 <div id="face-detail" class="face-detail">
                     Blink/head movement slowly
                 </div>
-                
+
+                <!-- Face Not Found overlay -->
+                <div id="face-not-found" class="face-not-found hidden">
+                    <div class="face-not-found-icon"><i class="fas fa-face-frown"></i></div>
+                    <p class="face-not-found-msg">Face not found.<br>Please look directly at the camera.</p>
+                    <button id="face-retry-btn" class="btn btn-primary face-retry-btn">
+                        <i class="fas fa-rotate-right"></i> Try Again
+                    </button>
+                </div>
+
                 <button id="face-demo-btn" class="btn btn-secondary face-demo-btn">
                     <i class="fas fa-face-smile"></i> Simulate Scan (Demo Mode)
                 </button>
@@ -400,6 +411,14 @@
                     <button id="settings-scan-demo-btn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%; font-size: 0.8rem; padding: 4px 8px;">
                         Simulate Scan
                     </button>
+                    <!-- Settings Face Not Found overlay -->
+                    <div id="settings-face-not-found" class="face-not-found hidden">
+                        <div class="face-not-found-icon"><i class="fas fa-face-frown"></i></div>
+                        <p class="face-not-found-msg">Face not found.<br>Please look directly at the camera.</p>
+                        <button id="settings-face-retry-btn" class="btn btn-primary face-retry-btn">
+                            <i class="fas fa-rotate-right"></i> Try Again
+                        </button>
+                    </div>
                     <!-- Nickname input shown after face scan succeeds -->
                     <div id="settings-nickname-form" class="settings-nickname-form hidden">
                         <p class="settings-nickname-label"><i class="fas fa-circle-check" style="color:#10b981"></i> Face registered! Enter your name:</p>
@@ -420,6 +439,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=129" defer></script>
+    <script src="/app.js?v=130" defer></script>
 </body>
 </html>

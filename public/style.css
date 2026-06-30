@@ -3435,6 +3435,49 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* ── Face Not Found overlay ── */
+.face-not-found {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1.5px solid rgba(239, 68, 68, 0.35);
+    border-radius: 16px;
+    padding: 18px 20px;
+    margin-bottom: 8px;
+    animation: lbFadeIn 0.3s ease;
+}
+
+.face-not-found-icon {
+    font-size: 2.2rem;
+    color: #ef4444;
+    animation: pulse-warn 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-warn {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.92); }
+}
+
+.face-not-found-msg {
+    font-size: 0.9rem;
+    color: var(--text-main);
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.face-retry-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+}
+
+
 /* ── Settings Modal ── */
 .settings-modal-overlay {
     display: none;
