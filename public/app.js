@@ -161,12 +161,16 @@ function getOrCreateUserId() {
     try {
         let uid = sessionStorage.getItem('piktalk_userId');
         if (!uid || uid === 'null' || uid === 'undefined') {
+            // Check for persistent face identity from localStorage
+            uid = localStorage.getItem('piktalk_face_userid');
+        }
+        if (!uid || uid === 'null' || uid === 'undefined') {
             uid = 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
             sessionStorage.setItem('piktalk_userId', uid);
         }
         return uid;
     } catch(e) {
-        // Fallback if sessionStorage is blocked
+        // Fallback if storage is blocked
         return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
     }
 }
@@ -1611,6 +1615,31 @@ function showNicknameModal() {
     // Only start the scan if we are not already on the profile setup step
     const alreadyOnSetup = profileSetupSection && !profileSetupSection.classList.contains('hidden');
     if (!alreadyOnSetup) {
+        // ── Auto-Login check (Persist session across page reload / site re-opens) ──
+        const faceId = localStorage.getItem('piktalk_face_userid');
+        if (faceId) {
+            const savedProfile = JSON.parse(localStorage.getItem(`piktalk_profile_${faceId}`) || '{}');
+            if (savedProfile && savedProfile.nickname) {
+                console.log('[FaceID] Persistent session found! Auto-logging in user:', savedProfile.nickname);
+                myUserId = faceId;
+                sessionStorage.setItem('piktalk_userId', faceId);
+                myNickname = savedProfile.nickname;
+                myProfilePic = savedProfile.profilePic || '';
+                
+                showChat();
+                if (socket) {
+                    socket.emit('join-room', {
+                        roomID: currentRoomID,
+                        nickname: myNickname,
+                        profilePic: myProfilePic,
+                        userId: myUserId,
+                        password: currentRoomPassword
+                    });
+                }
+                return;
+            }
+        }
+
         // Show scanner, hide profile form
         if (faceScanSection) faceScanSection.classList.remove('hidden');
         if (profileSetupSection) profileSetupSection.classList.add('hidden');
