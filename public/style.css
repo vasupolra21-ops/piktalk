@@ -1286,14 +1286,16 @@ body.light-mode .bubble-timestamp {
 /* Wrapper holds the avatar circle + pencil badge together */
 .avatar-wrapper {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
     display: inline-block;
+    /* Allow badge to overflow the boundary */
+    overflow: visible;
 }
 
 .avatar-preview {
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     background: var(--input-bg);
     border: 2px dashed var(--glass-border);
@@ -1332,22 +1334,24 @@ body.light-mode .bubble-timestamp {
     pointer-events: none;
 }
 
-/* ── Pencil edit badge ── */
+/* ── Pencil edit badge — half inside / half outside the circle ── */
 .avatar-edit-badge {
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 28px;
-    height: 28px;
+    bottom: 4px;
+    right: 4px;
+    /* Translate half of its own size outward so it straddles the edge */
+    transform: translate(25%, 25%);
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: var(--primary);
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.68rem;
-    border: 2.5px solid var(--card-bg);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+    font-size: 0.78rem;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.45);
     pointer-events: all;
     transition: transform 0.18s ease, background 0.18s ease;
     z-index: 10;
@@ -1355,7 +1359,7 @@ body.light-mode .bubble-timestamp {
 }
 
 .avatar-edit-badge:hover {
-    transform: scale(1.2);
+    transform: translate(25%, 25%) scale(1.15);
     background: var(--accent);
 }
 
@@ -1890,13 +1894,18 @@ body.light-mode .waveform-bar {
     }
 
     .avatar-preview {
-        width: 80px;
-        height: 80px;
+        width: 120px;
+        height: 120px;
         transition: all 0.25s ease;
     }
 
+    .avatar-wrapper {
+        width: 120px;
+        height: 120px;
+    }
+
     .avatar-preview i {
-        font-size: 1.5rem;
+        font-size: 2rem;
     }
 
     .profile-setup p {
@@ -1916,12 +1925,17 @@ body.light-mode .waveform-bar {
     }
 
     .modal.keyboard-active .avatar-preview {
-        width: 65px;
-        height: 65px;
+        width: 90px;
+        height: 90px;
+    }
+
+    .modal.keyboard-active .avatar-wrapper {
+        width: 90px;
+        height: 90px;
     }
 
     .modal.keyboard-active .avatar-preview i {
-        font-size: 1.25rem;
+        font-size: 1.6rem;
     }
 
     .modal.keyboard-active .modal-content input {
