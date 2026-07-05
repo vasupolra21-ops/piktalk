@@ -4006,7 +4006,20 @@ async function _onFaceScanComplete() {
         localStorage.setItem('piktalk_face_userid', localMatch.faceUserId);
         myUserId = localMatch.faceUserId;
         sessionStorage.setItem('piktalk_userId', localMatch.faceUserId);
+        
+        // Ensure descriptor is stored in localStorage for future updates
+        if (descriptor) {
+            localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+        }
+        
         saveBiometrics(descriptor, faceScanVideoEl);
+
+        // Sync to server so cross-device match works!
+        const savedProfile = JSON.parse(localStorage.getItem(`piktalk_profile_${localMatch.faceUserId}`) || '{}');
+        if (descriptor) {
+            _syncFaceToServer(localMatch.faceUserId, descriptor, savedProfile.nickname || '', savedProfile.profilePic || null);
+        }
+
         handleScanSuccess('Access Granted!');
         return;
     }
