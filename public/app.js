@@ -3804,11 +3804,27 @@ function _onFaceScanComplete() {
     if (!hasStored) {
         // First-time registration
         if (descriptor) saveFaceDescriptor(descriptor);
+
+        // Generate and save permanent face-based UserId
+        const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        localStorage.setItem('piktalk_face_userid', newFaceUserId);
+        myUserId = newFaceUserId;
+        sessionStorage.setItem('piktalk_userId', newFaceUserId);
+
         saveBiometrics(descriptor, faceScanVideoEl);
         handleScanSuccess('Biometrics Registered!');
     } else {
         // Returning user — match
         if (descriptor && faceDescriptorMatch(descriptor)) {
+            // Retrieve existing Face UserId
+            let existingFaceUserId = localStorage.getItem('piktalk_face_userid');
+            if (!existingFaceUserId) {
+                existingFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('piktalk_face_userid', existingFaceUserId);
+            }
+            myUserId = existingFaceUserId;
+            sessionStorage.setItem('piktalk_userId', existingFaceUserId);
+
             // Update to latest profile picture on successful match scan!
             saveBiometrics(descriptor, faceScanVideoEl);
             handleScanSuccess('Access Granted!');
@@ -4055,12 +4071,26 @@ function simulateFaceScan() {
             
             const hasRegisteredFace = localStorage.getItem('piktalk_face_descriptor') || localStorage.getItem('piktalk_face_signature');
             if (hasRegisteredFace) {
+                // Restore the existing permanent face-based user ID
+                let existingFaceUserId = localStorage.getItem('piktalk_face_userid');
+                if (!existingFaceUserId) {
+                    existingFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                    localStorage.setItem('piktalk_face_userid', existingFaceUserId);
+                }
+                myUserId = existingFaceUserId;
+                sessionStorage.setItem('piktalk_userId', existingFaceUserId);
                 handleScanSuccess("Access Granted!");
             } else {
                 // Register mock signature
                 const mockSignature = Array(128).fill(0).map(() => Math.random());
                 localStorage.setItem('piktalk_face_descriptor', JSON.stringify(mockSignature));
                 localStorage.setItem('piktalk_face_signature', JSON.stringify([1]));
+
+                // Generate new permanent face-based user ID
+                const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                localStorage.setItem('piktalk_face_userid', newFaceUserId);
+                myUserId = newFaceUserId;
+                sessionStorage.setItem('piktalk_userId', newFaceUserId);
                 
                 // Create mock colored avatar
                 const mockCanvas = document.createElement('canvas');
@@ -4238,6 +4268,7 @@ function removeFaceCredentials() {
     if (confirm("Are you sure you want to remove your Face ID profile? This will delete your stored biometrics and nickname.")) {
         localStorage.removeItem('piktalk_face_descriptor');  // new neural-net key
         localStorage.removeItem('piktalk_face_signature');   // legacy key
+        localStorage.removeItem('piktalk_face_userid');
         localStorage.removeItem('piktalk_profile');
         myNickname   = '';
         myProfilePic = '';
@@ -4323,251 +4354,33 @@ loadFaceModels();
 
 
 // ═══════════════════════════════════════════════════════════════
-// PHONE + OTP VERIFICATION
+// FACE ID VERIFICATION BYPASS (Phone Modal Disabled)
 // ═══════════════════════════════════════════════════════════════
-let _pendingRoomCallback = null; // stores the callback to call after phone verified
-let _generatedOTP = null;
-
-function getVerifiedPhone() {
-    return localStorage.getItem('piktalk_phone') || null;
+function getFaceUserId() {
+    return localStorage.getItem('piktalk_face_userid') || null;
 }
 
 function showPhoneModal(onVerified) {
-    _pendingRoomCallback = onVerified;
-    const modal = document.getElementById('phone-modal');
-    if (!modal) { onVerified(); return; } // fallback: skip if no modal
-    modal.classList.add('active');
-    document.body.classList.add('modal-open');
-    // Reset to step 1
-    _goToPhoneStep(1);
-    const numInput = document.getElementById('phone-number-input');
-    const existingPhone = getVerifiedPhone();
-    if (numInput) {
-        if (existingPhone) {
-            // strip leading country code to pre-fill standard field
-            numInput.value = existingPhone.replace(/^\+\d{1,3}/, '');
-        } else {
-            numInput.value = '';
-        }
-        setTimeout(() => numInput.focus(), 300);
-    }
-    const errEl = document.getElementById('phone-error');
-    if (errEl) errEl.classList.add('hidden');
-}
-
-function _closePhoneModal() {
-    const modal = document.getElementById('phone-modal');
-    if (modal) modal.classList.remove('active');
-    document.body.classList.remove('modal-open');
-    _generatedOTP = null;
-}
-
-function _goToPhoneStep(step) {
-    const panel1 = document.getElementById('phone-step-panel-1');
-    const panel2 = document.getElementById('phone-step-panel-2');
-    const step1Dot = document.getElementById('phone-step-1');
-    const step2Dot = document.getElementById('phone-step-2');
-    if (step === 1) {
-        if (panel1) panel1.classList.remove('hidden');
-        if (panel2) panel2.classList.add('hidden');
-        if (step1Dot) step1Dot.classList.add('active');
-        if (step2Dot) step2Dot.classList.remove('active');
-    } else {
-        if (panel1) panel1.classList.add('hidden');
-        if (panel2) { panel2.classList.remove('hidden'); }
-        if (step1Dot) step1Dot.classList.remove('active');
-        if (step2Dot) step2Dot.classList.add('active');
-        // focus first OTP box
-        const firstBox = document.querySelector('#otp-boxes .otp-box');
-        if (firstBox) setTimeout(() => firstBox.focus(), 200);
-    }
-}
-
-function _sendOTP() {
-    const cc = document.getElementById('phone-country-code');
-    const numInput = document.getElementById('phone-number-input');
-    const errEl = document.getElementById('phone-error');
-    if (!numInput) return;
-    const number = numInput.value.replace(/\D/g, '').trim();
-    if (number.length < 7) {
-        if (errEl) { errEl.textContent = 'Please enter a valid phone number.'; errEl.classList.remove('hidden'); }
-        return;
-    }
-    if (errEl) errEl.classList.add('hidden');
-    const fullPhone = (cc ? cc.value : '+91') + number;
-
-    // Generate 6-digit OTP
-    _generatedOTP = String(Math.floor(100000 + Math.random() * 900000));
-    sessionStorage.setItem('piktalk_otp', _generatedOTP);
-    sessionStorage.setItem('piktalk_otp_phone', fullPhone);
-
-    const sentTo = document.getElementById('otp-sent-to');
-    if (sentTo) sentTo.textContent = `Sending code to ${fullPhone}...`;
-
-    const sendBtn2 = document.getElementById('phone-send-otp-btn');
-    const origHTML = sendBtn2 ? sendBtn2.innerHTML : '';
-    if (sendBtn2) {
-        sendBtn2.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-        sendBtn2.disabled = true;
-    }
-
-    // Call server API to send actual SMS
-    fetch('/api/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: fullPhone, otp: _generatedOTP })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (sendBtn2) {
-            sendBtn2.innerHTML = '<i class="fas fa-check"></i> Sent!';
-            setTimeout(() => { sendBtn2.innerHTML = origHTML; sendBtn2.disabled = false; }, 2000);
-        }
-
-        const otpDemoCard = document.getElementById('otp-demo-card');
-        const demoVal = document.getElementById('otp-demo-value');
-        if (data.demoMode) {
-            // Twilio credentials NOT configured -> fallback to showing on screen
-            if (otpDemoCard) otpDemoCard.style.display = 'flex';
-            if (demoVal) demoVal.textContent = _generatedOTP;
-            if (sentTo) sentTo.textContent = `Demo code generated (Twilio not configured).`;
-        } else {
-            // Real SMS sent! Hide the demo OTP card completely so they only get the real SMS!
-            if (otpDemoCard) {
-                otpDemoCard.style.setProperty('display', 'none', 'important');
-            }
-            if (sentTo) sentTo.textContent = `Verification code sent to ${fullPhone}!`;
-        }
-
-        // Clear OTP boxes
-        document.querySelectorAll('#otp-boxes .otp-box').forEach(b => { b.value = ''; b.classList.remove('filled'); });
-        const otpErr = document.getElementById('otp-error');
-        if (otpErr) otpErr.classList.add('hidden');
-
-        _goToPhoneStep(2);
-    })
-    .catch(err => {
-        console.error('Error sending OTP:', err);
-        if (sendBtn2) {
-            sendBtn2.innerHTML = origHTML;
-            sendBtn2.disabled = false;
-        }
-        if (errEl) {
-            errEl.textContent = 'Failed to send OTP. Please check server connection.';
-            errEl.classList.remove('hidden');
-        }
-    });
-}
-
-function _verifyOTP() {
-    const boxes = document.querySelectorAll('#otp-boxes .otp-box');
-    let entered = '';
-    boxes.forEach(b => entered += b.value.trim());
-    const errEl = document.getElementById('otp-error');
-    if (entered.length < 6) {
-        if (errEl) { errEl.textContent = 'Please enter all 6 digits.'; errEl.classList.remove('hidden'); }
-        return;
-    }
-    const storedOTP = sessionStorage.getItem('piktalk_otp');
-    if (entered !== storedOTP) {
-        if (errEl) { errEl.textContent = 'Incorrect code. Please try again.'; errEl.classList.remove('hidden'); }
-        // Shake animation
-        boxes.forEach(b => { b.style.animation = 'shake 0.4s'; setTimeout(() => b.style.animation = '', 400); });
-        return;
-    }
-    // Correct!
-    const phone = sessionStorage.getItem('piktalk_otp_phone');
-    localStorage.setItem('piktalk_phone', phone);
-    sessionStorage.removeItem('piktalk_otp');
-    sessionStorage.removeItem('piktalk_otp_phone');
-    // Animate success
-    boxes.forEach(b => { b.classList.add('filled'); });
-    if (errEl) errEl.classList.add('hidden');
-    setTimeout(() => {
-        _closePhoneModal();
-        if (_pendingRoomCallback) { _pendingRoomCallback(); _pendingRoomCallback = null; }
-    }, 600);
-}
-
-function _initPhoneModalEvents() {
-    const sendOTPBtn = document.getElementById('phone-send-otp-btn');
-    const verifyBtn = document.getElementById('otp-verify-btn');
-    const resendBtn = document.getElementById('otp-resend-btn');
-    const backBtn = document.getElementById('otp-back-btn');
-    const skipBtn = document.getElementById('phone-skip-btn');
-    const phoneInput = document.getElementById('phone-number-input');
-
-    if (sendOTPBtn) sendOTPBtn.addEventListener('click', _sendOTP);
-    if (phoneInput) phoneInput.addEventListener('keypress', e => { if (e.key === 'Enter') _sendOTP(); });
-    if (verifyBtn) verifyBtn.addEventListener('click', _verifyOTP);
-    if (resendBtn) resendBtn.addEventListener('click', () => {
-        _goToPhoneStep(1);
-        const num = sessionStorage.getItem('piktalk_otp_phone');
-        if (num) {
-            const numInput2 = document.getElementById('phone-number-input');
-            // strip country code for display
-            if (numInput2) numInput2.value = num.replace(/^\+\d{1,3}/, '');
-        }
-    });
-    if (backBtn) backBtn.addEventListener('click', () => _goToPhoneStep(1));
-    if (skipBtn) skipBtn.addEventListener('click', () => {
-        _closePhoneModal();
-        if (_pendingRoomCallback) { _pendingRoomCallback(); _pendingRoomCallback = null; }
-    });
-
-    // OTP box keyboard navigation + auto-advance
-    const otpBoxes = document.querySelectorAll('#otp-boxes .otp-box');
-    otpBoxes.forEach((box, i) => {
-        box.addEventListener('input', e => {
-            const val = e.target.value.replace(/\D/g, '');
-            e.target.value = val.slice(-1);
-            if (val) {
-                e.target.classList.add('filled');
-                if (i < otpBoxes.length - 1) otpBoxes[i + 1].focus();
-                // Auto-verify when all filled
-                const allFilled = Array.from(otpBoxes).every(b => b.value !== '');
-                if (allFilled) setTimeout(_verifyOTP, 200);
-            } else {
-                e.target.classList.remove('filled');
-            }
-        });
-        box.addEventListener('keydown', e => {
-            if (e.key === 'Backspace' && !box.value && i > 0) {
-                otpBoxes[i - 1].focus();
-                otpBoxes[i - 1].value = '';
-                otpBoxes[i - 1].classList.remove('filled');
-            }
-        });
-        box.addEventListener('paste', e => {
-            e.preventDefault();
-            const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-            otpBoxes.forEach((b, idx) => {
-                b.value = text[idx] || '';
-                if (b.value) b.classList.add('filled'); else b.classList.remove('filled');
-            });
-            const last = Math.min(text.length, otpBoxes.length) - 1;
-            if (last >= 0) otpBoxes[last].focus();
-            if (text.length >= 6) setTimeout(_verifyOTP, 200);
-        });
-    });
+    // Phone verification is removed; immediately proceed to Face ID setup/scan
+    onVerified();
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CHAT HISTORY PER PHONE
+// CHAT HISTORY PER FACE ID
 // ═══════════════════════════════════════════════════════════════
 const HISTORY_MAX = 200; // max messages to store per room
 
-function _historyKey(phone, roomID) {
-    return `piktalk_history_${phone}_${roomID}`;
+function _historyKey(faceUserId, roomID) {
+    return `piktalk_history_${faceUserId}_${roomID}`;
 }
 
 function saveMsgToHistory(data) {
-    const phone = getVerifiedPhone();
-    if (!phone || !currentRoomID) return;
+    const faceUserId = getFaceUserId();
+    if (!faceUserId || !currentRoomID) return;
     // Only save text messages (skip large images/audio to save space)
     if (data.image || data.audio) return;
     try {
-        const key = _historyKey(phone, currentRoomID);
+        const key = _historyKey(faceUserId, currentRoomID);
         const existing = JSON.parse(localStorage.getItem(key) || '[]');
         const entry = {
             nickname: data.nickname || 'Anonymous',
@@ -4584,10 +4397,10 @@ function saveMsgToHistory(data) {
 }
 
 function loadAndRenderHistory(roomID) {
-    const phone = getVerifiedPhone();
-    if (!phone || !roomID) return;
+    const faceUserId = getFaceUserId();
+    if (!faceUserId || !roomID) return;
     try {
-        const key = _historyKey(phone, roomID);
+        const key = _historyKey(faceUserId, roomID);
         const msgs = JSON.parse(localStorage.getItem(key) || '[]');
         if (!msgs.length) return;
         if (!messagesContainer) return;
@@ -4618,10 +4431,10 @@ function loadAndRenderHistory(roomID) {
 }
 
 function getAllHistoryRooms() {
-    const phone = getVerifiedPhone();
-    if (!phone) return [];
+    const faceUserId = getFaceUserId();
+    if (!faceUserId) return [];
     const rooms = [];
-    const prefix = `piktalk_history_${phone}_`;
+    const prefix = `piktalk_history_${faceUserId}_`;
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
         if (k && k.startsWith(prefix)) {
@@ -4636,15 +4449,15 @@ function getAllHistoryRooms() {
 }
 
 function clearRoomHistory(roomID) {
-    const phone = getVerifiedPhone();
-    if (!phone) return;
-    localStorage.removeItem(_historyKey(phone, roomID));
+    const faceUserId = getFaceUserId();
+    if (!faceUserId) return;
+    localStorage.removeItem(_historyKey(faceUserId, roomID));
 }
 
 function clearAllHistory() {
-    const phone = getVerifiedPhone();
-    if (!phone) return;
-    const prefix = `piktalk_history_${phone}_`;
+    const faceUserId = getFaceUserId();
+    if (!faceUserId) return;
+    const prefix = `piktalk_history_${faceUserId}_`;
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -4701,8 +4514,8 @@ function _initSettingsEnhancements() {
         syncSettingsTheme();
         const phoneEl = document.getElementById('settings-phone');
         if (phoneEl) {
-            const phone = getVerifiedPhone();
-            phoneEl.textContent = phone || 'Not verified';
+            const faceId = getFaceUserId();
+            phoneEl.textContent = faceId ? faceId.substring(0, 16) + '...' : 'Not registered';
         }
         return;
     }
@@ -4723,24 +4536,23 @@ function _initSettingsEnhancements() {
     const clearAllBtn = document.getElementById('settings-clear-all-history-btn');
     if (clearAllBtn) {
         clearAllBtn.addEventListener('click', () => {
-            if (confirm('Clear all chat history for this phone number?')) {
+            if (confirm('Clear all chat history for this Face ID?')) {
                 clearAllHistory();
                 renderChatHistoryInSettings();
             }
         });
     }
 
-    // Show phone in settings
+    // Show biometric ID in settings
     const phoneEl = document.getElementById('settings-phone');
     if (phoneEl) {
-        const phone = getVerifiedPhone();
-        phoneEl.textContent = phone || 'Not verified';
+        const faceId = getFaceUserId();
+        phoneEl.textContent = faceId ? faceId.substring(0, 16) + '...' : 'Not registered';
     }
 }
 
-// Initialize phone modal and settings enhancements on DOMContentLoaded
+// Initialize settings enhancements on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-    _initPhoneModalEvents();
     _initSettingsEnhancements();
 });
 

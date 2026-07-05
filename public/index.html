@@ -384,8 +384,8 @@
                     <div class="settings-profile-details">
                         <span class="details-label">Registered Nickname</span>
                         <span id="settings-nickname" class="details-value">Not Registered</span>
-                        <span class="details-label" style="margin-top:4px;">Phone Number</span>
-                        <span id="settings-phone" class="details-value" style="font-size:0.85rem; color: var(--text-muted);">Not verified</span>
+                        <span class="details-label" style="margin-top:4px;">Face ID</span>
+                        <span id="settings-phone" class="details-value" style="font-size:0.85rem; color: var(--text-secondary);">Not registered</span>
                     </div>
                 </div>
                 <!-- Light / Dark Mode Toggle -->
@@ -465,86 +465,6 @@
         </div>
     </div>
 
-    <!-- Phone Verification Modal -->
-    <div id="phone-modal" class="modal" role="dialog" aria-modal="true">
-        <div class="phone-modal-card glass-card">
-            <!-- Step indicator -->
-            <div class="phone-steps">
-                <div class="phone-step active" id="phone-step-1">
-                    <div class="step-dot">1</div>
-                    <span>Phone</span>
-                </div>
-                <div class="phone-step-line"></div>
-                <div class="phone-step" id="phone-step-2">
-                    <div class="step-dot">2</div>
-                    <span>Verify</span>
-                </div>
-            </div>
-
-            <!-- Step 1: Phone number entry -->
-            <div id="phone-step-panel-1" class="phone-panel">
-                <div class="phone-modal-icon"><i class="fas fa-mobile-screen-button"></i></div>
-                <h2 class="phone-modal-title">Verify Your Number</h2>
-                <p class="phone-modal-sub">We'll send a one-time code to confirm your identity and store your chat history.</p>
-                <div class="phone-input-row">
-                    <select id="phone-country-code" class="phone-country-select">
-                        <option value="+91">🇮🇳 +91</option>
-                        <option value="+1">🇺🇸 +1</option>
-                        <option value="+44">🇬🇧 +44</option>
-                        <option value="+61">🇦🇺 +61</option>
-                        <option value="+971">🇦🇪 +971</option>
-                        <option value="+65">🇸🇬 +65</option>
-                        <option value="+49">🇩🇪 +49</option>
-                        <option value="+33">🇫🇷 +33</option>
-                        <option value="+86">🇨🇳 +86</option>
-                        <option value="+81">🇯🇵 +81</option>
-                        <option value="+82">🇰🇷 +82</option>
-                        <option value="+55">🇧🇷 +55</option>
-                        <option value="+92">🇵🇰 +92</option>
-                        <option value="+880">🇧🇩 +880</option>
-                        <option value="+62">🇮🇩 +62</option>
-                        <option value="+234">🇳🇬 +234</option>
-                        <option value="+7">🇷🇺 +7</option>
-                        <option value="+20">🇪🇬 +20</option>
-                        <option value="+27">🇿🇦 +27</option>
-                        <option value="+52">🇲🇽 +52</option>
-                    </select>
-                    <input type="tel" id="phone-number-input" class="phone-number-field" placeholder="Enter phone number" maxlength="15" autocomplete="tel" inputmode="numeric">
-                </div>
-                <div id="phone-error" class="phone-error hidden"></div>
-                <button id="phone-send-otp-btn" class="btn btn-primary phone-btn">
-                    <i class="fas fa-paper-plane"></i> Send OTP
-                </button>
-                <button id="phone-skip-btn" class="phone-skip-link">Skip for now &rarr;</button>
-            </div>
-
-            <!-- Step 2: OTP entry -->
-            <div id="phone-step-panel-2" class="phone-panel hidden">
-                <div class="phone-modal-icon otp-icon"><i class="fas fa-shield-halved"></i></div>
-                <h2 class="phone-modal-title">Enter OTP</h2>
-                <p class="phone-modal-sub" id="otp-sent-to">Code sent to your number</p>
-                <!-- Demo OTP display -->
-                <div id="otp-demo-card" class="otp-demo-card">
-                    <i class="fas fa-circle-info"></i>
-                    <span>Demo OTP: <strong id="otp-demo-value"></strong></span>
-                </div>
-                <div class="otp-boxes" id="otp-boxes">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
-                </div>
-                <div id="otp-error" class="phone-error hidden"></div>
-                <button id="otp-verify-btn" class="btn btn-primary phone-btn">
-                    <i class="fas fa-check-circle"></i> Verify
-                </button>
-                <button id="otp-resend-btn" class="phone-skip-link">Resend code &rarr;</button>
-                <button id="otp-back-btn" class="phone-skip-link" style="display:block; margin-top:4px;">&larr; Change number</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Image Lightbox -->
     <div class="img-lightbox" id="img-lightbox" role="dialog" aria-modal="true">
