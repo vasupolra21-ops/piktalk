@@ -665,7 +665,11 @@ function setupEventListeners() {
     if (faceRetryBtn) {
         faceRetryBtn.addEventListener('click', () => {
             const faceNotFoundEl = document.getElementById('face-not-found');
-            if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+            if (faceNotFoundEl) {
+                faceNotFoundEl.classList.add('hidden');
+                const msgEl = faceNotFoundEl.querySelector('.face-not-found-msg');
+                if (msgEl) msgEl.innerHTML = 'Face not found.<br>Please look directly at the camera.';
+            }
             if (faceScanStatusEl) {
                 faceScanStatusEl.className = 'face-status';
                 faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
@@ -681,7 +685,11 @@ function setupEventListeners() {
     if (settingsFaceRetryBtn) {
         settingsFaceRetryBtn.addEventListener('click', () => {
             const settingsFaceNotFoundEl = document.getElementById('settings-face-not-found');
-            if (settingsFaceNotFoundEl) settingsFaceNotFoundEl.classList.add('hidden');
+            if (settingsFaceNotFoundEl) {
+                settingsFaceNotFoundEl.classList.add('hidden');
+                const msgEl = settingsFaceNotFoundEl.querySelector('.face-not-found-msg');
+                if (msgEl) msgEl.innerHTML = 'Face not found.<br>Please look directly at the camera.';
+            }
             if (faceScanStatusEl) {
                 faceScanStatusEl.className = 'face-status';
                 faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
@@ -3482,7 +3490,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.50;   // euclidean distance threshold (lower = stricter)
+const FACE_MATCH_DIST  = 0.60;   // euclidean distance threshold (lower = stricter)
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
@@ -3992,7 +4000,7 @@ function handleScanFailure(statusText) {
         faceScanStatusEl.innerHTML = `<i class="fas fa-circle-xmark"></i> ${statusText}`;
     }
     if (faceScanDetailEl) {
-        faceScanDetailEl.textContent = 'Redirecting to register new profile...';
+        faceScanDetailEl.textContent = 'Face verification failed.';
     }
     
     if (faceScanVideoEl) {
@@ -4003,28 +4011,16 @@ function handleScanFailure(statusText) {
         }
     }
     
-    setTimeout(() => {
-        // Mismatch -> Consider as new user, clear saved data, and repeat scan flow
-        localStorage.removeItem('piktalk_face_descriptor');
-        localStorage.removeItem('piktalk_face_signature');
-        localStorage.removeItem('piktalk_profile');
-        myNickname = '';
-        myProfilePic = '';
-        if (nicknameInput) nicknameInput.value = '';
-        if (avatarPreviewImg) avatarPreviewImg.classList.add('hidden');
-        if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
-        
-        if (faceScanSection) faceScanSection.classList.remove('hidden');
-        if (profileSetupSection) profileSetupSection.classList.add('hidden');
-        
-        if (faceScanDetailEl) {
-            faceScanDetailEl.textContent = 'Biometric mismatch. Creating a new profile...';
+    // Show face-not-found overlay with mismatch message (without deleting stored credentials)
+    const overlayId = faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found';
+    const faceNotFoundEl = document.getElementById(overlayId);
+    if (faceNotFoundEl) {
+        const msgEl = faceNotFoundEl.querySelector('.face-not-found-msg');
+        if (msgEl) {
+            msgEl.innerHTML = 'Biometric mismatch.<br>Face did not match stored credentials.';
         }
-        
-        setTimeout(() => {
-            startFaceScanFlow(false);
-        }, 1200);
-    }, 1500);
+        faceNotFoundEl.classList.remove('hidden');
+    }
 }
 
 // Simulates Face scan for modal step
