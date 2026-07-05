@@ -4680,8 +4680,44 @@ function _initSettingsEnhancements() {
     }
 }
 
+// One-time migration of old face profile to the new database
+function migrateOldFaceProfile() {
+    try {
+        const hasUsers = localStorage.getItem('piktalk_users');
+        if (!hasUsers) {
+            const oldDescRaw = localStorage.getItem('piktalk_face_descriptor');
+            if (oldDescRaw) {
+                const oldDesc = JSON.parse(oldDescRaw);
+                const oldProfileRaw = localStorage.getItem('piktalk_profile');
+                let oldNickname = '';
+                let oldProfilePic = null;
+                if (oldProfileRaw) {
+                    const oldProfile = JSON.parse(oldProfileRaw);
+                    oldNickname = oldProfile.nickname || '';
+                    oldProfilePic = oldProfile.profilePic || null;
+                }
+                const oldFaceUserId = localStorage.getItem('piktalk_face_userid') || ('u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
+                
+                // Save to new database
+                saveUserInDatabase(oldFaceUserId, oldDesc, oldNickname, oldProfilePic);
+                localStorage.setItem('piktalk_face_userid', oldFaceUserId);
+                
+                // Save profile under new key
+                localStorage.setItem(`piktalk_profile_${oldFaceUserId}`, JSON.stringify({
+                    nickname: oldNickname,
+                    profilePic: oldProfilePic
+                }));
+                console.log('[FaceID] Migrated old face profile to new multi-user database successfully ✓');
+            }
+        }
+    } catch(e) {
+        console.warn('[FaceID] Migration failed:', e);
+    }
+}
+
 // Initialize settings enhancements on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
+    migrateOldFaceProfile();
     _initSettingsEnhancements();
 });
 
