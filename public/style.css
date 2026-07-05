@@ -4150,7 +4150,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     flex-direction: column;
     position: absolute;
     inset: 0;
-    background: var(--card-bg);
+    background: var(--bg-dark);
     border-radius: 24px;
     overflow: hidden;
     z-index: 10;
@@ -4162,30 +4162,39 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     to   { transform: translateX(0);    opacity: 1; }
 }
 
+
+/* ── Conversation Panel Header (matches main chat header style) ── */
 .conversation-header {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
+    padding: 14px 16px;
     border-bottom: 1px solid var(--glass-border);
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--card-bg);
+    flex-shrink: 0;
 }
 
 .btn-icon-back {
     background: none;
     border: none;
     color: var(--text-main);
-    font-size: 1rem;
+    font-size: 1.1rem;
     cursor: pointer;
-    padding: 6px;
+    padding: 8px;
     border-radius: 50%;
+    width: 36px;
+    height: 36px;
     transition: background 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 .btn-icon-back:hover {
     background: rgba(255, 255, 255, 0.08);
+}
+body.light-mode .btn-icon-back:hover {
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .conversation-title-area {
@@ -4196,8 +4205,8 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 }
 
 .conversation-room-id {
-    font-weight: 600;
-    font-size: 0.95rem;
+    font-weight: 700;
+    font-size: 1rem;
     color: var(--text-main);
     white-space: nowrap;
     overflow: hidden;
@@ -4206,77 +4215,47 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 
 .conversation-msg-count {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: var(--accent);
+    margin-top: 1px;
 }
 
 .btn-primary-sm {
     background: var(--primary);
     border: none;
     color: white;
-    padding: 6px 12px;
-    border-radius: 12px;
-    font-size: 0.75rem;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 0.78rem;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, transform 0.15s;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 .btn-primary-sm:hover {
     opacity: 0.9;
+    transform: scale(1.03);
 }
 
+/* ── Message scroll area — matches main chat background ── */
 .settings-conv-messages {
     flex: 1;
     overflow-y: auto;
-    padding: 16px;
+    padding: 16px 14px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    background: rgba(0, 0, 0, 0.25);
+    gap: 2px;
+    background: var(--bg-dark);
+    scrollbar-width: thin;
 }
 
-.conv-msg-bubble {
-    display: flex;
-    flex-direction: column;
-    max-width: 80%;
-    padding: 10px 14px;
-    border-radius: 16px;
-    font-size: 0.85rem;
-    line-height: 1.4;
-    word-break: break-word;
+/* Light mode overrides */
+body.light-mode .settings-conv-messages {
+    background: #f0f4f8;
 }
 
-.conv-msg-bubble.sent {
-    align-self: flex-end;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    border-bottom-right-radius: 4px;
-}
-
-.conv-msg-bubble.received {
-    align-self: flex-start;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-main);
-    border-bottom-left-radius: 4px;
-}
-
-.conv-msg-name {
-    font-size: 0.7rem;
-    font-weight: 600;
-    margin-bottom: 2px;
-    opacity: 0.8;
-}
-
-.conv-msg-text {
-    margin-bottom: 3px;
-}
-
-.conv-msg-time {
-    font-size: 0.65rem;
-    text-align: right;
-    opacity: 0.6;
-}
 
 

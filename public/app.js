@@ -4662,17 +4662,34 @@ window._showRoomConversation = function(roomID) {
     
     if (msgCountEl) msgCountEl.textContent = `${msgs.length} messages`;
     
-    // Render bubbles
+    // Render messages in chat-room style
     if (msgs.length === 0) {
-        msgContainer.innerHTML = `<div class="settings-history-empty"><i class="fas fa-message-slash"></i><p>No messages stored</p></div>`;
+        msgContainer.innerHTML = `<div class="settings-history-empty"><i class="fas fa-comments-slash"></i><p>No messages stored</p></div>`;
     } else {
-        msgContainer.innerHTML = msgs.map(m => `
-            <div class="conv-msg-bubble ${m.isMine ? 'sent' : 'received'}">
-                ${!m.isMine ? `<span class="conv-msg-name">${escapeHtml(m.nickname)}</span>` : ''}
-                <div class="conv-msg-text">${escapeHtml(m.text)}</div>
-                <div class="conv-msg-time">${m.time}</div>
-            </div>
-        `).join('');
+        msgContainer.innerHTML = msgs.map((m, i) => {
+            const side = m.isMine ? 'sent' : 'received';
+            const nameColor = m.isMine ? 'var(--text-muted)' : getNicknameColor(m.nickname);
+            const avatarHtml = m.isMine ? '' : getAvatar(m.nickname, null);
+            
+            const senderInfo = !m.isMine ? `
+                <div class="message-info">
+                    <span class="sender-name" style="color: ${nameColor}">${escapeHtml(m.nickname || 'Unknown')}</span>
+                </div>` : '';
+                
+            return `
+                <div class="message ${side}" style="animation: none; max-width: 82%;">
+                    ${senderInfo}
+                    <div class="message-content">
+                        ${avatarHtml}
+                        <div class="bubble-wrapper">
+                            <div class="bubble">
+                                <span class="bubble-text">${escapeHtml(m.text)}</span>
+                                <span class="bubble-timestamp">${m.time || ''}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     }
     
     // Bind join action
