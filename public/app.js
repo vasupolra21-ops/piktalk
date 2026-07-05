@@ -207,6 +207,26 @@ function loadSavedProfile() {
 function saveProfileLocally(nickname, profilePic) {
     try {
         localStorage.setItem(_profileKey(), JSON.stringify({ nickname, profilePic: profilePic || null }));
+
+        const faceUserId = localStorage.getItem('piktalk_face_userid');
+        if (faceUserId) {
+            let descriptor = null;
+            const descRaw = localStorage.getItem('piktalk_face_descriptor');
+            if (descRaw) {
+                try { descriptor = new Float32Array(JSON.parse(descRaw)); } catch(e) {}
+            }
+            if (!descriptor) {
+                descriptor = loadFaceDescriptor(); // try loading from users list
+            }
+
+            // Update local users database list
+            saveUserInDatabase(faceUserId, descriptor, nickname, profilePic);
+
+            // Sync to server face registry for cross-device match
+            if (descriptor) {
+                _syncFaceToServer(faceUserId, descriptor, nickname, profilePic);
+            }
+        }
     } catch(e) {
         console.warn('Could not save profile to localStorage:', e);
     }
@@ -4029,7 +4049,10 @@ async function _onFaceScanComplete() {
     myUserId = newFaceUserId;
     sessionStorage.setItem('piktalk_userId', newFaceUserId);
 
-    if (descriptor) saveUserInDatabase(newFaceUserId, descriptor);
+    if (descriptor) {
+        localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+        saveUserInDatabase(newFaceUserId, descriptor);
+    }
     saveBiometrics(descriptor, faceScanVideoEl);
     // Push to server so this face can be recognized on any other device
     if (descriptor) _syncFaceToServer(newFaceUserId, descriptor, '', null);
@@ -4609,8 +4632,7 @@ function saveSettingsNickname() {
 
     // Save to localStorage profile
     const profile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
-    profile.nickname = newName;
-    localStorage.setItem(_profileKey(), JSON.stringify(profile));
+    saveProfileLocally(newName, profile.profilePic || myProfilePic);
 
     // Update live session nickname if user is already in chat
     myNickname = newName;
