@@ -8,6 +8,22 @@ const os = require('os');
 const compression = require('compression');
 const db = require('./db');
 
+// Load local .env file if it exists (built-in parser to avoid npm dependencies)
+try {
+    const fs = require('fs');
+    if (fs.existsSync('.env')) {
+        const env = fs.readFileSync('.env', 'utf8');
+        env.split('\n').forEach(line => {
+            const parts = line.split('=');
+            if (parts.length >= 2) {
+                const key = parts[0].trim();
+                const val = parts.slice(1).join('=').trim().replace(/^['"]|['"]$/g, '');
+                process.env[key] = val;
+            }
+        });
+    }
+} catch(e) {}
+
 const app = express();
 app.use(express.json());
 const server = http.createServer(app);
