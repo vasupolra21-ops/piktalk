@@ -196,10 +196,8 @@ function loadSavedProfile() {
             }
             if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
         }
-        // Restore nickname to input so returning user sees their name
-        if (profile.nickname && nicknameInput) {
-            nicknameInput.value = profile.nickname;
-        }
+        // NOTE: do NOT pre-fill nickname here — it is set only after face scan
+        // identifies who this person is (in handleScanSuccess)
     } catch(e) {
         console.warn('Could not load saved profile from localStorage:', e);
     }
@@ -3972,6 +3970,8 @@ function startFaceScanFlow(isSettings = false) {
         faceScanCanvasEl = faceCanvas;
         faceScanStatusEl = faceStatus;
         faceScanDetailEl = faceDetail;
+        // Clear nickname so each person types their own name after scan
+        if (nicknameInput) nicknameInput.value = '';
     }
 
     if (!faceScanVideoEl) return;
