@@ -147,6 +147,26 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Map: faceUserId -> { faceUserId, descriptor: number[], nickname, profilePic, updatedAt }
 const faceRegistry = new Map();
 
+// Load faces from database on startup
+async function initFaceRegistry() {
+    try {
+        const saved = await db.getFaces();
+        for (const f of saved) {
+            faceRegistry.set(f.faceUserId, {
+                faceUserId: f.faceUserId,
+                descriptor: f.descriptor,
+                nickname: f.nickname || '',
+                profilePic: f.profilePic || null,
+                updatedAt: Date.now()
+            });
+        }
+        console.log(`👤 Loaded ${faceRegistry.size} faces from database.`);
+    } catch (e) {
+        console.error("Failed to initialize face registry from database:", e);
+    }
+}
+initFaceRegistry();
+
 // Euclidean distance between two number arrays
 function euclidDist(a, b) {
     let sum = 0;
@@ -157,7 +177,7 @@ function euclidDist(a, b) {
 const FACE_MATCH_THRESHOLD = 0.50; // same tolerance as client
 
 // POST /api/face/register  — save or update a face profile
-app.post('/api/face/register', (req, res) => {
+app.post('/api/face/register', async (req, res) => {
     const { faceUserId, descriptor, nickname, profilePic } = req.body;
     if (!faceUserId || !Array.isArray(descriptor) || descriptor.length !== 128) {
         return res.status(400).json({ error: 'Invalid payload' });
@@ -169,6 +189,12 @@ app.post('/api/face/register', (req, res) => {
         profilePic: profilePic || null,
         updatedAt: Date.now()
     });
+    // Persist to database
+    try {
+        await db.saveFace(faceUserId, descriptor, nickname || '', profilePic || null);
+    } catch (e) {
+        console.error("Failed to save face profile to database:", e);
+    }
     res.json({ ok: true });
 });
 

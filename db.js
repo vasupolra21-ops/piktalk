@@ -200,6 +200,50 @@ const db = {
             writeJSON(data);
         }
         return true;
+    },
+
+    saveFace: async (faceUserId, descriptor, nickname, profilePic) => {
+        const dateTime = getISTDateTime();
+        if (useMongo && mongoDb) {
+            try {
+                const face = { faceUserId, descriptor, nickname, profilePic, dateTime };
+                await mongoDb.collection('faces').updateOne(
+                    { faceUserId },
+                    { $set: face },
+                    { upsert: true }
+                );
+                return face;
+            } catch (err) {
+                console.error("MongoDB saveFace error:", err.message);
+            }
+        }
+        // Fallback to JSON
+        const data = readJSON();
+        if (!data.faces) data.faces = {};
+        data.faces[faceUserId] = { descriptor, nickname, profilePic, dateTime };
+        writeJSON(data);
+        return data.faces[faceUserId];
+    },
+
+    getFaces: async () => {
+        if (useMongo && mongoDb) {
+            try {
+                const list = await mongoDb.collection('faces').find({}).toArray();
+                return list;
+            } catch (err) {
+                console.error("MongoDB getFaces error:", err.message);
+            }
+        }
+        // Fallback to JSON
+        const data = readJSON();
+        if (!data.faces) data.faces = {};
+        return Object.entries(data.faces).map(([faceUserId, val]) => ({
+            faceUserId,
+            descriptor: val.descriptor,
+            nickname: val.nickname,
+            profilePic: val.profilePic,
+            dateTime: val.dateTime
+        }));
     }
 };
 
