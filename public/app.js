@@ -3613,7 +3613,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.50;   // euclidean distance threshold — robust (0.50) for mobile & cross-device cameras
+const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.40) so different people don't match
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
