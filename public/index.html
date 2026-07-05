@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=133" as="style">
+    <link rel="preload" href="/style.css?v=134" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=133" as="script">
+    <link rel="preload" href="/app.js?v=134" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=133">
+    <link rel="stylesheet" href="/style.css?v=134">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -378,6 +378,7 @@
                 <button class="settings-cancel-btn" id="settings-close-btn" aria-label="Close">&times;</button>
             </div>
             <div class="settings-body">
+                <!-- Profile section -->
                 <div class="settings-profile-info">
                     <div id="settings-avatar-wrap" class="settings-avatar">
                         <img id="settings-avatar-img" src="" alt="Profile Avatar" class="hidden">
@@ -386,8 +387,27 @@
                     <div class="settings-profile-details">
                         <span class="details-label">Registered Nickname</span>
                         <span id="settings-nickname" class="details-value">Not Registered</span>
+                        <span class="details-label" style="margin-top:4px;">Phone Number</span>
+                        <span id="settings-phone" class="details-value" style="font-size:0.85rem; color: var(--text-muted);">Not verified</span>
                     </div>
                 </div>
+                <!-- Light / Dark Mode Toggle -->
+                <div class="settings-section-card">
+                    <div class="settings-row">
+                        <div class="settings-row-icon" style="background: linear-gradient(135deg, #f59e0b, #f97316)">
+                            <i class="fas fa-circle-half-stroke"></i>
+                        </div>
+                        <div class="settings-row-label">
+                            <span class="settings-row-title">Appearance</span>
+                            <span class="settings-row-sub" id="theme-label">Dark Mode</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="settings-theme-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Biometric Status -->
                 <div class="settings-biometric-status">
                     <span class="biometric-label">Biometric Status</span>
                     <span id="settings-bio-status" class="biometric-value status-unregistered"><i class="fas fa-circle-xmark"></i> Unregistered</span>
@@ -424,10 +444,107 @@
                         <p class="settings-nickname-label"><i class="fas fa-circle-check" style="color:#10b981"></i> Face registered! Enter your name:</p>
                         <input type="text" id="settings-nickname-input" class="settings-nickname-input" placeholder="Enter nickname..." maxlength="20" autocomplete="off" autocorrect="off" spellcheck="false">
                         <button id="settings-save-name-btn" class="btn btn-primary" style="width:100%; margin-top:8px;">
-                            <i class="fas fa-check"></i> Save & Done
+                            <i class="fas fa-check"></i> Save &amp; Done
                         </button>
                     </div>
                 </div>
+                <!-- Chat History Section -->
+                <div class="settings-section-card">
+                    <div class="settings-section-header">
+                        <div class="settings-row-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6)">
+                            <i class="fas fa-clock-rotate-left"></i>
+                        </div>
+                        <span class="settings-section-title">Chat History</span>
+                        <button id="settings-clear-all-history-btn" class="btn-text-danger" title="Clear All">Clear All</button>
+                    </div>
+                    <div id="settings-history-list" class="settings-history-list">
+                        <div class="settings-history-empty">
+                            <i class="fas fa-message-slash"></i>
+                            <p>No chat history yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Verification Modal -->
+    <div id="phone-modal" class="modal" role="dialog" aria-modal="true">
+        <div class="phone-modal-card glass-card">
+            <!-- Step indicator -->
+            <div class="phone-steps">
+                <div class="phone-step active" id="phone-step-1">
+                    <div class="step-dot">1</div>
+                    <span>Phone</span>
+                </div>
+                <div class="phone-step-line"></div>
+                <div class="phone-step" id="phone-step-2">
+                    <div class="step-dot">2</div>
+                    <span>Verify</span>
+                </div>
+            </div>
+
+            <!-- Step 1: Phone number entry -->
+            <div id="phone-step-panel-1" class="phone-panel">
+                <div class="phone-modal-icon"><i class="fas fa-mobile-screen-button"></i></div>
+                <h2 class="phone-modal-title">Verify Your Number</h2>
+                <p class="phone-modal-sub">We'll send a one-time code to confirm your identity and store your chat history.</p>
+                <div class="phone-input-row">
+                    <select id="phone-country-code" class="phone-country-select">
+                        <option value="+91">🇮🇳 +91</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                        <option value="+61">🇦🇺 +61</option>
+                        <option value="+971">🇦🇪 +971</option>
+                        <option value="+65">🇸🇬 +65</option>
+                        <option value="+49">🇩🇪 +49</option>
+                        <option value="+33">🇫🇷 +33</option>
+                        <option value="+86">🇨🇳 +86</option>
+                        <option value="+81">🇯🇵 +81</option>
+                        <option value="+82">🇰🇷 +82</option>
+                        <option value="+55">🇧🇷 +55</option>
+                        <option value="+92">🇵🇰 +92</option>
+                        <option value="+880">🇧🇩 +880</option>
+                        <option value="+62">🇮🇩 +62</option>
+                        <option value="+234">🇳🇬 +234</option>
+                        <option value="+7">🇷🇺 +7</option>
+                        <option value="+20">🇪🇬 +20</option>
+                        <option value="+27">🇿🇦 +27</option>
+                        <option value="+52">🇲🇽 +52</option>
+                    </select>
+                    <input type="tel" id="phone-number-input" class="phone-number-field" placeholder="Enter phone number" maxlength="15" autocomplete="tel" inputmode="numeric">
+                </div>
+                <div id="phone-error" class="phone-error hidden"></div>
+                <button id="phone-send-otp-btn" class="btn btn-primary phone-btn">
+                    <i class="fas fa-paper-plane"></i> Send OTP
+                </button>
+                <button id="phone-skip-btn" class="phone-skip-link">Skip for now &rarr;</button>
+            </div>
+
+            <!-- Step 2: OTP entry -->
+            <div id="phone-step-panel-2" class="phone-panel hidden">
+                <div class="phone-modal-icon otp-icon"><i class="fas fa-shield-halved"></i></div>
+                <h2 class="phone-modal-title">Enter OTP</h2>
+                <p class="phone-modal-sub" id="otp-sent-to">Code sent to your number</p>
+                <!-- Demo OTP display -->
+                <div id="otp-demo-card" class="otp-demo-card">
+                    <i class="fas fa-circle-info"></i>
+                    <span>Demo OTP: <strong id="otp-demo-value"></strong></span>
+                </div>
+                <div class="otp-boxes" id="otp-boxes">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                    <input type="text" class="otp-box" maxlength="1" inputmode="numeric">
+                </div>
+                <div id="otp-error" class="phone-error hidden"></div>
+                <button id="otp-verify-btn" class="btn btn-primary phone-btn">
+                    <i class="fas fa-check-circle"></i> Verify
+                </button>
+                <button id="otp-resend-btn" class="phone-skip-link">Resend code &rarr;</button>
+                <button id="otp-back-btn" class="phone-skip-link" style="display:block; margin-top:4px;">&larr; Change number</button>
             </div>
         </div>
     </div>
@@ -439,6 +556,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=133" defer></script>
+    <script src="/app.js?v=134" defer></script>
 </body>
 </html>

@@ -1474,6 +1474,8 @@ function showChat() {
     if (inviteBtn) inviteBtn.style.display = '';
     updateInputsState();
     updateThemeColor();
+    // Load chat history for this room
+    setTimeout(() => loadAndRenderHistory(currentRoomID), 100);
 }
 
 // Show or hide admin-only UI elements based on current admin status
@@ -1554,6 +1556,7 @@ if (socket) {
     socket.on('receive-message', (data) => {
         hideTyping();
         appendMessage(data, data.id === socket.id);
+        saveMsgToHistory(data);
         if (msgSound) msgSound.play().catch(() => {});
 
         // Auto-refresh smart replies in real time if suggestions bar is currently open
@@ -1643,7 +1646,7 @@ if (socket) {
             currentRoomPassword = createRoomPasswordInput.value.trim() || null;
             
             window.history.pushState({}, '', `/chat/${currentRoomID}`);
-            showNicknameModal();
+            showPhoneModal(showNicknameModal);
         } else {
             if (createRoomError) {
                 createRoomError.textContent = 'Room ID is already in use. Please try another one.';
@@ -1670,7 +1673,7 @@ if (socket) {
             } else {
                 currentRoomPassword = null;
                 window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                showNicknameModal();
+                showPhoneModal(showNicknameModal);
             }
         }
     });
@@ -1683,7 +1686,7 @@ if (socket) {
             currentRoomPassword = joinRoomPasswordInput.value.trim();
             
             window.history.pushState({}, '', `/chat/${roomID}`);
-            showNicknameModal();
+            showPhoneModal(showNicknameModal);
         } else {
             if (joinPasswordError) {
                 joinPasswordError.textContent = 'Incorrect password. Please try again.';
@@ -4173,6 +4176,8 @@ function openSettings() {
     if (settingsModal) {
         settingsModal.classList.add('open');
         updateSettingsUI();
+        renderChatHistoryInSettings();
+        _initSettingsEnhancements();
     }
 }
 
@@ -4315,4 +4320,375 @@ function saveSettingsNickname() {
 
 // Pre-load AI models immediately on script execution
 loadFaceModels();
+
+
+// ═══════════════════════════════════════════════════════════════
+// PHONE + OTP VERIFICATION
+// ═══════════════════════════════════════════════════════════════
+let _pendingRoomCallback = null; // stores the callback to call after phone verified
+let _generatedOTP = null;
+
+function getVerifiedPhone() {
+    return localStorage.getItem('piktalk_phone') || null;
+}
+
+function showPhoneModal(onVerified) {
+    // If phone is already verified, skip the modal
+    const existingPhone = getVerifiedPhone();
+    if (existingPhone) {
+        onVerified();
+        return;
+    }
+    _pendingRoomCallback = onVerified;
+    const modal = document.getElementById('phone-modal');
+    if (!modal) { onVerified(); return; } // fallback: skip if no modal
+    modal.classList.add('active');
+    document.body.classList.add('modal-open');
+    // Reset to step 1
+    _goToPhoneStep(1);
+    const numInput = document.getElementById('phone-number-input');
+    if (numInput) { numInput.value = ''; setTimeout(() => numInput.focus(), 300); }
+    const errEl = document.getElementById('phone-error');
+    if (errEl) errEl.classList.add('hidden');
+}
+
+function _closePhoneModal() {
+    const modal = document.getElementById('phone-modal');
+    if (modal) modal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+    _generatedOTP = null;
+}
+
+function _goToPhoneStep(step) {
+    const panel1 = document.getElementById('phone-step-panel-1');
+    const panel2 = document.getElementById('phone-step-panel-2');
+    const step1Dot = document.getElementById('phone-step-1');
+    const step2Dot = document.getElementById('phone-step-2');
+    if (step === 1) {
+        if (panel1) panel1.classList.remove('hidden');
+        if (panel2) panel2.classList.add('hidden');
+        if (step1Dot) step1Dot.classList.add('active');
+        if (step2Dot) step2Dot.classList.remove('active');
+    } else {
+        if (panel1) panel1.classList.add('hidden');
+        if (panel2) { panel2.classList.remove('hidden'); }
+        if (step1Dot) step1Dot.classList.remove('active');
+        if (step2Dot) step2Dot.classList.add('active');
+        // focus first OTP box
+        const firstBox = document.querySelector('#otp-boxes .otp-box');
+        if (firstBox) setTimeout(() => firstBox.focus(), 200);
+    }
+}
+
+function _sendOTP() {
+    const cc = document.getElementById('phone-country-code');
+    const numInput = document.getElementById('phone-number-input');
+    const errEl = document.getElementById('phone-error');
+    if (!numInput) return;
+    const number = numInput.value.replace(/\D/g, '').trim();
+    if (number.length < 7) {
+        if (errEl) { errEl.textContent = 'Please enter a valid phone number.'; errEl.classList.remove('hidden'); }
+        return;
+    }
+    if (errEl) errEl.classList.add('hidden');
+    const fullPhone = (cc ? cc.value : '+91') + number;
+
+    // Generate 6-digit OTP
+    _generatedOTP = String(Math.floor(100000 + Math.random() * 900000));
+    sessionStorage.setItem('piktalk_otp', _generatedOTP);
+    sessionStorage.setItem('piktalk_otp_phone', fullPhone);
+
+    // Show OTP in demo card
+    const demoVal = document.getElementById('otp-demo-value');
+    if (demoVal) demoVal.textContent = _generatedOTP;
+    const sentTo = document.getElementById('otp-sent-to');
+    if (sentTo) sentTo.textContent = `Code sent to ${fullPhone}`;
+
+    // Clear OTP boxes
+    document.querySelectorAll('#otp-boxes .otp-box').forEach(b => { b.value = ''; b.classList.remove('filled'); });
+    const otpErr = document.getElementById('otp-error');
+    if (otpErr) otpErr.classList.add('hidden');
+
+    // Animate send button
+    const sendBtn2 = document.getElementById('phone-send-otp-btn');
+    if (sendBtn2) {
+        const orig = sendBtn2.innerHTML;
+        sendBtn2.innerHTML = '<i class="fas fa-check"></i> Sent!';
+        sendBtn2.disabled = true;
+        setTimeout(() => { sendBtn2.innerHTML = orig; sendBtn2.disabled = false; }, 2000);
+    }
+    _goToPhoneStep(2);
+}
+
+function _verifyOTP() {
+    const boxes = document.querySelectorAll('#otp-boxes .otp-box');
+    let entered = '';
+    boxes.forEach(b => entered += b.value.trim());
+    const errEl = document.getElementById('otp-error');
+    if (entered.length < 6) {
+        if (errEl) { errEl.textContent = 'Please enter all 6 digits.'; errEl.classList.remove('hidden'); }
+        return;
+    }
+    const storedOTP = sessionStorage.getItem('piktalk_otp');
+    if (entered !== storedOTP) {
+        if (errEl) { errEl.textContent = 'Incorrect code. Please try again.'; errEl.classList.remove('hidden'); }
+        // Shake animation
+        boxes.forEach(b => { b.style.animation = 'shake 0.4s'; setTimeout(() => b.style.animation = '', 400); });
+        return;
+    }
+    // Correct!
+    const phone = sessionStorage.getItem('piktalk_otp_phone');
+    localStorage.setItem('piktalk_phone', phone);
+    sessionStorage.removeItem('piktalk_otp');
+    sessionStorage.removeItem('piktalk_otp_phone');
+    // Animate success
+    boxes.forEach(b => { b.classList.add('filled'); });
+    if (errEl) errEl.classList.add('hidden');
+    setTimeout(() => {
+        _closePhoneModal();
+        if (_pendingRoomCallback) { _pendingRoomCallback(); _pendingRoomCallback = null; }
+    }, 600);
+}
+
+function _initPhoneModalEvents() {
+    const sendOTPBtn = document.getElementById('phone-send-otp-btn');
+    const verifyBtn = document.getElementById('otp-verify-btn');
+    const resendBtn = document.getElementById('otp-resend-btn');
+    const backBtn = document.getElementById('otp-back-btn');
+    const skipBtn = document.getElementById('phone-skip-btn');
+    const phoneInput = document.getElementById('phone-number-input');
+
+    if (sendOTPBtn) sendOTPBtn.addEventListener('click', _sendOTP);
+    if (phoneInput) phoneInput.addEventListener('keypress', e => { if (e.key === 'Enter') _sendOTP(); });
+    if (verifyBtn) verifyBtn.addEventListener('click', _verifyOTP);
+    if (resendBtn) resendBtn.addEventListener('click', () => {
+        _goToPhoneStep(1);
+        const num = sessionStorage.getItem('piktalk_otp_phone');
+        if (num) {
+            const numInput2 = document.getElementById('phone-number-input');
+            // strip country code for display
+            if (numInput2) numInput2.value = num.replace(/^\+\d{1,3}/, '');
+        }
+    });
+    if (backBtn) backBtn.addEventListener('click', () => _goToPhoneStep(1));
+    if (skipBtn) skipBtn.addEventListener('click', () => {
+        _closePhoneModal();
+        if (_pendingRoomCallback) { _pendingRoomCallback(); _pendingRoomCallback = null; }
+    });
+
+    // OTP box keyboard navigation + auto-advance
+    const otpBoxes = document.querySelectorAll('#otp-boxes .otp-box');
+    otpBoxes.forEach((box, i) => {
+        box.addEventListener('input', e => {
+            const val = e.target.value.replace(/\D/g, '');
+            e.target.value = val.slice(-1);
+            if (val) {
+                e.target.classList.add('filled');
+                if (i < otpBoxes.length - 1) otpBoxes[i + 1].focus();
+                // Auto-verify when all filled
+                const allFilled = Array.from(otpBoxes).every(b => b.value !== '');
+                if (allFilled) setTimeout(_verifyOTP, 200);
+            } else {
+                e.target.classList.remove('filled');
+            }
+        });
+        box.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !box.value && i > 0) {
+                otpBoxes[i - 1].focus();
+                otpBoxes[i - 1].value = '';
+                otpBoxes[i - 1].classList.remove('filled');
+            }
+        });
+        box.addEventListener('paste', e => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+            otpBoxes.forEach((b, idx) => {
+                b.value = text[idx] || '';
+                if (b.value) b.classList.add('filled'); else b.classList.remove('filled');
+            });
+            const last = Math.min(text.length, otpBoxes.length) - 1;
+            if (last >= 0) otpBoxes[last].focus();
+            if (text.length >= 6) setTimeout(_verifyOTP, 200);
+        });
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHAT HISTORY PER PHONE
+// ═══════════════════════════════════════════════════════════════
+const HISTORY_MAX = 200; // max messages to store per room
+
+function _historyKey(phone, roomID) {
+    return `piktalk_history_${phone}_${roomID}`;
+}
+
+function saveMsgToHistory(data) {
+    const phone = getVerifiedPhone();
+    if (!phone || !currentRoomID) return;
+    // Only save text messages (skip large images/audio to save space)
+    if (data.image || data.audio) return;
+    try {
+        const key = _historyKey(phone, currentRoomID);
+        const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        const entry = {
+            nickname: data.nickname || 'Anonymous',
+            text: data.message || '',
+            time: data.time || new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            profilePic: null, // don't store profile pics (large)
+            isMine: data.id === (socket && socket.id)
+        };
+        existing.push(entry);
+        // Keep only last HISTORY_MAX messages
+        if (existing.length > HISTORY_MAX) existing.splice(0, existing.length - HISTORY_MAX);
+        localStorage.setItem(key, JSON.stringify(existing));
+    } catch(e) { /* storage full or blocked */ }
+}
+
+function loadAndRenderHistory(roomID) {
+    const phone = getVerifiedPhone();
+    if (!phone || !roomID) return;
+    try {
+        const key = _historyKey(phone, roomID);
+        const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!msgs.length) return;
+        if (!messagesContainer) return;
+        // Add a separator
+        const sep = document.createElement('div');
+        sep.style.cssText = 'text-align:center;color:var(--text-muted);font-size:0.75rem;padding:8px 0;opacity:0.6;';
+        sep.textContent = `— ${msgs.length} messages from history —`;
+        messagesContainer.appendChild(sep);
+        msgs.forEach(msg => {
+            const bubble = document.createElement('div');
+            bubble.className = `message ${msg.isMine ? 'sent' : 'received'} history-msg`;
+            bubble.style.opacity = '0.75';
+            bubble.innerHTML = `
+                <div class="message-bubble">
+                    ${!msg.isMine ? `<span class="message-name">${msg.nickname}</span>` : ''}
+                    <div class="message-text">${escapeHtml(msg.text)}</div>
+                    <div class="message-time">${msg.time}</div>
+                </div>`;
+            messagesContainer.appendChild(bubble);
+        });
+        // Separator after history
+        const sep2 = document.createElement('div');
+        sep2.style.cssText = 'text-align:center;color:var(--text-muted);font-size:0.75rem;padding:8px 0;opacity:0.6;';
+        sep2.textContent = '— Live messages —';
+        messagesContainer.appendChild(sep2);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    } catch(e) { /* ignore */ }
+}
+
+function getAllHistoryRooms() {
+    const phone = getVerifiedPhone();
+    if (!phone) return [];
+    const rooms = [];
+    const prefix = `piktalk_history_${phone}_`;
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) {
+            const roomID = k.replace(prefix, '');
+            try {
+                const msgs = JSON.parse(localStorage.getItem(k) || '[]');
+                rooms.push({ roomID, count: msgs.length, last: msgs[msgs.length - 1] || null });
+            } catch(e) {}
+        }
+    }
+    return rooms.sort((a, b) => b.count - a.count);
+}
+
+function clearRoomHistory(roomID) {
+    const phone = getVerifiedPhone();
+    if (!phone) return;
+    localStorage.removeItem(_historyKey(phone, roomID));
+}
+
+function clearAllHistory() {
+    const phone = getVerifiedPhone();
+    if (!phone) return;
+    const prefix = `piktalk_history_${phone}_`;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS ENHANCEMENTS: THEME TOGGLE + HISTORY
+// ═══════════════════════════════════════════════════════════════
+function renderChatHistoryInSettings() {
+    const listEl = document.getElementById('settings-history-list');
+    if (!listEl) return;
+    const rooms = getAllHistoryRooms();
+    if (!rooms.length) {
+        listEl.innerHTML = `<div class="settings-history-empty"><i class="fas fa-message-slash"></i><p>No chat history yet</p></div>`;
+        return;
+    }
+    listEl.innerHTML = rooms.map(r => `
+        <div class="history-room-row">
+            <div class="history-room-icon"><i class="fas fa-comments"></i></div>
+            <div class="history-room-info">
+                <div class="history-room-id">${escapeHtml(r.roomID)}</div>
+                <div class="history-room-meta">${r.count} messages${r.last ? ' · ' + (r.last.text || '').substring(0,30) : ''}</div>
+            </div>
+            <button class="history-room-clear" onclick="_clearRoomHistoryFromUI('${escapeHtml(r.roomID)}')"><i class="fas fa-trash"></i></button>
+        </div>
+    `).join('');
+}
+
+window._clearRoomHistoryFromUI = function(roomID) {
+    clearRoomHistory(roomID);
+    renderChatHistoryInSettings();
+};
+
+function _initSettingsEnhancements() {
+    // Theme toggle in settings
+    const settingsThemeToggle = document.getElementById('settings-theme-toggle');
+    const themeLabel = document.getElementById('theme-label');
+
+    function syncSettingsTheme() {
+        const isLight = document.body.classList.contains('light-mode');
+        if (settingsThemeToggle) settingsThemeToggle.checked = isLight;
+        if (themeLabel) themeLabel.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+    }
+    syncSettingsTheme();
+
+    if (settingsThemeToggle) {
+        settingsThemeToggle.addEventListener('change', () => {
+            if (typeof toggleTheme === 'function') toggleTheme();
+            setTimeout(syncSettingsTheme, 50);
+        });
+    }
+
+    // Clear all history button
+    const clearAllBtn = document.getElementById('settings-clear-all-history-btn');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+            if (confirm('Clear all chat history for this phone number?')) {
+                clearAllHistory();
+                renderChatHistoryInSettings();
+            }
+        });
+    }
+
+    // Show phone in settings
+    const phoneEl = document.getElementById('settings-phone');
+    if (phoneEl) {
+        const phone = getVerifiedPhone();
+        phoneEl.textContent = phone || 'Not verified';
+    }
+}
+
+// Initialize phone modal and settings enhancements on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    _initPhoneModalEvents();
+    _initSettingsEnhancements();
+});
+
 
