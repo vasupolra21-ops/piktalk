@@ -4355,7 +4355,8 @@ function handleScanSuccess(statusText) {
             // Autofill nickname from this person's own saved profile
             if (nicknameInput) nicknameInput.value = savedProfile.nickname || '';
             
-            // Restore avatar preview if available
+            // Restore avatar preview: use saved profile pic if available,
+            // otherwise keep the freshly captured face photo currently in myProfilePic
             if (savedProfile.profilePic) {
                 myProfilePic = savedProfile.profilePic;
                 if (avatarPreviewImg) {
@@ -4365,26 +4366,45 @@ function handleScanSuccess(statusText) {
                 }
                 if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
             } else {
-                myProfilePic = '';
-                if (avatarPreviewImg) {
-                    avatarPreviewImg.src = '';
-                    avatarPreviewImg.classList.add('hidden');
+                // Keep the freshly captured face from saveBiometrics
+                if (myProfilePic) {
+                    if (avatarPreviewImg) {
+                        avatarPreviewImg.src = myProfilePic;
+                        avatarPreviewImg.classList.remove('hidden');
+                        avatarPreviewImg.style.objectFit = 'cover';
+                    }
+                    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                } else {
+                    if (avatarPreviewImg) {
+                        avatarPreviewImg.src = '';
+                        avatarPreviewImg.classList.add('hidden');
+                    }
+                    if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
                 }
-                if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
             }
             
             // Transition view
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         } else {
-            // First time login - clear previous nickname and reset avatar preview
+            // First time login - clear previous nickname only. Keep the freshly captured face photo!
             if (nicknameInput) nicknameInput.value = '';
-            myProfilePic = '';
-            if (avatarPreviewImg) {
-                avatarPreviewImg.src = '';
-                avatarPreviewImg.classList.add('hidden');
+            
+            // Ensure the freshly captured face is shown in the preview
+            if (myProfilePic) {
+                if (avatarPreviewImg) {
+                    avatarPreviewImg.src = myProfilePic;
+                    avatarPreviewImg.classList.remove('hidden');
+                    avatarPreviewImg.style.objectFit = 'cover';
+                }
+                if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+            } else {
+                if (avatarPreviewImg) {
+                    avatarPreviewImg.src = '';
+                    avatarPreviewImg.classList.add('hidden');
+                }
+                if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
             }
-            if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
 
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
