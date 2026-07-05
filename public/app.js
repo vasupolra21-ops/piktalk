@@ -3921,7 +3921,12 @@ function saveBiometrics(signature, video) {
         const sy = ((video.videoHeight || 300) - size) / 2;
         
         try {
+            // Translate and scale to mirror the image horizontally, matching the mirrored preview
+            thumbCtx.translate(150, 0);
+            thumbCtx.scale(-1, 1);
             thumbCtx.drawImage(video, sx, sy, size, size, 0, 0, 150, 150);
+            // Reset transform matrix
+            thumbCtx.setTransform(1, 0, 0, 1, 0, 0);
         } catch(e) {
             // Mock if drawImage fails
             thumbCtx.fillStyle = '#10b981';
