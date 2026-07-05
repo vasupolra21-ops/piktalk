@@ -3513,8 +3513,8 @@ async function loadFaceModels() {
     faceModelsLoading = true;
     try {
         await Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL),
-            faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODEL_URL),
+            faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
             faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
         ]);
         faceModelsLoaded = true;
@@ -3529,7 +3529,8 @@ async function loadFaceModels() {
 async function detectFaceNN(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.55 }); // larger input = finer facial details
+        // Use SsdMobilenetv1Options for very high accuracy facial detail detection
+        const opts = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.55 });
         const det  = await faceapi
             .detectSingleFace(video, opts)
             .withFaceLandmarks(true)
@@ -4144,12 +4145,68 @@ function simulateFaceScan() {
             
             const users = getRegisteredUsers();
             if (users.length > 0) {
-                // Restore the existing permanent face-based user ID of the first registered user
-                const u = users[0];
-                localStorage.setItem('piktalk_face_userid', u.faceUserId);
-                myUserId = u.faceUserId;
-                sessionStorage.setItem('piktalk_userId', u.faceUserId);
-                handleScanSuccess("Access Granted!");
+                // Prompt user to select profile simulation mode (match vs new user)
+                const userListText = users.map((u, i) => `${i + 1}. ${u.nickname || 'Unnamed User'}`).join('\n');
+                const simulateMatch = confirm(`Simulate matching an existing profile?\n\nRegistered profiles:\n${userListText}\n\nClick "OK" to simulate matching existing, or "Cancel" to simulate a new user (brother).`);
+                
+                if (simulateMatch) {
+                    const u = users[0];
+                    localStorage.setItem('piktalk_face_userid', u.faceUserId);
+                    myUserId = u.faceUserId;
+                    sessionStorage.setItem('piktalk_userId', u.faceUserId);
+                    handleScanSuccess("Access Granted!");
+                } else {
+                    // Simulate new user (brother)
+                    const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+                    localStorage.setItem('piktalk_face_userid', newFaceUserId);
+                    myUserId = newFaceUserId;
+                    sessionStorage.setItem('piktalk_userId', newFaceUserId);
+
+                    // Register mock signature
+                    const mockSignature = Array(128).fill(0).map(() => Math.random());
+                    saveUserInDatabase(newFaceUserId, mockSignature, '', null);
+                    
+                    // Create mock colored avatar (different color for new user)
+                    const mockCanvas = document.createElement('canvas');
+                    mockCanvas.width = 150;
+                    mockCanvas.height = 150;
+                    const mockCtx = mockCanvas.getContext('2d');
+                    const gradient = mockCtx.createLinearGradient(0, 0, 150, 150);
+                    gradient.addColorStop(0, '#f59e0b');
+                    gradient.addColorStop(1, '#ef4444');
+                    mockCtx.fillStyle = gradient;
+                    mockCtx.fillRect(0, 0, 150, 150);
+                    
+                    mockCtx.fillStyle = '#ffffff';
+                    mockCtx.beginPath();
+                    mockCtx.arc(75, 75, 45, 0, 2*Math.PI);
+                    mockCtx.fill();
+                    mockCtx.fillStyle = '#f59e0b';
+                    mockCtx.beginPath();
+                    mockCtx.arc(60, 65, 5, 0, 2*Math.PI);
+                    mockCtx.arc(90, 65, 5, 0, 2*Math.PI);
+                    mockCtx.fill();
+                    mockCtx.strokeStyle = '#f59e0b';
+                    mockCtx.lineWidth = 4;
+                    mockCtx.beginPath();
+                    mockCtx.arc(75, 75, 25, 0.1 * Math.PI, 0.9 * Math.PI);
+                    mockCtx.stroke();
+                    
+                    const mockAvatarDataURL = mockCanvas.toDataURL();
+                    myProfilePic = mockAvatarDataURL;
+                    
+                    if (avatarPreviewImg) {
+                        avatarPreviewImg.src = mockAvatarDataURL;
+                        avatarPreviewImg.classList.remove('hidden');
+                        avatarPreviewImg.style.objectFit = 'cover';
+                    }
+                    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                    
+                    const profile = { nickname: '', profilePic: mockAvatarDataURL };
+                    localStorage.setItem(_profileKey(), JSON.stringify(profile));
+                    
+                    handleScanSuccess("Biometrics Registered!");
+                }
             } else {
                 // Generate new permanent face-based user ID
                 const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
