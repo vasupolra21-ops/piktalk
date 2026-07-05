@@ -9,6 +9,7 @@ const compression = require('compression');
 const db = require('./db');
 
 const app = express();
+app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, {
     maxHttpBufferSize: 1e8 // 100 MB limit for large photos
@@ -31,6 +32,78 @@ app.use((req, res, next) => {
 // Health check endpoint for keep-alive and monitoring
 app.get('/ping', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
+const https = require('https');
+
+function sendTwilioSMS(accountSid, authToken, from, to, body) {
+    return new Promise((resolve, reject) => {
+        const postData = new URLSearchParams({ To: to, From: from, Body: body }).toString();
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+        const options = {
+            hostname: 'api.twilio.com',
+            port: 443,
+            path: `/2010-04-01/Accounts/${accountSid}/Messages.json`,
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${auth}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postData)
+            }
+        };
+
+        const req = https.request(options, (res) => {
+            let chunk = '';
+            res.on('data', (d) => { chunk += d; });
+            res.on('end', () => {
+                try {
+                    const parsed = JSON.parse(chunk);
+                    if (res.statusCode >= 200 && res.statusCode < 300) {
+                        resolve(parsed);
+                    } else {
+                        reject(new Error(parsed.message || 'Twilio request failed'));
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        req.on('error', (e) => { reject(e); });
+        req.write(postData);
+        req.end();
+    });
+}
+
+// POST endpoint to trigger actual SMS sending
+app.post('/api/send-otp', async (req, res) => {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+        return res.status(400).json({ error: 'Missing phone or otp' });
+    }
+
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const fromNumber = process.env.TWILIO_FROM_NUMBER;
+
+    if (!accountSid || !authToken || !fromNumber) {
+        console.warn('Twilio credentials not configured. Printing OTP to server log:');
+        console.log(`[OTP Verification] Code for ${phone}: ${otp}`);
+        return res.status(200).json({ 
+            success: true, 
+            demoMode: true, 
+            message: 'OTP printed to server logs (Twilio env variables not configured on Render).' 
+        });
+    }
+
+    try {
+        const bodyText = `Your PikTalk verification code is: ${otp}`;
+        const result = await sendTwilioSMS(accountSid, authToken, fromNumber, phone, bodyText);
+        return res.status(200).json({ success: true, sid: result.sid });
+    } catch (err) {
+        console.error('Error calling Twilio API:', err);
+        return res.status(500).json({ error: err.message || 'Twilio failed to send SMS' });
+    }
 });
 
 // Serve static files with robust caching headers

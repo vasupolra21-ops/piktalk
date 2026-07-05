@@ -4398,26 +4398,62 @@ function _sendOTP() {
     sessionStorage.setItem('piktalk_otp', _generatedOTP);
     sessionStorage.setItem('piktalk_otp_phone', fullPhone);
 
-    // Show OTP in demo card
-    const demoVal = document.getElementById('otp-demo-value');
-    if (demoVal) demoVal.textContent = _generatedOTP;
     const sentTo = document.getElementById('otp-sent-to');
-    if (sentTo) sentTo.textContent = `Code sent to ${fullPhone}`;
+    if (sentTo) sentTo.textContent = `Sending code to ${fullPhone}...`;
 
-    // Clear OTP boxes
-    document.querySelectorAll('#otp-boxes .otp-box').forEach(b => { b.value = ''; b.classList.remove('filled'); });
-    const otpErr = document.getElementById('otp-error');
-    if (otpErr) otpErr.classList.add('hidden');
-
-    // Animate send button
     const sendBtn2 = document.getElementById('phone-send-otp-btn');
+    const origHTML = sendBtn2 ? sendBtn2.innerHTML : '';
     if (sendBtn2) {
-        const orig = sendBtn2.innerHTML;
-        sendBtn2.innerHTML = '<i class="fas fa-check"></i> Sent!';
+        sendBtn2.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
         sendBtn2.disabled = true;
-        setTimeout(() => { sendBtn2.innerHTML = orig; sendBtn2.disabled = false; }, 2000);
     }
-    _goToPhoneStep(2);
+
+    // Call server API to send actual SMS
+    fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: fullPhone, otp: _generatedOTP })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (sendBtn2) {
+            sendBtn2.innerHTML = '<i class="fas fa-check"></i> Sent!';
+            setTimeout(() => { sendBtn2.innerHTML = origHTML; sendBtn2.disabled = false; }, 2000);
+        }
+
+        const otpDemoCard = document.getElementById('otp-demo-card');
+        const demoVal = document.getElementById('otp-demo-value');
+        if (data.demoMode) {
+            // Twilio credentials NOT configured -> fallback to showing on screen
+            if (otpDemoCard) otpDemoCard.style.display = 'flex';
+            if (demoVal) demoVal.textContent = _generatedOTP;
+            if (sentTo) sentTo.textContent = `Demo code generated (Twilio not configured).`;
+        } else {
+            // Real SMS sent! Hide the demo OTP card completely so they only get the real SMS!
+            if (otpDemoCard) {
+                otpDemoCard.style.setProperty('display', 'none', 'important');
+            }
+            if (sentTo) sentTo.textContent = `Verification code sent to ${fullPhone}!`;
+        }
+
+        // Clear OTP boxes
+        document.querySelectorAll('#otp-boxes .otp-box').forEach(b => { b.value = ''; b.classList.remove('filled'); });
+        const otpErr = document.getElementById('otp-error');
+        if (otpErr) otpErr.classList.add('hidden');
+
+        _goToPhoneStep(2);
+    })
+    .catch(err => {
+        console.error('Error sending OTP:', err);
+        if (sendBtn2) {
+            sendBtn2.innerHTML = origHTML;
+            sendBtn2.disabled = false;
+        }
+        if (errEl) {
+            errEl.textContent = 'Failed to send OTP. Please check server connection.';
+            errEl.classList.remove('hidden');
+        }
+    });
 }
 
 function _verifyOTP() {
