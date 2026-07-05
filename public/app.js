@@ -4750,12 +4750,13 @@ function loadAndRenderHistory(roomID) {
         sep.textContent = `— ${msgs.length} messages from history —`;
         messagesContainer.appendChild(sep);
         msgs.forEach(msg => {
+            const isMine = msg.isMine || (msg.nickname && myNickname && msg.nickname.trim().toLowerCase() === myNickname.trim().toLowerCase());
             const bubble = document.createElement('div');
-            bubble.className = `message ${msg.isMine ? 'sent' : 'received'} history-msg`;
+            bubble.className = `message ${isMine ? 'sent' : 'received'} history-msg`;
             bubble.style.opacity = '0.75';
             bubble.innerHTML = `
                 <div class="message-bubble">
-                    ${!msg.isMine ? `<span class="message-name">${msg.nickname}</span>` : ''}
+                    ${!isMine ? `<span class="message-name">${msg.nickname}</span>` : ''}
                     <div class="message-text">${escapeHtml(msg.text)}</div>
                     <div class="message-time">${msg.time}</div>
                 </div>`;
@@ -4871,11 +4872,12 @@ window._showRoomConversation = function(roomID) {
         msgContainer.innerHTML = `<div class="settings-history-empty"><i class="fas fa-comments-slash"></i><p>No messages stored</p></div>`;
     } else {
         msgContainer.innerHTML = msgs.map((m, i) => {
-            const side = m.isMine ? 'sent' : 'received';
-            const nameColor = m.isMine ? 'var(--text-muted)' : getNicknameColor(m.nickname);
-            const avatarHtml = m.isMine ? '' : getAvatar(m.nickname, null);
+            const isMine = m.isMine || (m.nickname && myNickname && m.nickname.trim().toLowerCase() === myNickname.trim().toLowerCase());
+            const side = isMine ? 'sent' : 'received';
+            const nameColor = isMine ? 'var(--text-muted)' : getNicknameColor(m.nickname);
+            const avatarHtml = isMine ? '' : getAvatar(m.nickname, null);
             
-            const senderInfo = !m.isMine ? `
+            const senderInfo = !isMine ? `
                 <div class="message-info">
                     <span class="sender-name" style="color: ${nameColor}">${escapeHtml(m.nickname || 'Unknown')}</span>
                 </div>` : '';
