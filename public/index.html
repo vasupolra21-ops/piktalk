@@ -278,39 +278,18 @@
                 </div>
                 
                 <div class="scanner-container">
-                    <!-- SVG Progress Ring sits outside the circular scanner -->
-                    <div class="scanner-ring-wrapper">
-                        <svg class="scan-progress-ring" id="face-scan-ring" viewBox="0 0 220 220">
-                            <!-- Background track -->
-                            <circle class="scan-ring-track" cx="110" cy="110" r="104"/>
-                            <!-- Animated progress arc -->
-                            <circle class="scan-ring-fill" id="face-ring-fill" cx="110" cy="110" r="104"/>
-                        </svg>
-                        <div class="circular-scanner">
-                            <video id="face-video" autoplay playsinline muted></video>
-                            <canvas id="face-canvas"></canvas>
-                            <div class="scan-laser"></div>
-                            <!-- Corner brackets overlay -->
-                            <div class="scan-corner tl"></div>
-                            <div class="scan-corner tr"></div>
-                            <div class="scan-corner bl"></div>
-                            <div class="scan-corner br"></div>
-                        </div>
+                    <div class="circular-scanner">
+                        <video id="face-video" autoplay playsinline muted></video>
+                        <canvas id="face-canvas"></canvas>
+                        <div class="scan-laser"></div>
                     </div>
                 </div>
-
+                
                 <div id="face-status" class="face-status">
                     <i class="fas fa-camera"></i> Align face in camera frame...
                 </div>
                 <div id="face-detail" class="face-detail">
                     Blink/head movement slowly
-                </div>
-                <!-- Scanning progress bar -->
-                <div class="scan-progress-bar-wrap" id="face-progress-bar-wrap">
-                    <div class="scan-progress-bar-track">
-                        <div class="scan-progress-bar-fill" id="face-progress-bar-fill"></div>
-                    </div>
-                    <span class="scan-progress-bar-label" id="face-progress-bar-label">0%</span>
                 </div>
 
                 <!-- Face Not Found overlay -->
@@ -438,37 +417,12 @@
                 </div>
                 <!-- Inline mini scanner for Settings registration -->
                 <div id="settings-scan-container" class="settings-scan-container hidden">
-                    <div class="scanner-container">
-                        <!-- SVG Progress Ring sits outside the circular scanner -->
-                        <div class="scanner-ring-wrapper">
-                            <svg class="scan-progress-ring" id="settings-scan-ring" viewBox="0 0 220 220">
-                                <!-- Background track -->
-                                <circle class="scan-ring-track" cx="110" cy="110" r="104"/>
-                                <!-- Animated progress arc -->
-                                <circle class="scan-ring-fill" id="settings-ring-fill" cx="110" cy="110" r="104"/>
-                            </svg>
-                            <div class="circular-scanner mini-scanner">
-                                <video id="settings-video" autoplay playsinline muted></video>
-                                <canvas id="settings-canvas"></canvas>
-                                <div class="scan-laser"></div>
-                                <!-- Corner brackets overlay -->
-                                <div class="scan-corner tl"></div>
-                                <div class="scan-corner tr"></div>
-                                <div class="scan-corner bl"></div>
-                                <div class="scan-corner br"></div>
-                            </div>
-                        </div>
+                    <div class="circular-scanner mini-scanner">
+                        <video id="settings-video" autoplay playsinline muted></video>
+                        <canvas id="settings-canvas"></canvas>
+                        <div class="scan-laser"></div>
                     </div>
                     <div id="settings-scan-status" class="settings-scan-status">Align face in frame...</div>
-                    
-                    <!-- Scanning progress bar for settings -->
-                    <div class="scan-progress-bar-wrap" id="settings-progress-bar-wrap">
-                        <div class="scan-progress-bar-track">
-                            <div class="scan-progress-bar-fill" id="settings-progress-bar-fill"></div>
-                        </div>
-                        <span class="scan-progress-bar-label" id="settings-progress-bar-label">0%</span>
-                    </div>
-
                     <button id="settings-scan-demo-btn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%; font-size: 0.8rem; padding: 4px 8px;">
                         Simulate Scan
                     </button>
