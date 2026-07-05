@@ -4333,12 +4333,6 @@ function getVerifiedPhone() {
 }
 
 function showPhoneModal(onVerified) {
-    // If phone is already verified, skip the modal
-    const existingPhone = getVerifiedPhone();
-    if (existingPhone) {
-        onVerified();
-        return;
-    }
     _pendingRoomCallback = onVerified;
     const modal = document.getElementById('phone-modal');
     if (!modal) { onVerified(); return; } // fallback: skip if no modal
@@ -4347,7 +4341,16 @@ function showPhoneModal(onVerified) {
     // Reset to step 1
     _goToPhoneStep(1);
     const numInput = document.getElementById('phone-number-input');
-    if (numInput) { numInput.value = ''; setTimeout(() => numInput.focus(), 300); }
+    const existingPhone = getVerifiedPhone();
+    if (numInput) {
+        if (existingPhone) {
+            // strip leading country code to pre-fill standard field
+            numInput.value = existingPhone.replace(/^\+\d{1,3}/, '');
+        } else {
+            numInput.value = '';
+        }
+        setTimeout(() => numInput.focus(), 300);
+    }
     const errEl = document.getElementById('phone-error');
     if (errEl) errEl.classList.add('hidden');
 }
