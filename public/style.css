@@ -3412,7 +3412,22 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     justify-content: center;
     gap: 8px;
     transition: color 0.3s ease;
-    height: 24px; /* Fixed height to prevent dynamic text layout shifts */
+    min-height: 26px; /* slightly taller so spinning icon is never clipped */
+    overflow: visible;
+}
+
+/* Guarantee the spinner icon rotates during scanning regardless of fa-spin class */
+.face-status i.fa-spinner,
+.face-status i.fa-spin,
+.settings-scan-status i.fa-spinner,
+.settings-scan-status i.fa-spin {
+    display: inline-block;
+    animation: faceScanSpin 1s linear infinite;
+}
+
+@keyframes faceScanSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
 }
 
 .face-status.success {
