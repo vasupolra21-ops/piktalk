@@ -4647,16 +4647,30 @@ window._clearRoomHistoryFromUI = function(roomID) {
     renderChatHistoryInSettings();
 };
 
-function _initSettingsEnhancements() {
-    // Theme toggle in settings
+let _settingsEnhancementsInitialized = false;
+
+function syncSettingsTheme() {
     const settingsThemeToggle = document.getElementById('settings-theme-toggle');
     const themeLabel = document.getElementById('theme-label');
+    const isLight = document.body.classList.contains('light-mode');
+    if (settingsThemeToggle) settingsThemeToggle.checked = isLight;
+    if (themeLabel) themeLabel.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+}
 
-    function syncSettingsTheme() {
-        const isLight = document.body.classList.contains('light-mode');
-        if (settingsThemeToggle) settingsThemeToggle.checked = isLight;
-        if (themeLabel) themeLabel.textContent = isLight ? 'Light Mode' : 'Dark Mode';
+function _initSettingsEnhancements() {
+    if (_settingsEnhancementsInitialized) {
+        syncSettingsTheme();
+        const phoneEl = document.getElementById('settings-phone');
+        if (phoneEl) {
+            const phone = getVerifiedPhone();
+            phoneEl.textContent = phone || 'Not verified';
+        }
+        return;
     }
+    _settingsEnhancementsInitialized = true;
+
+    // Theme toggle in settings
+    const settingsThemeToggle = document.getElementById('settings-theme-toggle');
     syncSettingsTheme();
 
     if (settingsThemeToggle) {
