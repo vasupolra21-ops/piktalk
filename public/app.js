@@ -953,13 +953,10 @@ function setupEventListeners() {
     }
 
     if (attachBtn) {
-        // Prevent keyboard dismissal on mobile
-        attachBtn.addEventListener('mousedown', (e) => e.preventDefault());
-        attachBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            imgInput.click();
-        }, { passive: false });
-        attachBtn.addEventListener('click', () => imgInput.click());
+        // Standard click event listener works reliably across all mobile and desktop browsers
+        attachBtn.addEventListener('click', () => {
+            if (imgInput) imgInput.click();
+        });
     }
     
     // AI smart replies trigger
@@ -1110,78 +1107,75 @@ function setupEventListeners() {
         });
     }
 
-    if (imgInput) imgInput.addEventListener('change', () => {
-        const file = imgInput.files[0];
-        if (!file) return;
-        if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
+    // ── Image Editor Preview & Editor Logic ──
+    let editorSelectedFile = null;
+    let editorRotationAngle = 0;
 
-        if (file.type === 'image/gif') {
-            // Send raw GIF to preserve animation
+    const editorModal = document.getElementById('image-editor-modal');
+    const editorCloseBtn = document.getElementById('image-editor-close-btn');
+    const editorCancelBtn = document.getElementById('image-editor-cancel-btn');
+    const editorSendBtn = document.getElementById('image-editor-send-btn');
+    const editorRotateBtn = document.getElementById('image-editor-rotate-btn');
+    const editorFilterSelect = document.getElementById('image-editor-filter');
+    const editorPreviewImg = document.getElementById('image-editor-preview');
+
+    function openImageEditor(file) {
+        editorSelectedFile = file;
+        editorRotationAngle = 0;
+        
+        if (!editorModal || !editorPreviewImg) return;
+        
+        if (editorFilterSelect) editorFilterSelect.value = 'none';
+        editorPreviewImg.style.transform = 'rotate(0deg)';
+        editorPreviewImg.style.filter = 'none';
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            editorPreviewImg.src = e.target.result;
+            editorModal.style.display = 'flex';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    const closeEditor = () => {
+        if (editorModal) editorModal.style.display = 'none';
+        editorSelectedFile = null;
+        if (imgInput) imgInput.value = '';
+    };
+
+    if (editorCloseBtn) editorCloseBtn.addEventListener('click', closeEditor);
+    if (editorCancelBtn) editorCancelBtn.addEventListener('click', closeEditor);
+
+    if (editorRotateBtn && editorPreviewImg) {
+        editorRotateBtn.addEventListener('click', () => {
+            editorRotationAngle = (editorRotationAngle + 90) % 360;
+            editorPreviewImg.style.transform = `rotate(${editorRotationAngle}deg)`;
+        });
+    }
+
+    if (editorFilterSelect && editorPreviewImg) {
+        editorFilterSelect.addEventListener('change', () => {
+            const val = editorFilterSelect.value;
+            if (val === 'grayscale') editorPreviewImg.style.filter = 'grayscale(100%)';
+            else if (val === 'sepia') editorPreviewImg.style.filter = 'sepia(100%)';
+            else if (val === 'invert') editorPreviewImg.style.filter = 'invert(100%)';
+            else if (val === 'brightness') editorPreviewImg.style.filter = 'brightness(1.3)';
+            else editorPreviewImg.style.filter = 'none';
+        });
+    }
+
+    if (editorSendBtn) {
+        editorSendBtn.addEventListener('click', () => {
+            if (!editorSelectedFile) return;
+
+            const oldHtml = editorSendBtn.innerHTML;
+            editorSendBtn.disabled = true;
+            editorSendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+
             const reader = new FileReader();
             reader.onload = (e) => {
-                if (socket) {
-                    socket.emit('send-message', {
-                        roomID: currentRoomID,
-                        message: '',
-                        image: e.target.result,
-                        replyTo: replyingTo || null
-                    });
-                    clearReply();
-                    if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-                    setTimeout(() => {
-                        if (messageInput && !messageInput.disabled) messageInput.focus();
-                    }, 50);
-                } else {
-                    alert("Not connected to server. Image could not be sent.");
-                }
-            };
-            reader.readAsDataURL(file);
-        } else {
-            // Compress other images (JPEG, PNG, WEBP, etc.) before sending
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const maxW = 1200;
-                    const maxH = 1200;
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    if (width > maxW || height > maxH) {
-                        if (width > height) {
-                            height = Math.round((height * maxW) / width);
-                            width = maxW;
-                        } else {
-                            width = Math.round((width * maxH) / height);
-                            height = maxH;
-                        }
-                    }
-
-                    const canvas = document.createElement('canvas');
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                    if (socket) {
-                        socket.emit('send-message', {
-                            roomID: currentRoomID,
-                            message: '',
-                            image: compressedBase64,
-                            replyTo: replyingTo || null
-                        });
-                        clearReply();
-                        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-                        setTimeout(() => {
-                            if (messageInput && !messageInput.disabled) messageInput.focus();
-                        }, 50);
-                    } else {
-                        alert("Not connected to server. Image could not be sent.");
-                    }
-                };
-                img.onerror = () => {
-                    // Fallback to sending original base64 if drawing to canvas fails
+                if (editorSelectedFile.type === 'image/gif' && editorRotationAngle === 0 && (!editorFilterSelect || editorFilterSelect.value === 'none')) {
+                    // Send raw GIF directly if not rotated or filtered to preserve animation
                     if (socket) {
                         socket.emit('send-message', {
                             roomID: currentRoomID,
@@ -1195,12 +1189,97 @@ function setupEventListeners() {
                             if (messageInput && !messageInput.disabled) messageInput.focus();
                         }, 50);
                     }
-                };
-                img.src = e.target.result;
+                    editorSendBtn.disabled = false;
+                    editorSendBtn.innerHTML = oldHtml;
+                    closeEditor();
+                } else {
+                    // Render rotation + filters to canvas
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        const isRotated90or270 = (editorRotationAngle === 90 || editorRotationAngle === 270);
+                        const destW = isRotated90or270 ? img.naturalHeight : img.naturalWidth;
+                        const destH = isRotated90or270 ? img.naturalWidth : img.naturalHeight;
+
+                        const maxW = 1200;
+                        const maxH = 1200;
+                        let width = destW;
+                        let height = destH;
+                        if (width > maxW || height > maxH) {
+                            if (width > height) {
+                                height = Math.round((height * maxW) / width);
+                                width = maxW;
+                            } else {
+                                width = Math.round((width * maxH) / height);
+                                height = maxH;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate((editorRotationAngle * Math.PI) / 180);
+
+                        const val = editorFilterSelect ? editorFilterSelect.value : 'none';
+                        if (val === 'grayscale') ctx.filter = 'grayscale(100%)';
+                        else if (val === 'sepia') ctx.filter = 'sepia(100%)';
+                        else if (val === 'invert') ctx.filter = 'invert(100%)';
+                        else if (val === 'brightness') ctx.filter = 'brightness(1.3)';
+                        else ctx.filter = 'none';
+
+                        const drawW = isRotated90or270 ? height : width;
+                        const drawH = isRotated90or270 ? width : height;
+                        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+                        if (socket) {
+                            socket.emit('send-message', {
+                                roomID: currentRoomID,
+                                message: '',
+                                image: compressedBase64,
+                                replyTo: replyingTo || null
+                            });
+                            clearReply();
+                            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                            setTimeout(() => {
+                                if (messageInput && !messageInput.disabled) messageInput.focus();
+                            }, 50);
+                        }
+
+                        editorSendBtn.disabled = false;
+                        editorSendBtn.innerHTML = oldHtml;
+                        closeEditor();
+                    };
+                    img.onerror = () => {
+                        if (socket) {
+                            socket.emit('send-message', {
+                                roomID: currentRoomID,
+                                message: '',
+                                image: e.target.result,
+                                replyTo: replyingTo || null
+                            });
+                            clearReply();
+                        }
+                        editorSendBtn.disabled = false;
+                        editorSendBtn.innerHTML = oldHtml;
+                        closeEditor();
+                    };
+                    img.src = e.target.result;
+                }
             };
-            reader.readAsDataURL(file);
-        }
-        imgInput.value = ''; // reset so same file can be re-sent
+            reader.readAsDataURL(editorSelectedFile);
+        });
+    }
+
+    if (imgInput) imgInput.addEventListener('change', () => {
+        const file = imgInput.files[0];
+        if (!file) return;
+        if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
+        openImageEditor(file);
     });
 
     // ── Voice message listeners ──

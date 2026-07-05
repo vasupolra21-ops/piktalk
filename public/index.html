@@ -26,13 +26,13 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=143" as="style">
+    <link rel="preload" href="/style.css?v=144" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=143" as="script">
+    <link rel="preload" href="/app.js?v=144" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=143">
+    <link rel="stylesheet" href="/style.css?v=144">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -489,7 +489,43 @@
         <img id="img-lightbox-img" src="" alt="Full size image">
     </div>
 
+    <!-- Image Preview & Editor Modal -->
+    <div id="image-editor-modal" class="image-editor-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+        <div class="image-editor-box glass-card">
+            <div class="image-editor-header">
+                <span class="image-editor-title"><i class="fas fa-image"></i> Preview &amp; Edit Image</span>
+                <button class="image-editor-close" id="image-editor-close-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="image-editor-body">
+                <div class="image-editor-preview-container">
+                    <img id="image-editor-preview" src="" alt="Selected Preview">
+                </div>
+                <div class="image-editor-toolbar">
+                    <button id="image-editor-rotate-btn" class="editor-tool-btn" title="Rotate 90°">
+                        <i class="fas fa-rotate-right"></i> Rotate 90°
+                    </button>
+                    <div class="editor-filter-group">
+                        <label for="image-editor-filter" style="color: var(--text-muted);">Filter:</label>
+                        <select id="image-editor-filter" class="editor-select">
+                            <option value="none">Original</option>
+                            <option value="grayscale">Grayscale</option>
+                            <option value="sepia">Sepia</option>
+                            <option value="invert">Invert Colors</option>
+                            <option value="brightness">Brighten</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="image-editor-footer">
+                <button id="image-editor-cancel-btn" class="btn btn-secondary">Cancel</button>
+                <button id="image-editor-send-btn" class="btn btn-primary" style="margin-left: 8px;">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=143" defer></script>
+    <script src="/app.js?v=144" defer></script>
 </body>
 </html>

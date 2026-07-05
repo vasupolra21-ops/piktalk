@@ -4259,3 +4259,162 @@ body.light-mode .settings-conv-messages {
 
 
 
+/* ── Image Editor Modal ── */
+.image-editor-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: rgba(0, 0, 0, 0.9);
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(8px);
+    animation: lbFadeIn 0.2s ease;
+}
+
+.image-editor-modal-overlay.open {
+    display: flex;
+}
+
+.image-editor-box {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 0;
+    width: min(440px, 95vw);
+    max-height: 90vh;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.image-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.image-editor-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.image-editor-close {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: var(--text-main);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.image-editor-close:hover {
+    background: rgba(255,255,255,0.2);
+}
+body.light-mode .image-editor-close:hover {
+    background: rgba(0,0,0,0.06);
+}
+
+.image-editor-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    overflow-y: auto;
+}
+
+.image-editor-preview-container {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-height: 280px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--glass-border);
+    position: relative;
+}
+
+#image-editor-preview {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    transition: transform 0.25s ease, filter 0.2s ease;
+}
+
+.image-editor-toolbar {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.editor-tool-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    padding: 8px 16px;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.editor-tool-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+}
+body.light-mode .editor-tool-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.editor-filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.editor-select {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--glass-border);
+    color: var(--text-main);
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+body.light-mode .editor-select {
+    background: #ffffff;
+    color: #000000;
+}
+
+.image-editor-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 16px 20px;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.15);
+    width: 100%;
+}
