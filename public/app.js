@@ -4692,9 +4692,7 @@ window._showRoomConversation = function(roomID) {
         };
     }
     
-    // Toggle views (hide settings menu cards, show conversation detail)
-    const cards = document.querySelectorAll('.settings-body > :not(#settings-conversation-detail)');
-    cards.forEach(c => c.classList.add('hidden'));
+    // Show conversation detail panel (it absolutely overlays the entire modal)
     detailEl.classList.remove('hidden');
     
     // Scroll messages to bottom
@@ -4707,15 +4705,7 @@ function _closeRoomConversation() {
     const detailEl = document.getElementById('settings-conversation-detail');
     if (!detailEl) return;
     
-    // Restore normal settings elements (unhide them)
-    const cards = document.querySelectorAll('.settings-body > :not(#settings-conversation-detail)');
-    cards.forEach(c => {
-        // Only unhide if they are not dynamically controlled ones like settings-scan-container or settings-nickname-form
-        if (c.id !== 'settings-scan-container' && c.id !== 'settings-nickname-form') {
-            c.classList.remove('hidden');
-        }
-    });
-    
+    // Hide the conversation panel (settings-body content is always visible behind it)
     detailEl.classList.add('hidden');
     
     // Refresh history room list
