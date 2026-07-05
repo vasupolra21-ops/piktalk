@@ -140,6 +140,60 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
 }));
 
+// ══════════════════════════════════════════════════════════════
+// CROSS-DEVICE FACE REGISTRY (server-side in-memory store)
+// ══════════════════════════════════════════════════════════════
+
+// Map: faceUserId -> { faceUserId, descriptor: number[], nickname, profilePic, updatedAt }
+const faceRegistry = new Map();
+
+// Euclidean distance between two number arrays
+function euclidDist(a, b) {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += (a[i] - b[i]) ** 2;
+    return Math.sqrt(sum);
+}
+
+const FACE_MATCH_THRESHOLD = 0.50; // same tolerance as client
+
+// POST /api/face/register  — save or update a face profile
+app.post('/api/face/register', (req, res) => {
+    const { faceUserId, descriptor, nickname, profilePic } = req.body;
+    if (!faceUserId || !Array.isArray(descriptor) || descriptor.length !== 128) {
+        return res.status(400).json({ error: 'Invalid payload' });
+    }
+    faceRegistry.set(faceUserId, {
+        faceUserId,
+        descriptor,
+        nickname: nickname || '',
+        profilePic: profilePic || null,
+        updatedAt: Date.now()
+    });
+    res.json({ ok: true });
+});
+
+// POST /api/face/match  — find nearest registered face
+app.post('/api/face/match', (req, res) => {
+    const { descriptor } = req.body;
+    if (!Array.isArray(descriptor) || descriptor.length !== 128) {
+        return res.status(400).json({ error: 'Invalid descriptor' });
+    }
+
+    let best = null;
+    let bestDist = Infinity;
+    for (const entry of faceRegistry.values()) {
+        if (!entry.descriptor) continue;
+        const d = euclidDist(entry.descriptor, descriptor);
+        if (d < bestDist) { bestDist = d; best = entry; }
+    }
+
+    if (best && bestDist < FACE_MATCH_THRESHOLD) {
+        res.json({ matched: true, faceUserId: best.faceUserId, nickname: best.nickname, profilePic: best.profilePic, distance: bestDist });
+    } else {
+        res.json({ matched: false });
+    }
+});
+
 // Route for homepage
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

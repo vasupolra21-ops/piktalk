@@ -790,6 +790,15 @@ function setupEventListeners() {
         if (nick) {
             myNickname = nick;
             saveProfileLocally(myNickname, myProfilePic);
+            // Sync nickname + profilePic to server so cross-device face match returns correct profile
+            const faceId = localStorage.getItem('piktalk_face_userid');
+            const savedDescRaw = localStorage.getItem('piktalk_face_descriptor');
+            if (faceId && savedDescRaw) {
+                try {
+                    const desc = JSON.parse(savedDescRaw);
+                    _syncFaceToServer(faceId, desc, myNickname, myProfilePic);
+                } catch(e) {}
+            }
             showChat();
             if (socket) {
                 socket.emit('join-room', {
@@ -3950,38 +3959,99 @@ async function runFaceScanLoop() {
 }
 
 // Called when liveness + face verification is complete
-function _onFaceScanComplete() {
+async function _onFaceScanComplete() {
     const descriptor = faceCapturedDescriptor;
 
     if (faceScanIsSettings) {
         // Settings re-registration
         if (descriptor) saveFaceDescriptor(descriptor);
         saveBiometrics(descriptor, faceScanVideoEl);
+        // Also push updated descriptor to server for cross-device sync
+        const faceId = localStorage.getItem('piktalk_face_userid');
+        if (faceId && descriptor) {
+            const nickname = localStorage.getItem('piktalk_face_nickname') || '';
+            _syncFaceToServer(faceId, descriptor, nickname, null);
+        }
         handleScanSuccess('Face ID registered successfully!');
         return;
     }
 
-    // See if the face matches any of the registered users in the database
-    const matchedUser = findMatchingUser(descriptor);
-
-    if (matchedUser) {
-        // Returning user — Match!
-        localStorage.setItem('piktalk_face_userid', matchedUser.faceUserId);
-        myUserId = matchedUser.faceUserId;
-        sessionStorage.setItem('piktalk_userId', matchedUser.faceUserId);
-
+    // ── Step 1: Check local device database first (fast) ──
+    const localMatch = findMatchingUser(descriptor);
+    if (localMatch) {
+        localStorage.setItem('piktalk_face_userid', localMatch.faceUserId);
+        myUserId = localMatch.faceUserId;
+        sessionStorage.setItem('piktalk_userId', localMatch.faceUserId);
         saveBiometrics(descriptor, faceScanVideoEl);
         handleScanSuccess('Access Granted!');
-    } else {
-        // New user! (either database empty or new face scanned)
-        const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-        localStorage.setItem('piktalk_face_userid', newFaceUserId);
-        myUserId = newFaceUserId;
-        sessionStorage.setItem('piktalk_userId', newFaceUserId);
+        return;
+    }
 
-        if (descriptor) saveUserInDatabase(newFaceUserId, descriptor);
-        saveBiometrics(descriptor, faceScanVideoEl);
-        handleScanSuccess('Biometrics Registered!');
+    // ── Step 2: No local match → query server for cross-device match ──
+    if (faceScanStatusEl) {
+        faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking identity across devices...';
+    }
+
+    try {
+        const resp = await fetch('/api/face/match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ descriptor: Array.from(descriptor) })
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.matched) {
+                console.log('[FaceID] Cross-device match found! User:', data.faceUserId, 'dist:', data.distance);
+                // Restore the user on this new device
+                localStorage.setItem('piktalk_face_userid', data.faceUserId);
+                myUserId = data.faceUserId;
+                sessionStorage.setItem('piktalk_userId', data.faceUserId);
+
+                // Save their profile locally so future scans on this device are instant
+                if (data.nickname) localStorage.setItem('piktalk_face_nickname', data.nickname);
+                saveUserInDatabase(data.faceUserId, descriptor, data.nickname, data.profilePic);
+                if (descriptor) {
+                    localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+                }
+
+                saveBiometrics(descriptor, faceScanVideoEl);
+                handleScanSuccess('Welcome back! (Recognized across devices)');
+                return;
+            }
+        }
+    } catch(e) {
+        console.warn('[FaceID] Server match failed, continuing as new user:', e);
+    }
+
+    // ── Step 3: Truly new user — create profile ──
+    const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('piktalk_face_userid', newFaceUserId);
+    myUserId = newFaceUserId;
+    sessionStorage.setItem('piktalk_userId', newFaceUserId);
+
+    if (descriptor) saveUserInDatabase(newFaceUserId, descriptor);
+    saveBiometrics(descriptor, faceScanVideoEl);
+    // Push to server so this face can be recognized on any other device
+    if (descriptor) _syncFaceToServer(newFaceUserId, descriptor, '', null);
+    handleScanSuccess('Biometrics Registered!');
+}
+
+// Push a face descriptor + metadata to the server face registry
+async function _syncFaceToServer(faceUserId, descriptor, nickname, profilePic) {
+    try {
+        await fetch('/api/face/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                faceUserId,
+                descriptor: Array.from(descriptor),
+                nickname: nickname || '',
+                profilePic: profilePic || null
+            })
+        });
+        console.log('[FaceID] Synced to server:', faceUserId);
+    } catch(e) {
+        console.warn('[FaceID] Server sync failed (offline?):', e);
     }
 }
 
