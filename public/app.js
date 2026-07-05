@@ -4722,7 +4722,18 @@ function saveMsgToHistory(data) {
     try {
         const key = _historyKey(faceUserId, currentRoomID);
         const existing = JSON.parse(localStorage.getItem(key) || '[]');
+        
+        // Prevent duplicate messages in shared storage (e.g. from multiple tabs or socket retries)
+        if (data.msgId) {
+            const isDuplicate = existing.some(msg => msg.msgId === data.msgId);
+            if (isDuplicate) {
+                console.log('[History] Skipping duplicate message:', data.msgId);
+                return;
+            }
+        }
+        
         const entry = {
+            msgId: data.msgId || null,
             nickname: data.nickname || 'Anonymous',
             text: data.message || '',
             time: data.time || new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
@@ -4741,8 +4752,18 @@ function loadAndRenderHistory(roomID) {
     if (!faceUserId || !roomID) return;
     try {
         const key = _historyKey(faceUserId, roomID);
-        const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+        let msgs = JSON.parse(localStorage.getItem(key) || '[]');
         if (!msgs.length) return;
+        
+        // Deduplicate existing history on the fly
+        const seen = new Set();
+        msgs = msgs.filter(msg => {
+            const uniqueKey = msg.msgId ? msg.msgId : `${msg.nickname}_${msg.text}_${msg.time}`;
+            if (seen.has(uniqueKey)) return false;
+            seen.add(uniqueKey);
+            return true;
+        });
+
         if (!messagesContainer) return;
         // Add a separator
         const sep = document.createElement('div');
@@ -4861,6 +4882,15 @@ window._showRoomConversation = function(roomID) {
         try {
             const key = _historyKey(faceUserId, roomID);
             msgs = JSON.parse(localStorage.getItem(key) || '[]');
+            
+            // Deduplicate existing history on the fly
+            const seen = new Set();
+            msgs = msgs.filter(msg => {
+                const uniqueKey = msg.msgId ? msg.msgId : `${msg.nickname}_${msg.text}_${msg.time}`;
+                if (seen.has(uniqueKey)) return false;
+                seen.add(uniqueKey);
+                return true;
+            });
         } catch(e) {}
     }
     
