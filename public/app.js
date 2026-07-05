@@ -3513,7 +3513,7 @@ async function loadFaceModels() {
     faceModelsLoading = true;
     try {
         await Promise.all([
-            faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_MODEL_URL),
+            faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL),
             faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
             faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
         ]);
@@ -3529,14 +3529,15 @@ async function loadFaceModels() {
 async function detectFaceNN(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        // Use SsdMobilenetv1Options for very high accuracy facial detail detection
-        const opts = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.55 });
+        // Tiny detector for fast bounding-box, full landmarks model for precise details
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 });
         const det  = await faceapi
             .detectSingleFace(video, opts)
-            .withFaceLandmarks(true)
+            .withFaceLandmarks(false) // Use full 68-point landmarks (false = full, true = tiny)
             .withFaceDescriptor();
         return det || null;
     } catch (e) {
+        console.warn('[FaceID] Detection failed:', e);
         return null;
     }
 }

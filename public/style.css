@@ -3355,6 +3355,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     height: 100%;
     object-fit: cover;
     border-radius: 50%;
+    transform: scaleX(-1);
 }
 
 .circular-scanner canvas {
@@ -3366,6 +3367,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     z-index: 2;
     border-radius: 50%;
     pointer-events: none;
+    transform: scaleX(-1);
 }
 
 .scan-laser {
