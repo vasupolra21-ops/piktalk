@@ -3329,38 +3329,106 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 .scanner-container {
     display: flex;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 18px;
+}
+
+/* ── Scanner ring wrapper — holds SVG ring + circular scanner ── */
+.scanner-ring-wrapper {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* SVG progress ring */
+.scan-progress-ring {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.scan-ring-track {
+    fill: none;
+    stroke: rgba(16, 185, 129, 0.12);
+    stroke-width: 5;
+}
+
+.scan-ring-fill {
+    fill: none;
+    stroke: #10b981;
+    stroke-width: 5;
+    stroke-linecap: round;
+    /* circumference of r=104 → 2πr ≈ 653.5 */
+    stroke-dasharray: 653.5;
+    stroke-dashoffset: 653.5; /* starts empty */
+    transition: stroke-dashoffset 0.08s linear, stroke 0.4s ease;
+    filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.7));
+}
+
+/* Glow ring when scanning */
+.scanner-ring-wrapper.scanning .scan-ring-fill {
+    stroke: #10b981;
+    filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.9));
+}
+.scanner-ring-wrapper.success .scan-ring-fill {
+    stroke: #10b981;
+    stroke-dashoffset: 0;
+}
+.scanner-ring-wrapper.error .scan-ring-fill {
+    stroke: #ef4444;
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+}
+
+/* Rotating outer glow dots when scanning */
+.scanner-ring-wrapper.scanning::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 70%, rgba(16,185,129,0.6) 100%);
+    animation: scanRingRotate 1.8s linear infinite;
+    z-index: 1;
+    pointer-events: none;
+}
+
+@keyframes scanRingRotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
 }
 
 .circular-scanner {
     position: relative;
-    width: 200px;
-    height: 200px;
+    width: 196px;
+    height: 196px;
     border-radius: 50%;
-    border: 3px dashed var(--primary);
-    box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+    border: 3px solid rgba(16,185,129,0.25);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.12), inset 0 0 20px rgba(0,0,0,0.4);
     overflow: hidden;
-    background: #000;
+    background: #0a0a0a;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.3s ease;
+    transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    z-index: 2;
 }
 
 .circular-scanner.scanning {
-    border-style: solid;
-    animation: scannerGlow 2s infinite ease-in-out;
+    border-color: rgba(16,185,129,0.5);
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.25), inset 0 0 20px rgba(0,0,0,0.4);
 }
 
 .circular-scanner.success {
     border-color: #10b981;
-    border-style: solid;
-    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.5);
 }
 
 .circular-scanner.error {
     border-color: var(--danger);
-    border-style: solid;
     box-shadow: 0 0 40px rgba(239, 68, 68, 0.4);
 }
 
@@ -3384,35 +3452,66 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     transform: scaleX(-1);
 }
 
+/* Scan laser line */
 .scan-laser {
     position: absolute;
     left: 0;
     right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, #10b981, transparent);
-    box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
+    height: 2px;
+    background: linear-gradient(90deg, transparent 0%, #10b981 30%, rgba(16,185,129,0.9) 50%, #10b981 70%, transparent 100%);
+    box-shadow: 0 0 8px #10b981, 0 0 16px rgba(16,185,129,0.5);
     z-index: 3;
-    animation: laserScan 2.5s infinite ease-in-out;
+    animation: laserScan 2s infinite ease-in-out;
     pointer-events: none;
     display: none;
+    top: 50%;
 }
 
 .circular-scanner.scanning .scan-laser {
     display: block;
 }
 
+/* Corner bracket overlays */
+.scan-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    z-index: 4;
+    pointer-events: none;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.circular-scanner.scanning .scan-corner {
+    display: block;
+    opacity: 1;
+    animation: cornerPulse 2s infinite ease-in-out;
+}
+
+.scan-corner.tl { top: 14%; left: 14%; border-top: 2px solid #10b981; border-left: 2px solid #10b981; }
+.scan-corner.tr { top: 14%; right: 14%; border-top: 2px solid #10b981; border-right: 2px solid #10b981; }
+.scan-corner.bl { bottom: 14%; left: 14%; border-bottom: 2px solid #10b981; border-left: 2px solid #10b981; }
+.scan-corner.br { bottom: 14%; right: 14%; border-bottom: 2px solid #10b981; border-right: 2px solid #10b981; }
+
+@keyframes cornerPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+/* Face status */
 .face-status {
     text-align: center;
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
     color: var(--primary);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     transition: color 0.3s ease;
-    height: 24px; /* Fixed height to prevent dynamic text layout shifts */
+    min-height: 26px;
 }
 
 .face-status.success {
@@ -3425,14 +3524,59 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 
 .face-detail {
     text-align: center;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-muted);
-    margin-bottom: 25px;
-    height: 20px; /* Fixed height to prevent page vibration/height shifts */
+    margin-bottom: 10px;
+    min-height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+}
+
+/* ── Scanning progress bar ── */
+.scan-progress-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 0 4px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    pointer-events: none;
+}
+
+.scan-progress-bar-wrap.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.scan-progress-bar-track {
+    flex: 1;
+    height: 5px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.scan-progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #059669, #10b981, #34d399);
+    box-shadow: 0 0 8px rgba(16,185,129,0.6);
+    transition: width 0.1s linear;
+}
+
+.scan-progress-bar-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #10b981;
+    min-width: 32px;
+    text-align: right;
+    letter-spacing: 0.02em;
 }
 
 .face-demo-btn {
@@ -3664,11 +3808,50 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     border-width: 2px !important;
 }
 
+/* Mini-scanner ring wrapper adaptation */
+.settings-scan-container .scanner-ring-wrapper {
+    width: 130px;
+    height: 130px;
+}
+
+.settings-scan-container .scan-ring-track,
+.settings-scan-container .scan-ring-fill {
+    stroke-width: 4;
+}
+
+/* Adjust corner brackets for mini scanner */
+.mini-scanner .scan-corner {
+    width: 10px;
+    height: 10px;
+    border-width: 1.5px !important;
+}
+.mini-scanner .scan-corner.tl { top: 12%; left: 12%; }
+.mini-scanner .scan-corner.tr { top: 12%; right: 12%; }
+.mini-scanner .scan-corner.bl { bottom: 12%; left: 12%; }
+.mini-scanner .scan-corner.br { bottom: 12%; right: 12%; }
+
+/* Rotate conic gradient highlight for mini scanner */
+.settings-scan-container .scanner-ring-wrapper.scanning::before {
+    inset: -3px;
+}
+
 .settings-scan-status {
     margin-top: 8px;
     font-size: 0.8rem;
     font-weight: 600;
     color: var(--primary);
+}
+.settings-scan-status.success {
+    color: #10b981;
+}
+.settings-scan-status.error {
+    color: var(--danger);
+}
+
+.settings-scan-container .scan-progress-bar-wrap {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 5px;
 }
 
 .settings-nickname-form {
@@ -3709,13 +3892,12 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 
 
 @keyframes laserScan {
-    0%, 100% { top: 0%; }
-    50% { top: 100%; }
-}
-
-@keyframes scannerGlow {
-    0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.1); }
-    50% { box-shadow: 0 0 35px rgba(16, 185, 129, 0.35); }
+    0%   { top: 5%; opacity: 0.7; }
+    45%  { top: 93%; opacity: 1; }
+    50%  { top: 93%; opacity: 0; }
+    51%  { top: 5%; opacity: 0; }
+    55%  { top: 5%; opacity: 0.7; }
+    100% { top: 5%; opacity: 0.7; }
 }
 
 .animate-pulse {

@@ -704,7 +704,7 @@ function setupEventListeners() {
             }
             if (faceScanStatusEl) {
                 faceScanStatusEl.className = 'face-status';
-                faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-face-viewfinder"></i> Align your face...';
             }
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Blink/head movement slowly';
             stopFaceScanFlow();
@@ -723,8 +723,8 @@ function setupEventListeners() {
                 if (msgEl) msgEl.innerHTML = 'Face not found.<br>Please look directly at the camera.';
             }
             if (faceScanStatusEl) {
-                faceScanStatusEl.className = 'face-status';
-                faceScanStatusEl.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+                faceScanStatusEl.className = 'settings-scan-status';
+                faceScanStatusEl.innerHTML = '<i class="fas fa-face-viewfinder"></i> Align face in frame...';
             }
             stopFaceScanFlow();
             setTimeout(() => startFaceScanFlow(faceScanIsSettings), 300);
@@ -1622,7 +1622,7 @@ function showNicknameModal() {
         // Set initial status
         if (faceStatus) {
             faceStatus.className = 'face-status';
-            faceStatus.innerHTML = '<i class="fas fa-camera"></i> Align face in camera frame...';
+            faceStatus.innerHTML = '<i class="fas fa-face-viewfinder"></i> Align your face...';
         }
         if (faceDetail) faceDetail.textContent = 'Blink/head movement slowly';
 
@@ -3872,10 +3872,9 @@ function runFaceScanOverlay() {
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Smoothly interpolate the displayed percentage
+    // Smoothly interpolate the displayed percentage (lerp towards target)
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        // Increment smoothly towards target liveness progress
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.15;
+        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.12;
         if (faceScanLivenessDisplayProgress > 99.5 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
@@ -3888,25 +3887,63 @@ function runFaceScanOverlay() {
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Oval alignment guide
+        // Oval alignment guide (subtle, canvas-based)
         const pct = faceScanLivenessDisplayProgress / 100;
-        ctx.strokeStyle = `rgba(16,185,129,${0.35 + pct * 0.65})`;
-        ctx.lineWidth   = 3 + pct * 2;
-        ctx.beginPath();
-        ctx.ellipse(
-            canvas.width / 2, canvas.height / 2,
-            canvas.width * 0.28, canvas.height * 0.38,
-            0, 0, 2 * Math.PI
-        );
-        ctx.stroke();
+        if (pct > 0) {
+            ctx.strokeStyle = `rgba(16,185,129,${0.15 + pct * 0.3})`;
+            ctx.lineWidth   = 1.5 + pct * 1.5;
+            ctx.setLineDash([8, 4]);
+            ctx.beginPath();
+            ctx.ellipse(
+                canvas.width / 2, canvas.height / 2,
+                canvas.width * 0.28, canvas.height * 0.38,
+                0, 0, 2 * Math.PI
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
     }
 
-    // Update status UI text smoothly at 60fps
+    // Drive SVG progress ring
+    const ringFill = document.getElementById(faceScanIsSettings ? 'settings-ring-fill' : 'face-ring-fill');
+    if (ringFill) {
+        const circumference = 653.5; // 2π × 104
+        const offset = circumference - (faceScanLivenessDisplayProgress / 100) * circumference;
+        ringFill.style.strokeDashoffset = offset;
+    }
+
+    // Drive progress bar fill + label
+    const barFill  = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-fill' : 'face-progress-bar-fill');
+    const barLabel = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-label' : 'face-progress-bar-label');
+    const barWrap  = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-wrap' : 'face-progress-bar-wrap');
+    const displayPercent = Math.floor(faceScanLivenessDisplayProgress);
+
+    if (barFill)  barFill.style.width = `${faceScanLivenessDisplayProgress}%`;
+    if (barLabel) barLabel.textContent = `${displayPercent}%`;
+
+    // Show/hide progress bar — only visible once face is detected
+    if (barWrap) {
+        if (faceScanLivenessProgress > 0 && !faceScanLivenessVerified) {
+            barWrap.classList.add('visible');
+        } else if (faceScanLivenessVerified || faceScanLivenessProgress === 0) {
+            barWrap.classList.remove('visible');
+        }
+    }
+
+    // Update status text: "Align your face" → "Scanning (X%)"
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified) {
-        const displayPercent = Math.floor(faceScanLivenessDisplayProgress);
-        faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML =
-            `<i class="fas fa-spinner fa-spin"></i> Scanning (${displayPercent}%)`;
+        const baseClass = faceScanIsSettings ? 'settings-scan-status' : 'face-status';
+        if (faceScanLivenessProgress === 0) {
+            // No face detected yet — show align instruction
+            faceScanStatusEl.className = baseClass;
+            faceScanStatusEl.innerHTML = faceScanIsSettings
+                ? '<i class="fas fa-face-viewfinder"></i> Align face in frame...'
+                : '<i class="fas fa-face-viewfinder"></i> Align your face...';
+        } else {
+            // Face found and scanning in progress
+            faceScanStatusEl.className = baseClass;
+            faceScanStatusEl.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Scanning (${displayPercent}%)`;
+        }
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
@@ -4208,9 +4245,19 @@ function startFaceScanFlow(isSettings = false) {
     const scanner = faceScanVideoEl.closest('.circular-scanner');
     if (scanner) { scanner.className = 'circular-scanner scanning'; scanner.style.borderColor = ''; }
 
+    // Also set scanning state on the ring wrapper
+    const ringWrapper = faceScanVideoEl.closest('.scanner-ring-wrapper');
+    if (ringWrapper) ringWrapper.className = 'scanner-ring-wrapper scanning';
+
+    // Reset progress bar
+    const barWrap = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-wrap' : 'face-progress-bar-wrap');
+    if (barWrap) barWrap.classList.remove('visible');
+
     if (faceScanStatusEl) {
-        faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing camera...';
+        faceScanStatusEl.className = faceScanIsSettings ? 'settings-scan-status' : 'face-status';
+        faceScanStatusEl.innerHTML = faceScanIsSettings
+            ? '<i class="fas fa-face-viewfinder"></i> Align face in frame...'
+            : '<i class="fas fa-face-viewfinder"></i> Align your face...';
     }
 
     // Hide face-not-found overlay
@@ -4223,10 +4270,7 @@ function startFaceScanFlow(isSettings = false) {
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.play().then(() => {
-                    if (faceScanStatusEl) {
-                        faceScanStatusEl.className = 'face-status';
-                        faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
-                    }
+                    // Let the rAF overlay loop handle the text smoothly
                     // Start overlay draw loop (rAF)
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
                     // Start async detection loop immediately (100ms)
@@ -4255,6 +4299,8 @@ function stopFaceScanFlow() {
         faceScanStream = null;
     }
     if (faceScanVideoEl) {
+        const ringWrapper = faceScanVideoEl.closest('.scanner-ring-wrapper');
+        if (ringWrapper) ringWrapper.className = 'scanner-ring-wrapper';
         faceScanVideoEl.srcObject = null;
     }
 }
@@ -4264,7 +4310,7 @@ function handleScanSuccess(statusText) {
     stopFaceScanFlow();
     
     if (faceScanStatusEl) {
-        faceScanStatusEl.className = 'face-status success';
+        faceScanStatusEl.className = faceScanIsSettings ? 'settings-scan-status success' : 'face-status success';
         faceScanStatusEl.innerHTML = `<i class="fas fa-circle-check"></i> ${statusText}`;
     }
     if (faceScanDetailEl) {
@@ -4277,7 +4323,13 @@ function handleScanSuccess(statusText) {
             scanner.className = 'circular-scanner success';
             scanner.style.borderColor = '';
         }
+        const ringWrapper = faceScanVideoEl.closest('.scanner-ring-wrapper');
+        if (ringWrapper) ringWrapper.className = 'scanner-ring-wrapper success';
     }
+
+    // Hide progress bar on success
+    const barWrap = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-wrap' : 'face-progress-bar-wrap');
+    if (barWrap) barWrap.classList.remove('visible');
     
     setTimeout(() => {
         if (faceScanIsSettings) {
@@ -4345,7 +4397,7 @@ function handleScanFailure(statusText) {
     stopFaceScanFlow();
     
     if (faceScanStatusEl) {
-        faceScanStatusEl.className = 'face-status error';
+        faceScanStatusEl.className = faceScanIsSettings ? 'settings-scan-status error' : 'face-status error';
         faceScanStatusEl.innerHTML = `<i class="fas fa-circle-xmark"></i> ${statusText}`;
     }
     if (faceScanDetailEl) {
@@ -4358,7 +4410,13 @@ function handleScanFailure(statusText) {
             scanner.className = 'circular-scanner error';
             scanner.style.borderColor = '';
         }
+        const ringWrapper = faceScanVideoEl.closest('.scanner-ring-wrapper');
+        if (ringWrapper) ringWrapper.className = 'scanner-ring-wrapper error';
     }
+
+    // Hide progress bar on failure
+    const barWrapErr = document.getElementById(faceScanIsSettings ? 'settings-progress-bar-wrap' : 'face-progress-bar-wrap');
+    if (barWrapErr) barWrapErr.classList.remove('visible');
     
     // Show face-not-found overlay with mismatch message (without deleting stored credentials)
     const overlayId = faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found';
