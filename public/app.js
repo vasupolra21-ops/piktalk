@@ -4284,11 +4284,37 @@ function handleScanSuccess(statusText) {
             // Autofill nickname from this person's own saved profile
             if (nicknameInput) nicknameInput.value = savedProfile.nickname || '';
             
+            // Restore avatar preview if available
+            if (savedProfile.profilePic) {
+                myProfilePic = savedProfile.profilePic;
+                if (avatarPreviewImg) {
+                    avatarPreviewImg.src = savedProfile.profilePic;
+                    avatarPreviewImg.classList.remove('hidden');
+                    avatarPreviewImg.style.objectFit = 'cover';
+                }
+                if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+            } else {
+                myProfilePic = '';
+                if (avatarPreviewImg) {
+                    avatarPreviewImg.src = '';
+                    avatarPreviewImg.classList.add('hidden');
+                }
+                if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
+            }
+            
             // Transition view
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         } else {
-            // First time login - show nickname setup fields
+            // First time login - clear previous nickname and reset avatar preview
+            if (nicknameInput) nicknameInput.value = '';
+            myProfilePic = '';
+            if (avatarPreviewImg) {
+                avatarPreviewImg.src = '';
+                avatarPreviewImg.classList.add('hidden');
+            }
+            if (avatarPreviewIcon) avatarPreviewIcon.classList.remove('hidden');
+
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
