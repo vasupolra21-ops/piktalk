@@ -3609,7 +3609,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.40) so siblings don't match
+const FACE_MATCH_DIST  = 0.50;   // euclidean distance threshold — robust (0.50) for mobile & cross-device cameras
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
@@ -4029,6 +4029,22 @@ async function _onFaceScanComplete() {
 
                 // Save their profile locally so future scans on this device are instant
                 if (data.nickname) localStorage.setItem('piktalk_face_nickname', data.nickname);
+                
+                // Save to local profile storage key for autofill lookup
+                const profKey = `piktalk_profile_${data.faceUserId}`;
+                localStorage.setItem(profKey, JSON.stringify({ nickname: data.nickname || '', profilePic: data.profilePic || null }));
+                
+                // Restore profile picture preview if available
+                if (data.profilePic) {
+                    myProfilePic = data.profilePic;
+                    if (avatarPreviewImg) {
+                        avatarPreviewImg.src = data.profilePic;
+                        avatarPreviewImg.classList.remove('hidden');
+                        avatarPreviewImg.style.objectFit = 'cover';
+                    }
+                    if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+                }
+
                 saveUserInDatabase(data.faceUserId, descriptor, data.nickname, data.profilePic);
                 if (descriptor) {
                     localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
@@ -4247,7 +4263,7 @@ function handleScanSuccess(statusText) {
         // Load this face's profile (name is isolated per face ID)
         const savedProfile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
         
-        if (statusText === "Access Granted!") {
+        if (statusText === "Access Granted!" || statusText.indexOf("Welcome back") !== -1) {
             // Autofill nickname from this person's own saved profile
             if (nicknameInput) nicknameInput.value = savedProfile.nickname || '';
             
