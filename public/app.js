@@ -4332,6 +4332,7 @@ function simulateSettingsFaceScan() {
 function openSettings() {
     if (settingsModal) {
         settingsModal.classList.add('open');
+        if (typeof _closeRoomConversation === 'function') _closeRoomConversation();
         updateSettingsUI();
         renderChatHistoryInSettings();
         _initSettingsEnhancements();
@@ -4613,13 +4614,15 @@ function renderChatHistoryInSettings() {
         return;
     }
     listEl.innerHTML = rooms.map(r => `
-        <div class="history-room-row">
+        <div class="history-room-row" onclick="window._showRoomConversation('${escapeHtml(r.roomID)}')">
             <div class="history-room-icon"><i class="fas fa-comments"></i></div>
             <div class="history-room-info">
                 <div class="history-room-id">${escapeHtml(r.roomID)}</div>
                 <div class="history-room-meta">${r.count} messages${r.last ? ' · ' + (r.last.text || '').substring(0,30) : ''}</div>
             </div>
-            <button class="history-room-clear" onclick="_clearRoomHistoryFromUI('${escapeHtml(r.roomID)}')"><i class="fas fa-trash"></i></button>
+            <button class="history-room-clear" onclick="event.stopPropagation(); window._clearRoomHistoryFromUI('${escapeHtml(r.roomID)}')">
+                <i class="fas fa-trash"></i>
+            </button>
         </div>
     `).join('');
 }
@@ -4628,6 +4631,91 @@ window._clearRoomHistoryFromUI = function(roomID) {
     clearRoomHistory(roomID);
     renderChatHistoryInSettings();
 };
+
+window._showRoomConversation = function(roomID) {
+    const detailEl = document.getElementById('settings-conversation-detail');
+    const msgContainer = document.getElementById('settings-conv-messages');
+    const roomIdEl = document.getElementById('settings-conv-room-id');
+    const msgCountEl = document.getElementById('settings-conv-message-count');
+    const joinBtn = document.getElementById('settings-conv-join-btn');
+    const backBtn = document.getElementById('settings-conv-back-btn');
+    
+    if (!detailEl || !msgContainer) return;
+    
+    // Set headers
+    if (roomIdEl) roomIdEl.textContent = `Room: ${roomID}`;
+    
+    // Load messages
+    const faceUserId = getFaceUserId();
+    let msgs = [];
+    if (faceUserId) {
+        try {
+            const key = _historyKey(faceUserId, roomID);
+            msgs = JSON.parse(localStorage.getItem(key) || '[]');
+        } catch(e) {}
+    }
+    
+    if (msgCountEl) msgCountEl.textContent = `${msgs.length} messages`;
+    
+    // Render bubbles
+    if (msgs.length === 0) {
+        msgContainer.innerHTML = `<div class="settings-history-empty"><i class="fas fa-message-slash"></i><p>No messages stored</p></div>`;
+    } else {
+        msgContainer.innerHTML = msgs.map(m => `
+            <div class="conv-msg-bubble ${m.isMine ? 'sent' : 'received'}">
+                ${!m.isMine ? `<span class="conv-msg-name">${escapeHtml(m.nickname)}</span>` : ''}
+                <div class="conv-msg-text">${escapeHtml(m.text)}</div>
+                <div class="conv-msg-time">${m.time}</div>
+            </div>
+        `).join('');
+    }
+    
+    // Bind join action
+    if (joinBtn) {
+        joinBtn.onclick = () => {
+            window.location.hash = roomID;
+            if (settingsModal) settingsModal.classList.remove('open');
+            // Force hashchange/routing function to execute if present
+            if (typeof handleRouting === 'function') handleRouting();
+        };
+    }
+    
+    // Bind back action
+    if (backBtn) {
+        backBtn.onclick = () => {
+            _closeRoomConversation();
+        };
+    }
+    
+    // Toggle views (hide settings menu cards, show conversation detail)
+    const cards = document.querySelectorAll('.settings-body > :not(#settings-conversation-detail)');
+    cards.forEach(c => c.classList.add('hidden'));
+    detailEl.classList.remove('hidden');
+    
+    // Scroll messages to bottom
+    setTimeout(() => {
+        msgContainer.scrollTop = msgContainer.scrollHeight;
+    }, 50);
+};
+
+function _closeRoomConversation() {
+    const detailEl = document.getElementById('settings-conversation-detail');
+    if (!detailEl) return;
+    
+    // Restore normal settings elements (unhide them)
+    const cards = document.querySelectorAll('.settings-body > :not(#settings-conversation-detail)');
+    cards.forEach(c => {
+        // Only unhide if they are not dynamically controlled ones like settings-scan-container or settings-nickname-form
+        if (c.id !== 'settings-scan-container' && c.id !== 'settings-nickname-form') {
+            c.classList.remove('hidden');
+        }
+    });
+    
+    detailEl.classList.add('hidden');
+    
+    // Refresh history room list
+    renderChatHistoryInSettings();
+}
 
 let _settingsEnhancementsInitialized = false;
 

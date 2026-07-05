@@ -4133,4 +4133,142 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 }
 .history-room-clear:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
 
+.history-room-row {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.history-room-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Settings Conversation Detail View ── */
+.settings-conversation-detail {
+    display: flex;
+    flex-direction: column;
+    height: 400px;
+    background: var(--card-bg);
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--glass-border);
+    margin-top: 15px;
+    animation: lbFadeIn 0.25s ease;
+}
+
+.conversation-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-icon-back {
+    background: none;
+    border: none;
+    color: var(--text-main);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-icon-back:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.conversation-title-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.conversation-room-id {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.conversation-msg-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.btn-primary-sm {
+    background: var(--primary);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.btn-primary-sm:hover {
+    opacity: 0.9;
+}
+
+.settings-conv-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.conv-msg-bubble {
+    display: flex;
+    flex-direction: column;
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.conv-msg-bubble.sent {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.conv-msg-bubble.received {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-main);
+    border-bottom-left-radius: 4px;
+}
+
+.conv-msg-name {
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+    opacity: 0.8;
+}
+
+.conv-msg-text {
+    margin-bottom: 3px;
+}
+
+.conv-msg-time {
+    font-size: 0.65rem;
+    text-align: right;
+    opacity: 0.6;
+}
+
 

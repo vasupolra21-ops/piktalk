@@ -457,6 +457,24 @@
                             <i class="fas fa-message-slash"></i>
                             <p>No chat history yet</p>
                         </div>
+                </div>
+
+                <!-- Chat Conversation Detail View -->
+                <div id="settings-conversation-detail" class="settings-conversation-detail hidden">
+                    <div class="conversation-header">
+                        <button id="settings-conv-back-btn" class="btn-icon-back" title="Back to Rooms">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <div class="conversation-title-area">
+                            <span id="settings-conv-room-id" class="conversation-room-id">Room ID</span>
+                            <span id="settings-conv-message-count" class="conversation-msg-count">0 messages</span>
+                        </div>
+                        <button id="settings-conv-join-btn" class="btn-primary-sm" title="Join Room">
+                            <i class="fas fa-arrow-right-to-bracket"></i> Join
+                        </button>
+                    </div>
+                    <div id="settings-conv-messages" class="settings-conv-messages">
+                        <!-- Message bubbles render dynamically here -->
                     </div>
                 </div>
             </div>
