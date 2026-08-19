@@ -1256,6 +1256,14 @@ body.light-mode .bubble-timestamp {
     width: 90%;
 }
 
+#nickname-modal {
+    background: #ffffff !important;
+}
+
+#nickname-modal .modal-content {
+    background: #ffffff !important;
+}
+
 .modal-header {
     display: flex !important;
     justify-content: space-between !important;
@@ -1949,16 +1957,28 @@ body.light-mode .waveform-bar {
         min-width: 160px;
     }
 
-    .modal-content {
-        padding: 1.5rem 1.25rem;
-        margin: 16px;
-        width: calc(100% - 32px);
-        max-width: 360px;
-    }
-
-    /* Modal adjusts perfectly to visual viewport height on mobile (avoids being pushed under keyboard) */
     .modal {
         height: var(--viewport-height, 100dvh);
+        background: #ffffff !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0 !important;
+    }
+
+    .modal-content {
+        padding: 2rem 1.25rem !important;
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 420px !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
     /* Mobile-optimized compact modal layouts */
