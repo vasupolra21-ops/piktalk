@@ -346,33 +346,39 @@ function updateActiveModalViewport() {
     }
 }
 
-// - Messages scroll up, and the input sits right above the keyboard (like WhatsApp)
+// Handles iOS/Android keyboard open/close:
+// - When keyboard opens: shrinks #chat-view by moving its bottom edge up
+// - When keyboard closes: restores bottom to 0
+// This works together with the CSS: position:fixed; top:0; bottom:0
 function initViewportHandler() {
-    // Always set --viewport-height, even without visualViewport support
-    function applyViewportHeight() {
-        const vh = window.visualViewport
-            ? window.visualViewport.height
-            : window.innerHeight;
-        document.documentElement.style.setProperty('--viewport-height', vh + 'px');
+    const chatView = document.getElementById('chat-view');
 
-        // Scroll the page root back to 0 to prevent iOS from shifting the viewport
+    function adjustForKeyboard() {
+        if (!window.visualViewport) return;
+        const vv = window.visualViewport;
+        // Keyboard height = difference between window height and visual viewport height
+        const keyboardHeight = Math.max(0, window.innerHeight - vv.height);
+
+        if (chatView) {
+            // Move the bottom of the chat view up by the keyboard height
+            chatView.style.bottom = keyboardHeight + 'px';
+        }
+
+        // Scroll the page root to 0 to prevent iOS shifting
         if (window.scrollY !== 0) window.scrollTo(0, 0);
         if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
         if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
 
-        // Scroll chat to bottom so latest message is visible above keyboard
+        // Scroll messages to bottom so latest is visible above keyboard
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
+
+        updateActiveModalViewport();
     }
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', () => {
-            applyViewportHeight();
-            updateActiveModalViewport();
-        });
-
-        // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
+        window.visualViewport.addEventListener('resize', adjustForKeyboard);
         window.visualViewport.addEventListener('scroll', () => {
             if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
                 window.scrollTo(0, 0);
@@ -383,9 +389,6 @@ function initViewportHandler() {
         });
     }
 
-    // Fallback: also listen on window resize
-    window.addEventListener('resize', applyViewportHeight, { passive: true });
-
     // Also reset on any window scroll
     window.addEventListener('scroll', () => {
         if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
@@ -395,26 +398,31 @@ function initViewportHandler() {
         }
     }, { passive: true });
 
-    // Track keyboard open/close via message input focus/blur
+    // Track keyboard class via message input focus/blur
     if (messageInput) {
         messageInput.addEventListener('focus', () => {
             document.body.classList.add('keyboard-active');
-            // Apply height in staggered calls to catch Safari's delayed keyboard animation
-            setTimeout(applyViewportHeight, 50);
-            setTimeout(applyViewportHeight, 200);
-            setTimeout(applyViewportHeight, 400);
+            // Staggered calls to catch Safari's slow keyboard animation
+            setTimeout(adjustForKeyboard, 50);
+            setTimeout(adjustForKeyboard, 200);
+            setTimeout(adjustForKeyboard, 400);
         });
 
         messageInput.addEventListener('blur', () => {
             document.body.classList.remove('keyboard-active');
-            setTimeout(applyViewportHeight, 50);
-            setTimeout(applyViewportHeight, 200);
+            // Reset bottom to 0 when keyboard dismisses
+            setTimeout(() => {
+                if (chatView) chatView.style.bottom = '0px';
+                if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 50);
+            setTimeout(() => {
+                if (chatView) chatView.style.bottom = '0px';
+            }, 200);
         });
     }
 
-    // Set initial value immediately and after a brief delay (Safari may not have final size at DOMContentLoaded)
-    applyViewportHeight();
-    setTimeout(applyViewportHeight, 100);
+    // Initial call — ensure bottom is 0 on load (no keyboard)
+    if (chatView) chatView.style.bottom = '0px';
 }
 
 // ── Modal Keyboard Handler ──

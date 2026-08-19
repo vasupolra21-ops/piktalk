@@ -1762,14 +1762,12 @@ body.light-mode .waveform-bar {
         justify-content: flex-start;
     }
 
-    /* Chat View: fixed to real visual viewport, flex column filling full height */
+    /* Chat View: pinned to all 4 edges of the viewport — most reliable on iOS Safari */
     #chat-view.active {
         padding: 0 !important;
         margin: 0 !important;
         width: 100vw !important;
-        /* Use dvh as base; JS overrides --viewport-height when keyboard is open */
-        height: var(--viewport-height, 100dvh) !important;
-        max-height: var(--viewport-height, 100dvh) !important;
+        height: auto !important;       /* Let top+bottom control height, not an explicit value */
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
@@ -1779,12 +1777,13 @@ body.light-mode .waveform-bar {
         top: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        /* No bottom:0 — let height control size to avoid iOS bar conflicts */
+        bottom: 0 !important;          /* Pin to bottom — no extra space possible */
         z-index: 1000 !important;
     }
 
+    /* When keyboard is open, JS shifts bottom up by keyboard height via inline style */
     body.keyboard-active #chat-view.active {
-        height: var(--viewport-height, 100dvh) !important;
+        /* bottom is set by JS — no override here */
     }
 
     .main-hero {
