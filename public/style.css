@@ -654,8 +654,6 @@ body.light-mode .btn-icon {
     padding: 1.25rem 1.5rem;
     display: flex;
     flex-direction: column;
-    /* Anchor messages to the bottom — like WhatsApp/iMessage */
-    justify-content: flex-end;
     gap: 4px;
     scrollbar-width: thin;
     scrollbar-color: var(--primary) transparent;
