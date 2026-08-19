@@ -1759,7 +1759,7 @@ body.light-mode .waveform-bar {
         width: 100%;
     }
 
-    /* Chat View Mobile Container - Anchored strictly top to bottom without vertical centering shift */
+    /* Chat View Mobile Container - Fixed to screen viewport top-to-bottom */
     #chat-view.active {
         padding: 0 !important;
         margin: 0 !important;
@@ -1770,13 +1770,14 @@ body.light-mode .waveform-bar {
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        justify-content: flex-start !important;
+        justify-content: space-between !important;
         overflow: hidden !important;
-        position: absolute !important;
+        position: fixed !important;
         top: 0 !important;
         left: 0 !important;
         right: 0 !important;
         bottom: 0 !important;
+        z-index: 1000 !important;
     }
 
     .main-hero {
@@ -1825,15 +1826,18 @@ body.light-mode .waveform-bar {
         box-shadow: none !important;
         display: flex !important;
         flex-direction: column !important;
+        justify-content: space-between !important;
         overflow: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
         position: relative !important;
+        flex: 1 1 auto !important;
     }
     
     .chat-header {
         padding: 8px 12px;
         padding-top: calc(8px + env(safe-area-inset-top)); /* Notch status bar overlap fix */
+        flex: 0 0 auto !important;
         flex-shrink: 0 !important;
     }
 
@@ -1866,7 +1870,7 @@ body.light-mode .waveform-bar {
     }
 
     .messages-container {
-        flex: 1 1 auto !important;
+        flex: 1 1 0% !important;
         min-height: 0 !important; /* Critical for flexbox height shrinking! */
         padding: 8px 10px;
         gap: 2px;
@@ -1878,6 +1882,7 @@ body.light-mode .waveform-bar {
         padding: 8px 10px;
         padding-bottom: calc(8px + env(safe-area-inset-bottom)); /* Bottom safe area notch support */
         gap: 6px;
+        flex: 0 0 auto !important;
         flex-shrink: 0 !important; /* Prevent squeeze by messages container on mobile */
         width: 100% !important;
         box-sizing: border-box !important;
