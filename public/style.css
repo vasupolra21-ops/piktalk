@@ -1894,9 +1894,7 @@ body.light-mode .waveform-bar {
         flex-shrink: 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
-        padding: 8px 10px !important;
-        /* Keep composer above iPhone Safari bottom bar */
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        padding: 8px 10px 8px !important;
         gap: 6px;
         /* Ensure composer is never pushed off-screen */
         position: relative;
