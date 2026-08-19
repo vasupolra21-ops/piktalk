@@ -1760,8 +1760,7 @@ body.light-mode .waveform-bar {
     }
 
     /* Chat View Mobile Container - Anchored strictly top to bottom without vertical centering shift */
-    #chat-view,
-    #chat-view.container {
+    #chat-view.active {
         padding: 0 !important;
         margin: 0 !important;
         width: 100vw !important;
