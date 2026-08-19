@@ -4235,7 +4235,17 @@ function startFaceScanFlow(isSettings = false) {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
     if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
+    const videoConstraints = {
+        facingMode: 'user',
+        width: { ideal: 640 },
+        height: { ideal: 640 },
+        aspectRatio: { ideal: 1.0 }
+    };
+
+    const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }));
+
+    getCamStream()
         .then(stream => {
             faceScanStream = stream;
             if (faceScanVideoEl) {

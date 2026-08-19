@@ -3549,6 +3549,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center center;
     border-radius: 50%;
     transform: scaleX(-1);
 }
