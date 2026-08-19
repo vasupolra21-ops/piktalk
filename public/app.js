@@ -348,37 +348,43 @@ function updateActiveModalViewport() {
 
 // - Messages scroll up, and the input sits right above the keyboard (like WhatsApp)
 function initViewportHandler() {
-    if (!window.visualViewport) return;
-
+    // Always set --viewport-height, even without visualViewport support
     function applyViewportHeight() {
-        const vh = window.visualViewport.height;
+        const vh = window.visualViewport
+            ? window.visualViewport.height
+            : window.innerHeight;
         document.documentElement.style.setProperty('--viewport-height', vh + 'px');
 
-        // Force reset any window/body scroll shifts
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
+        // Scroll the page root back to 0 to prevent iOS from shifting the viewport
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+        if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+        if (document.documentElement.scrollTop !== 0) document.documentElement.scrollTop = 0;
 
-        // Chat: scroll to bottom so latest message is visible above keyboard
+        // Scroll chat to bottom so latest message is visible above keyboard
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     }
 
-    window.visualViewport.addEventListener('resize', () => {
-        applyViewportHeight();
-        updateActiveModalViewport();
-    });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            applyViewportHeight();
+            updateActiveModalViewport();
+        });
 
-    // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
-    window.visualViewport.addEventListener('scroll', () => {
-        if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
-            window.scrollTo(0, 0);
-            document.body.scrollTop = 0;
-            document.documentElement.scrollTop = 0;
-        }
-        updateActiveModalViewport();
-    });
+        // Prevent iOS Safari from scrolling the whole page up (causing the white gap)
+        window.visualViewport.addEventListener('scroll', () => {
+            if (window.scrollY !== 0 || document.body.scrollTop !== 0 || document.documentElement.scrollTop !== 0) {
+                window.scrollTo(0, 0);
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+            }
+            updateActiveModalViewport();
+        });
+    }
+
+    // Fallback: also listen on window resize
+    window.addEventListener('resize', applyViewportHeight, { passive: true });
 
     // Also reset on any window scroll
     window.addEventListener('scroll', () => {
@@ -389,23 +395,26 @@ function initViewportHandler() {
         }
     }, { passive: true });
 
-    // Reset layout viewport position when message input receives focus/blur
+    // Track keyboard open/close via message input focus/blur
     if (messageInput) {
         messageInput.addEventListener('focus', () => {
             document.body.classList.add('keyboard-active');
+            // Apply height in staggered calls to catch Safari's delayed keyboard animation
             setTimeout(applyViewportHeight, 50);
-            setTimeout(applyViewportHeight, 150);
+            setTimeout(applyViewportHeight, 200);
+            setTimeout(applyViewportHeight, 400);
         });
 
         messageInput.addEventListener('blur', () => {
             document.body.classList.remove('keyboard-active');
             setTimeout(applyViewportHeight, 50);
-            setTimeout(applyViewportHeight, 150);
+            setTimeout(applyViewportHeight, 200);
         });
     }
 
-    // Set initial value
+    // Set initial value immediately and after a brief delay (Safari may not have final size at DOMContentLoaded)
     applyViewportHeight();
+    setTimeout(applyViewportHeight, 100);
 }
 
 // ── Modal Keyboard Handler ──

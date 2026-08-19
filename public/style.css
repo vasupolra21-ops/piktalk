@@ -109,7 +109,7 @@ body.light-mode .animated-bg::after {
 }
 
 .container {
-    height: 100vh;
+    height: 100dvh;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -515,7 +515,7 @@ body.light-mode .btn-icon {
 .chat-container {
     width: 100%;
     max-width: 900px;
-    height: 85vh;
+    height: 85dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1741,49 +1741,50 @@ body.light-mode .waveform-bar {
         font-size: 16px !important;
     }
 
+    /* Use dvh so html/body fill only the visible area (no browser chrome overlap) */
     html {
-        height: 100% !important;
+        height: 100dvh !important;
         overflow: hidden !important;
     }
 
     body {
-        height: 100% !important;
+        height: 100dvh !important;
         overflow: hidden !important;
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
+        /* Do NOT use position:fixed — it collapses the height on iOS when keyboard opens */
     }
 
+    /* Full-screen container — no centering padding on mobile */
     .container {
         padding: 0;
-        height: 100%;
-        width: 100%;
+        height: 100dvh;
+        width: 100vw;
+        align-items: stretch;
+        justify-content: flex-start;
     }
 
-    /* Chat View Mobile Container - Fixed to screen viewport top-to-bottom */
+    /* Chat View: fixed to real visual viewport, flex column filling full height */
     #chat-view.active {
         padding: 0 !important;
         margin: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
+        width: 100vw !important;
+        /* Use dvh as base; JS overrides --viewport-height when keyboard is open */
+        height: var(--viewport-height, 100dvh) !important;
+        max-height: var(--viewport-height, 100dvh) !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
-        justify-content: space-between !important;
+        justify-content: flex-start !important;
         overflow: hidden !important;
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        bottom: 0 !important;
+        /* No bottom:0 — let height control size to avoid iOS bar conflicts */
         z-index: 1000 !important;
     }
 
     body.keyboard-active #chat-view.active {
-        height: var(--viewport-height, 100%) !important;
-        bottom: auto !important;
+        height: var(--viewport-height, 100dvh) !important;
     }
 
     .main-hero {
@@ -1825,19 +1826,21 @@ body.light-mode .waveform-bar {
     
     .chat-container {
         width: 100vw !important;
-        height: 100% !important;
+        /* Fill all remaining height from #chat-view after header */
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        height: auto !important;
         max-height: 100% !important;
         border-radius: 0 !important;
         border: none !important;
         box-shadow: none !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: space-between !important;
+        justify-content: flex-start !important;
         overflow: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
         position: relative !important;
-        flex: 1 1 auto !important;
     }
     
     .chat-header {
@@ -1877,27 +1880,34 @@ body.light-mode .waveform-bar {
 
     .messages-container {
         flex: 1 1 0% !important;
-        min-height: 0 !important; /* Critical for flexbox height shrinking! */
-        padding: 8px 10px;
+        min-height: 0 !important; /* Critical: allows flex child to shrink below content size */
+        padding: 8px 10px !important;
         gap: 2px;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
+        /* No fixed height — height is derived from remaining flex space */
     }
- 
+
     .chat-input-area {
-        padding: 8px 10px;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom)); /* Bottom safe area notch support */
-        gap: 6px;
+        /* Never shrink — always show the composer at the bottom */
         flex: 0 0 auto !important;
-        flex-shrink: 0 !important; /* Prevent squeeze by messages container on mobile */
+        flex-shrink: 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
+        padding: 8px 10px !important;
+        /* Keep composer above iPhone Safari bottom bar */
+        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        gap: 6px;
+        /* Ensure composer is never pushed off-screen */
+        position: relative;
+        z-index: 2;
     }
 
     .chat-input-row {
         gap: 6px;
     }
-    
+
+    /* When keyboard is open, remove the safe-area padding — keyboard handles spacing */
     body.keyboard-active .chat-input-area {
         padding-bottom: 8px !important;
     }
