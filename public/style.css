@@ -1742,15 +1742,18 @@ body.light-mode .waveform-bar {
     }
 
     html {
-        height: var(--viewport-height, 100dvh) !important;
-        overflow: hidden;
+        height: 100% !important;
+        overflow: hidden !important;
     }
 
     body {
-        height: var(--viewport-height, 100dvh) !important;
-        overflow: hidden;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0 !important;
+        height: 100% !important;
+        overflow: hidden !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
     }
 
     .container {
@@ -1763,10 +1766,8 @@ body.light-mode .waveform-bar {
     #chat-view.active {
         padding: 0 !important;
         margin: 0 !important;
-        width: 100vw !important;
+        width: 100% !important;
         height: 100% !important;
-        height: var(--viewport-height, 100dvh) !important;
-        max-height: var(--viewport-height, 100dvh) !important;
         display: flex !important;
         flex-direction: column !important;
         align-items: stretch !important;
@@ -1778,6 +1779,11 @@ body.light-mode .waveform-bar {
         right: 0 !important;
         bottom: 0 !important;
         z-index: 1000 !important;
+    }
+
+    body.keyboard-active #chat-view.active {
+        height: var(--viewport-height, 100%) !important;
+        bottom: auto !important;
     }
 
     .main-hero {
