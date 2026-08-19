@@ -1783,7 +1783,7 @@ body.light-mode .waveform-bar {
     }
 
     body.keyboard-active #chat-view.active {
-        /* height is set by JS via inline style when keyboard is open */
+        height: var(--viewport-height, 100dvh) !important;
     }
 
     .main-hero {

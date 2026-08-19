@@ -359,9 +359,14 @@ function initViewportHandler() {
     function applyKeyboardHeight() {
         if (!window.visualViewport || !chatView) return;
         const vv = window.visualViewport;
-        // Set exact visual height (excludes keyboard AND browser chrome)
-        chatView.style.height = vv.height + 'px';
-        chatView.style.top = vv.offsetTop + 'px';
+        const vh = vv.height;
+        const top = vv.offsetTop || 0;
+
+        // Set CSS variable on root and element with !important priority
+        document.documentElement.style.setProperty('--viewport-height', vh + 'px');
+        chatView.style.setProperty('height', vh + 'px', 'important');
+        chatView.style.setProperty('top', top + 'px', 'important');
+
         // Scroll to bottom so latest message stays visible above keyboard
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -370,10 +375,11 @@ function initViewportHandler() {
     }
 
     function clearKeyboardHeight() {
+        document.documentElement.style.removeProperty('--viewport-height');
         if (!chatView) return;
         // Remove inline styles — CSS 100dvh takes back over
-        chatView.style.height = '';
-        chatView.style.top = '';
+        chatView.style.removeProperty('height');
+        chatView.style.removeProperty('top');
     }
 
     // Prevent iOS page scroll (it creates white gaps)
