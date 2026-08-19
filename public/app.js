@@ -327,21 +327,18 @@ function updateActiveModalViewport() {
     if (window.visualViewport) {
         const vv = window.visualViewport;
         const activeModal = document.querySelector('.modal.active');
-        if (activeModal) {
-            activeModal.style.position = 'absolute';
-            activeModal.style.top = `${vv.offsetTop}px`;
-            activeModal.style.left = `${vv.offsetLeft}px`;
-            activeModal.style.width = `${vv.width}px`;
-            activeModal.style.height = `${vv.height}px`;
-        } else {
-            // Reset modals when inactive
-            document.querySelectorAll('.modal').forEach(m => {
-                m.style.position = '';
-                m.style.top = '';
-                m.style.left = '';
-                m.style.width = '';
-                m.style.height = '';
-            });
+        if (activeModal && activeModal.classList.contains('keyboard-active')) {
+            activeModal.style.setProperty('position', 'absolute', 'important');
+            activeModal.style.setProperty('top', `${vv.offsetTop}px`, 'important');
+            activeModal.style.setProperty('left', `${vv.offsetLeft}px`, 'important');
+            activeModal.style.setProperty('width', `${vv.width}px`, 'important');
+            activeModal.style.setProperty('height', `${vv.height}px`, 'important');
+        } else if (activeModal) {
+            activeModal.style.removeProperty('position');
+            activeModal.style.removeProperty('top');
+            activeModal.style.removeProperty('left');
+            activeModal.style.removeProperty('width');
+            activeModal.style.removeProperty('height');
         }
     }
 }
