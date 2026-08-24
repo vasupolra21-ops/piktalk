@@ -4819,12 +4819,17 @@ function showPhoneModal(onVerified) {
 // ═══════════════════════════════════════════════════════════════
 const HISTORY_MAX = 200; // max messages to store per room
 
+function getDeviceLabel() {
+    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
+    return isMobileDevice ? 'Mobile' : 'Pc';
+}
+
 function _historyKey(faceUserId, roomID) {
     return `piktalk_history_${faceUserId}_${roomID}`;
 }
 
 function saveMsgToHistory(data) {
-    const faceUserId = getFaceUserId();
+    const faceUserId = getFaceUserId() || 'user';
     if (!faceUserId || !currentRoomID) return;
     // Only save text messages (skip large images/audio to save space)
     if (data.image || data.audio) return;
@@ -4836,7 +4841,8 @@ function saveMsgToHistory(data) {
             text: data.message || '',
             time: data.time || new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
             profilePic: null, // don't store profile pics (large)
-            isMine: data.id === (socket && socket.id)
+            isMine: data.id === (socket && socket.id),
+            device: getDeviceLabel()
         };
         existing.push(entry);
         // Keep only last HISTORY_MAX messages
@@ -4846,7 +4852,7 @@ function saveMsgToHistory(data) {
 }
 
 function loadAndRenderHistory(roomID) {
-    const faceUserId = getFaceUserId();
+    const faceUserId = getFaceUserId() || 'user';
     if (!faceUserId || !roomID) return;
     try {
         const key = _historyKey(faceUserId, roomID);
@@ -4881,39 +4887,51 @@ function loadAndRenderHistory(roomID) {
 }
 
 function getAllHistoryRooms() {
-    const faceUserId = getFaceUserId();
-    if (!faceUserId) return [];
-    const rooms = [];
-    const prefix = `piktalk_history_${faceUserId}_`;
+    const roomsMap = new Map();
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(prefix)) {
-            const roomID = k.replace(prefix, '');
+        if (k && k.startsWith('piktalk_history_')) {
+            const parts = k.split('_');
+            const roomID = parts[parts.length - 1];
             try {
                 const msgs = JSON.parse(localStorage.getItem(k) || '[]');
-                rooms.push({ roomID, count: msgs.length, last: msgs[msgs.length - 1] || null });
+                if (msgs.length > 0) {
+                    const existing = roomsMap.get(roomID) || { count: 0, last: null, key: k };
+                    const lastMsg = msgs[msgs.length - 1];
+                    roomsMap.set(roomID, {
+                        roomID: roomID,
+                        count: Math.max(existing.count, msgs.length),
+                        last: lastMsg || existing.last,
+                        key: k
+                    });
+                }
             } catch(e) {}
         }
     }
+    const rooms = Array.from(roomsMap.values());
     return rooms.sort((a, b) => b.count - a.count);
 }
 
 function clearRoomHistory(roomID) {
-    const faceUserId = getFaceUserId();
-    if (!faceUserId) return;
-    localStorage.removeItem(_historyKey(faceUserId, roomID));
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('piktalk_history_') && k.endsWith(`_${roomID}`)) {
+            keysToRemove.push(k);
+        }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
 }
 
 function clearAllHistory() {
-    const faceUserId = getFaceUserId();
-    if (!faceUserId) return;
-    const prefix = `piktalk_history_${faceUserId}_`;
-    const keys = [];
+    const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.startsWith(prefix)) keys.push(k);
+        if (k && k.startsWith('piktalk_history_')) {
+            keysToRemove.push(k);
+        }
     }
-    keys.forEach(k => localStorage.removeItem(k));
+    keysToRemove.forEach(k => localStorage.removeItem(k));
 }
 
 function escapeHtml(str) {
@@ -4932,18 +4950,23 @@ function renderChatHistoryInSettings() {
         listEl.innerHTML = `<div class="settings-history-empty"><i class="fas fa-message-slash"></i><p>No chat history yet</p></div>`;
         return;
     }
-    listEl.innerHTML = rooms.map(r => `
+    const currentDeviceTag = getDeviceLabel();
+    listEl.innerHTML = rooms.map(r => {
+        const roomDevice = (r.last && r.last.device) ? r.last.device : currentDeviceTag;
+        const deviceIcon = roomDevice === 'Mobile' ? 'fa-mobile-screen-button' : 'fa-desktop';
+        return `
         <div class="history-room-row" onclick="window._showRoomConversation('${escapeHtml(r.roomID)}')">
             <div class="history-room-icon"><i class="fas fa-comments"></i></div>
             <div class="history-room-info">
                 <div class="history-room-id">${escapeHtml(r.roomID)}</div>
-                <div class="history-room-meta">${r.count} messages${r.last ? ' · ' + (r.last.text || '').substring(0,30) : ''}</div>
+                <div class="history-room-meta">${r.count} messages${r.last ? ' · ' + (r.last.text || '').substring(0,24) : ''}</div>
             </div>
+            <span class="history-device-tag"><i class="fas ${deviceIcon}"></i> ${roomDevice}</span>
             <button class="history-room-clear" onclick="event.stopPropagation(); window._clearRoomHistoryFromUI('${escapeHtml(r.roomID)}')">
                 <i class="fas fa-trash"></i>
             </button>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 window._clearRoomHistoryFromUI = function(roomID) {
@@ -4964,14 +4987,16 @@ window._showRoomConversation = function(roomID) {
     // Set headers
     if (roomIdEl) roomIdEl.textContent = `Room: ${roomID}`;
     
-    // Load messages
-    const faceUserId = getFaceUserId();
+    // Load messages across keys for this room
     let msgs = [];
-    if (faceUserId) {
-        try {
-            const key = _historyKey(faceUserId, roomID);
-            msgs = JSON.parse(localStorage.getItem(key) || '[]');
-        } catch(e) {}
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('piktalk_history_') && k.endsWith(`_${roomID}`)) {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(k) || '[]');
+                if (parsed.length > msgs.length) msgs = parsed;
+            } catch(e) {}
+        }
     }
     
     if (msgCountEl) msgCountEl.textContent = `${msgs.length} messages`;
@@ -5007,12 +5032,14 @@ window._showRoomConversation = function(roomID) {
         }).join('');
     }
     
-    // Bind join action
+    // Bind device label action ("Mobile" on phone, "Pc" on PC)
+    const currentDeviceLabel = getDeviceLabel();
+    const deviceIconClass = currentDeviceLabel === 'Mobile' ? 'fa-mobile-screen-button' : 'fa-desktop';
     if (joinBtn) {
+        joinBtn.innerHTML = `<i class="fas ${deviceIconClass}"></i> ${currentDeviceLabel}`;
         joinBtn.onclick = () => {
             window.location.hash = roomID;
             if (settingsModal) settingsModal.classList.remove('open');
-            // Force hashchange/routing function to execute if present
             if (typeof handleRouting === 'function') handleRouting();
         };
     }

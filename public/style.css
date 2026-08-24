@@ -4393,6 +4393,21 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 }
 .history-room-clear:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
 
+.history-device-tag {
+    background: rgba(99, 102, 241, 0.15);
+    color: var(--primary);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    margin-right: 4px;
+}
+
 .history-room-row {
     cursor: pointer;
     transition: background 0.2s;
