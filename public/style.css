@@ -30,10 +30,11 @@ body.light-mode {
 .theme-icon-dark { display: inline-block !important; }
 .theme-icon-light { display: none !important; }
 
-body.light-mode .theme-icon-dark,
-html.light-mode-active body .theme-icon-dark { display: none !important; }
-body.light-mode .theme-icon-light,
-html.light-mode-active body .theme-icon-light { display: inline-block !important; }
+html.light-mode-active .theme-icon-dark,
+body.light-mode .theme-icon-dark { display: none !important; }
+
+html.light-mode-active .theme-icon-light,
+body.light-mode .theme-icon-light { display: inline-block !important; }
 
 * {
     margin: 0;
