@@ -295,17 +295,17 @@ window.addEventListener('DOMContentLoaded', () => {
         renderEmojiPicker();
     }
 
-    // Load theme (default to light if not set)
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    if (savedTheme === 'light') {
-        document.body.classList.add('light-mode');
-        const icon = '<i class="fas fa-moon"></i>';
-        if (themeToggle) themeToggle.innerHTML = icon;
-        if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
-    } else {
-        const icon = '<i class="fas fa-sun"></i>';
-        if (themeToggle) themeToggle.innerHTML = icon;
-        if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
+    // Load theme: use saved theme if set, otherwise detect OS system default mode
+    const savedTheme = localStorage.getItem('theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(savedTheme);
+
+    // Listen for OS system theme changes if user hasn't manually overridden it
+    if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            if (!localStorage.getItem('theme')) {
+                applyTheme(e.matches ? 'dark' : 'light');
+            }
+        });
     }
 
     setupEventListeners();
@@ -1528,14 +1528,26 @@ function sendVoiceMessage() {
     reader.readAsDataURL(recordedAudioBlob);
 }
 
-function toggleTheme() {
-    document.body.classList.toggle('light-mode');
-    const isLight = document.body.classList.contains('light-mode');
+function applyTheme(theme) {
+    const isLight = (theme === 'light');
+    if (isLight) {
+        document.body.classList.add('light-mode');
+        document.documentElement.classList.add('light-mode-active');
+    } else {
+        document.body.classList.remove('light-mode');
+        document.documentElement.classList.remove('light-mode-active');
+    }
     const icon = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
     if (themeToggle) themeToggle.innerHTML = icon;
     if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
-    localStorage.setItem('theme', isLight ? 'light' : 'dark');
     updateThemeColor();
+}
+
+function toggleTheme() {
+    const isCurrentlyLight = document.body.classList.contains('light-mode');
+    const newTheme = isCurrentlyLight ? 'dark' : 'light';
+    applyTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
 }
 
 function showHome() {
