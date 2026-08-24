@@ -4247,15 +4247,15 @@ function startFaceScanFlow(isSettings = false) {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
     if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
+    if (faceScanVideoEl) faceScanVideoEl.classList.remove('ready');
+
     const videoConstraints = {
         facingMode: 'user',
-        width: { min: 320, ideal: 640, max: 1280 },
-        height: { min: 320, ideal: 640, max: 1280 },
-        aspectRatio: { ideal: 1.0 }
+        width: { ideal: 640 },
+        height: { ideal: 640 }
     };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }));
 
     getCamStream()
@@ -4264,6 +4264,9 @@ function startFaceScanFlow(isSettings = false) {
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.play().then(() => {
+                    setTimeout(() => {
+                        if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
+                    }, 80);
                     if (faceScanStatusEl) {
                         faceScanStatusEl.className = 'face-status';
                         faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';

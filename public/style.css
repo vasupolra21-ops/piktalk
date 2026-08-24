@@ -3580,9 +3580,15 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center 30%;
+    object-position: center 38%;
     border-radius: 50%;
     transform: scaleX(-1);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.circular-scanner video.ready {
+    opacity: 1;
 }
 
 .circular-scanner canvas {
