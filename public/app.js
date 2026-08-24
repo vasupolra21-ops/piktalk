@@ -3670,8 +3670,8 @@ async function loadFaceModels() {
 async function detectFaceNN(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        // Tiny detector for fast bounding-box (inputSize: 224 is optimized for speed)
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.40 });
+        // Fast lightweight detector (inputSize: 160 optimized for instant mobile detection)
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.35 });
         const det  = await faceapi
             .detectSingleFace(video, opts)
             .withFaceLandmarks(false) // Use full 68-point landmarks (false = full, true = tiny)
@@ -4005,9 +4005,9 @@ async function runFaceScanLoop() {
     facePrevLandmarks = detection.landmarks;
     faceMotionSum += motion;
 
-    // Progress: require motion + consecutive detections (faster scan)
-    if (motion > 0.3) faceScanLivenessProgress += 15;  // blink/head movement
-    else              faceScanLivenessProgress += 8; // just visible face
+    // Progress: require motion + consecutive detections (instant 1-sec scan)
+    if (motion > 0.2) faceScanLivenessProgress += 30;  // blink/head movement
+    else              faceScanLivenessProgress += 20; // just visible face
     faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
     if (faceScanDetailEl) faceScanDetailEl.textContent = 'Keep face steady, blink slowly';
@@ -4247,7 +4247,10 @@ function startFaceScanFlow(isSettings = false) {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
     if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-    if (faceScanVideoEl) faceScanVideoEl.classList.remove('ready');
+    if (faceScanVideoEl) {
+        faceScanVideoEl.classList.remove('ready');
+        faceScanVideoEl.style.opacity = '';
+    }
 
     const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
     const videoConstraints = isMobileDevice
@@ -4308,6 +4311,8 @@ function stopFaceScanFlow() {
         faceScanStream = null;
     }
     if (faceScanVideoEl) {
+        faceScanVideoEl.classList.remove('ready');
+        faceScanVideoEl.style.opacity = '0';
         faceScanVideoEl.srcObject = null;
     }
 }
