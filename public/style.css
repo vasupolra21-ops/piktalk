@@ -3558,13 +3558,29 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     height: 200px;
     border-radius: 50%;
     border: 3px dashed var(--primary);
-    box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.25);
     overflow: hidden;
-    background: #000;
+    background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
+}
+
+.circular-scanner::before {
+    content: "\f030";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 2.2rem;
+    color: rgba(99, 102, 241, 0.45);
+    position: absolute;
+    z-index: 1;
+    animation: camPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes camPulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.95); }
+    50% { opacity: 0.8; transform: scale(1.08); }
 }
 
 .circular-scanner.scanning {
@@ -3592,9 +3608,11 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     border-radius: 50%;
     transform: scaleX(-1);
     opacity: 0;
-    transition: opacity 0.3s ease;
+    transition: opacity 0.25s ease;
     pointer-events: none !important;
     user-select: none !important;
+    position: relative;
+    z-index: 2;
 }
 
 .circular-scanner video.ready {

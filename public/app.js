@@ -4273,12 +4273,17 @@ function startFaceScanFlow(isSettings = false) {
                 const revealVideo = () => {
                     if (revealed) return;
                     revealed = true;
-                    setTimeout(() => {
-                        if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
-                    }, 150);
+                    if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
                 };
 
-                faceScanVideoEl.onloadeddata = revealVideo;
+                // Listen to all readiness events for instant video reveal
+                faceScanVideoEl.onloadedmetadata = revealVideo;
+                faceScanVideoEl.onloadeddata     = revealVideo;
+                faceScanVideoEl.oncanplay        = revealVideo;
+                faceScanVideoEl.ontimeupdate     = revealVideo;
+
+                if (faceScanVideoEl.readyState >= 1) revealVideo();
+                setTimeout(revealVideo, 50);
 
                 faceScanVideoEl.play().then(() => {
                     revealVideo();
@@ -4288,9 +4293,12 @@ function startFaceScanFlow(isSettings = false) {
                     }
                     // Start overlay draw loop (rAF)
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
-                    // Start async detection loop immediately (100ms)
-                    faceScanTimerId = setTimeout(runFaceScanLoop, 100);
-                }).catch(e => console.error('Video play failed:', e));
+                    // Start async detection loop immediately (40ms)
+                    faceScanTimerId = setTimeout(runFaceScanLoop, 40);
+                }).catch(e => {
+                    console.error('Video play failed:', e);
+                    revealVideo();
+                });
             }
         })
         .catch(err => {
