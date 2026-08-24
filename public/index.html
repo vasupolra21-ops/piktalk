@@ -21,7 +21,9 @@
                 var saved = localStorage.getItem('theme');
                 var isDark = saved ? (saved === 'dark') : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 if (!isDark) {
-                    document.documentElement.className += ' light-mode-active';
+                    document.documentElement.classList.add('light-mode-active');
+                } else {
+                    document.documentElement.classList.remove('light-mode-active');
                 }
             } catch (e) {}
         })();
@@ -39,17 +41,17 @@
     <link rel="preconnect" href="https://cdn.socket.io" crossorigin>
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=178" as="style">
+    <link rel="preload" href="/style.css?v=179" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=178" as="script">
+    <link rel="preload" href="/app.js?v=179" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=178">
+    <link rel="stylesheet" href="/style.css?v=179">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" defer></script>
 </head>
 <body>
     <div class="animated-bg"></div>
@@ -540,6 +542,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=178" defer></script>
+    <script src="/app.js?v=179" defer></script>
 </body>
 </html>
