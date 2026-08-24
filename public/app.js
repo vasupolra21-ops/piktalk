@@ -4249,8 +4249,10 @@ function startFaceScanFlow(isSettings = false) {
     if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
     if (faceScanVideoEl) {
-        faceScanVideoEl.classList.remove('ready');
+        faceScanVideoEl.style.display = '';
+        faceScanVideoEl.style.visibility = '';
         faceScanVideoEl.style.opacity = '';
+        faceScanVideoEl.classList.remove('ready');
     }
 
     const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
@@ -4312,9 +4314,13 @@ function stopFaceScanFlow() {
         faceScanStream = null;
     }
     if (faceScanVideoEl) {
+        try { faceScanVideoEl.pause(); } catch(e) {}
         faceScanVideoEl.classList.remove('ready');
         faceScanVideoEl.style.opacity = '0';
+        faceScanVideoEl.style.visibility = 'hidden';
+        faceScanVideoEl.style.display = 'none';
         faceScanVideoEl.srcObject = null;
+        try { faceScanVideoEl.removeAttribute('src'); faceScanVideoEl.load(); } catch(e) {}
     }
 }
 

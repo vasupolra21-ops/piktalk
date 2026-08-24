@@ -3601,6 +3601,14 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     opacity: 1;
 }
 
+video::-webkit-media-controls,
+video::-webkit-media-controls-container,
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls-start-playback-button,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-overlay-play-button,
+video::-webkit-media-controls-enclosure,
+video::-picture-in-picture-button,
 .circular-scanner video::-webkit-media-controls,
 .circular-scanner video::-webkit-media-controls-container,
 .circular-scanner video::-webkit-media-controls-panel,
