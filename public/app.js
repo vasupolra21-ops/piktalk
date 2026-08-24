@@ -3941,7 +3941,7 @@ function runFaceScanOverlay() {
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified) {
         faceScanStatusEl.className = 'face-status';
         faceScanStatusEl.innerHTML =
-            `<i class="fas fa-microchip fa-spin"></i> Scanning (${displayPercent}%)`;
+            `<i class="fas fa-circle-notch fa-spin"></i> Scanning (${displayPercent}%)`;
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
@@ -4246,7 +4246,7 @@ function startFaceScanFlow(isSettings = false) {
 
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = '<i class="fas fa-microchip fa-spin"></i> Scanning (0%)';
+        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Scanning (0%)';
     }
     const initialBar = document.getElementById(isSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
     if (initialBar) initialBar.style.width = '0%';
