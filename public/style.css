@@ -1297,7 +1297,7 @@ body.light-mode .bubble-timestamp {
     height: 100dvh !important;
     max-width: 100vw !important;
     max-height: 100dvh !important;
-    background: #ffffff !important;
+    background: var(--bg-dark) !important;
     z-index: 99999 !important;
     display: flex !important;
     align-items: center !important;
@@ -1309,7 +1309,7 @@ body.light-mode .bubble-timestamp {
 }
 
 #nickname-modal .modal-content {
-    background: #ffffff !important;
+    background: var(--bg-dark) !important;
     box-shadow: none !important;
     border: none !important;
     border-radius: 0 !important;
@@ -2054,7 +2054,7 @@ body.light-mode .waveform-bar {
         height: 100dvh !important;
         max-width: 100vw !important;
         max-height: 100dvh !important;
-        background: #ffffff !important;
+        background: var(--bg-dark) !important;
         z-index: 99999 !important;
         display: flex !important;
         align-items: center !important;
@@ -2062,7 +2062,7 @@ body.light-mode .waveform-bar {
     }
 
     #nickname-modal .modal-content {
-        background: #ffffff !important;
+        background: var(--bg-dark) !important;
         box-shadow: none !important;
         border: none !important;
         border-radius: 0 !important;
