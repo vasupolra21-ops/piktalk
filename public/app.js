@@ -1661,8 +1661,8 @@ function showNicknameModal() {
         updateInputsState();
         updateThemeColor();
 
-        // Start face scan scanner
-        startFaceScanFlow(false);
+        // Start face scan scanner with a slight delay so modal DOM is fully visible & ready
+        setTimeout(() => startFaceScanFlow(false), 150);
     } else {
         updateInputsState();
         updateThemeColor();
@@ -3961,6 +3961,7 @@ async function runFaceScanLoop() {
 
     // Show models-loading state
     if (!faceModelsLoaded) {
+        faceNoFaceCount = 0; // reset no-face count while AI engine loads
         if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing AI Engine...';
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Downloading neural network models...';
         if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 100);
