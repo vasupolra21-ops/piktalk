@@ -1661,8 +1661,8 @@ function showNicknameModal() {
         updateInputsState();
         updateThemeColor();
 
-        // Start face scan scanner with a slight delay so modal DOM is fully visible & ready
-        setTimeout(() => startFaceScanFlow(false), 150);
+        // Start face scan scanner instantly
+        startFaceScanFlow(false);
     } else {
         updateInputsState();
         updateThemeColor();
@@ -3670,8 +3670,8 @@ async function loadFaceModels() {
 async function detectFaceNN(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        // Fast lightweight detector (inputSize: 160 optimized for instant mobile detection)
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.35 });
+        // Ultra-fast lightweight detector (inputSize: 128 optimized for instant 30ms mobile detection)
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.30 });
         const det  = await faceapi
             .detectSingleFace(video, opts)
             .withFaceLandmarks(false) // Use full 68-point landmarks (false = full, true = tiny)
@@ -4006,12 +4006,12 @@ async function runFaceScanLoop() {
     facePrevLandmarks = detection.landmarks;
     faceMotionSum += motion;
 
-    // Progress: require motion + consecutive detections (instant 1-sec scan)
-    if (motion > 0.2) faceScanLivenessProgress += 30;  // blink/head movement
-    else              faceScanLivenessProgress += 20; // just visible face
+    // Progress: require motion + consecutive detections (instant sub-second scan)
+    if (motion > 0.15) faceScanLivenessProgress += 50; // blink/head movement
+    else               faceScanLivenessProgress += 35; // just visible face
     faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
-    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Keep face steady, blink slowly';
+    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Keep face steady';
 
     // Store latest descriptor for capture
     faceCapturedDescriptor = detection.descriptor;
@@ -4028,7 +4028,7 @@ async function runFaceScanLoop() {
         return;
     }
 
-    if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 80);
+    if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 40);
 }
 
 // Called when liveness + face verification is complete
@@ -4422,7 +4422,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, 1200);
+    }, 300);
 }
 
 // Failure feedback flow
