@@ -27,14 +27,29 @@ body.light-mode {
 }
 
 /* CSS-Driven Theme Icon Controls for Instant Pure Render */
-.theme-icon-dark { display: inline-block !important; }
-.theme-icon-light { display: none !important; }
+#home-theme-toggle .theme-icon-dark,
+.btn-icon .theme-icon-dark {
+    display: inline-block !important;
+}
 
-html.light-mode-active .theme-icon-dark,
-body.light-mode .theme-icon-dark { display: none !important; }
+#home-theme-toggle .theme-icon-light,
+.btn-icon .theme-icon-light {
+    display: none !important;
+}
 
-html.light-mode-active .theme-icon-light,
-body.light-mode .theme-icon-light { display: inline-block !important; }
+html.light-mode-active #home-theme-toggle .theme-icon-dark,
+html.light-mode-active .btn-icon .theme-icon-dark,
+body.light-mode #home-theme-toggle .theme-icon-dark,
+body.light-mode .btn-icon .theme-icon-dark {
+    display: none !important;
+}
+
+html.light-mode-active #home-theme-toggle .theme-icon-light,
+html.light-mode-active .btn-icon .theme-icon-light,
+body.light-mode #home-theme-toggle .theme-icon-light,
+body.light-mode .btn-icon .theme-icon-light {
+    display: inline-block !important;
+}
 
 * {
     margin: 0;
