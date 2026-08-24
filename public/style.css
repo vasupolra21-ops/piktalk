@@ -3599,6 +3599,23 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     opacity: 1;
 }
 
+.circular-scanner video::-webkit-media-controls,
+.circular-scanner video::-webkit-media-controls-container,
+.circular-scanner video::-webkit-media-controls-panel,
+.circular-scanner video::-webkit-media-controls-start-playback-button,
+.circular-scanner video::-webkit-media-controls-play-button,
+.circular-scanner video::-webkit-media-controls-overlay-play-button,
+.circular-scanner video::-webkit-media-controls-enclosure,
+.circular-scanner video::-picture-in-picture-button {
+    display: none !important;
+    -webkit-appearance: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
 .circular-scanner canvas {
     position: absolute;
     top: 0;
