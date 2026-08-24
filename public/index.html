@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=195" as="style">
+    <link rel="preload" href="/style.css?v=196" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=195" as="script">
+    <link rel="preload" href="/app.js?v=196" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=195">
+    <link rel="stylesheet" href="/style.css?v=196">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -304,6 +304,10 @@
                     </div>
                 </div>
                 
+                <div class="scan-progress-wrap" id="scan-progress-wrap">
+                    <div class="scan-progress-bar" id="scan-progress-bar"></div>
+                </div>
+                
                 <div id="face-status" class="face-status">
                     <i class="fas fa-camera"></i> Align face in camera frame...
                 </div>
@@ -441,6 +445,9 @@
                         <canvas id="settings-canvas"></canvas>
                         <div class="scan-laser"></div>
                     </div>
+                    <div class="scan-progress-wrap" style="width: 140px; margin: 8px auto 8px auto;">
+                        <div class="scan-progress-bar" id="settings-scan-progress-bar"></div>
+                    </div>
                     <div id="settings-scan-status" class="settings-scan-status">Align face in frame...</div>
                     <button id="settings-scan-demo-btn" class="btn btn-secondary btn-sm" style="margin-top: 8px; width: 100%; font-size: 0.8rem; padding: 4px 8px;">
                         Simulate Scan
@@ -545,6 +552,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=195" defer></script>
+    <script src="/app.js?v=196" defer></script>
 </body>
 </html>

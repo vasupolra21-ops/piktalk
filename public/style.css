@@ -3673,6 +3673,27 @@ video::-picture-in-picture-button,
     display: block;
 }
 
+/* User-Friendly Biometric Progress Bar */
+.scan-progress-wrap {
+    width: 200px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    margin: 14px auto 14px auto;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--glass-border);
+}
+
+.scan-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary), #10b981);
+    border-radius: 10px;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+    transition: width 0.15s ease-out;
+}
+
 .face-status {
     text-align: center;
     font-size: 1.05rem;

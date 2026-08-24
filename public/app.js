@@ -3931,12 +3931,17 @@ function runFaceScanOverlay() {
         ctx.stroke();
     }
 
-    // Update status UI text smoothly at 60fps
+    // Update status UI text and progress bar smoothly at 60fps
+    const displayPercent = Math.floor(faceScanLivenessDisplayProgress);
+    const progressBar = document.getElementById(faceScanIsSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
+    if (progressBar) {
+        progressBar.style.width = displayPercent + '%';
+    }
+
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified) {
-        const displayPercent = Math.floor(faceScanLivenessDisplayProgress);
         faceScanStatusEl.className = 'face-status';
         faceScanStatusEl.innerHTML =
-            `<i class="fas fa-spinner fa-spin"></i> Scanning (${displayPercent}%)`;
+            `<i class="fas fa-microchip fa-spin"></i> Scanning (${displayPercent}%)`;
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
@@ -4241,8 +4246,10 @@ function startFaceScanFlow(isSettings = false) {
 
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing camera...';
+        faceScanStatusEl.innerHTML = '<i class="fas fa-microchip fa-spin"></i> Scanning (0%)';
     }
+    const initialBar = document.getElementById(isSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
+    if (initialBar) initialBar.style.width = '0%';
 
     // Hide face-not-found overlay
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
