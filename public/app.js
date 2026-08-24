@@ -4249,12 +4249,13 @@ function startFaceScanFlow(isSettings = false) {
 
     const videoConstraints = {
         facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 640 },
+        width: { min: 320, ideal: 640, max: 1280 },
+        height: { min: 320, ideal: 640, max: 1280 },
         aspectRatio: { ideal: 1.0 }
     };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }));
 
     getCamStream()
