@@ -1538,8 +1538,8 @@ function applyTheme(theme) {
         document.documentElement.classList.remove('light-mode-active');
     }
     const icon = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-    if (themeToggle) themeToggle.innerHTML = icon;
-    if (homeThemeToggle) homeThemeToggle.innerHTML = icon;
+    if (themeToggle && !themeToggle.querySelector('.theme-icon-dark')) themeToggle.innerHTML = icon;
+    if (homeThemeToggle && !homeThemeToggle.querySelector('.theme-icon-dark')) homeThemeToggle.innerHTML = icon;
     updateThemeColor();
 }
 

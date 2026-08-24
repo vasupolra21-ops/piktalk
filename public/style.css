@@ -25,6 +25,15 @@ html.light-mode-active body {
     --input-bg: #f8fafc;
 }
 
+/* CSS-Driven Theme Icon Controls for Instant Pure Render */
+.theme-icon-dark { display: inline-block !important; }
+.theme-icon-light { display: none !important; }
+
+body.light-mode .theme-icon-dark,
+html.light-mode-active body .theme-icon-dark { display: none !important; }
+body.light-mode .theme-icon-light,
+html.light-mode-active body .theme-icon-light { display: inline-block !important; }
+
 * {
     margin: 0;
     padding: 0;
