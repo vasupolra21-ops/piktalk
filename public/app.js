@@ -4262,10 +4262,12 @@ function startFaceScanFlow(isSettings = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const isMobileDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768);
-    const videoConstraints = isMobileDevice
-        ? { facingMode: 'user' }
-        : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } };
+    // Use explicit resolution constraints on all devices to prevent iPhone lens-switching zoom flash
+    const videoConstraints = {
+        facingMode: 'user',
+        width:  { ideal: 640, max: 1280 },
+        height: { ideal: 480, max: 960 }
+    };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }));
@@ -4282,15 +4284,19 @@ function startFaceScanFlow(isSettings = false) {
                     revealed = true;
                     if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
                 };
+                // On iOS, delay reveal by 500ms to let the camera fully settle
+                // and prevent the lens-switching zoom-in/zoom-out flash
+                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                const revealDelay = isIOS ? 500 : 50;
 
                 // Listen to all readiness events for instant video reveal
-                faceScanVideoEl.onloadedmetadata = revealVideo;
-                faceScanVideoEl.onloadeddata     = revealVideo;
-                faceScanVideoEl.oncanplay        = revealVideo;
-                faceScanVideoEl.ontimeupdate     = revealVideo;
+                faceScanVideoEl.onloadedmetadata = () => setTimeout(revealVideo, revealDelay);
+                faceScanVideoEl.onloadeddata     = () => setTimeout(revealVideo, revealDelay);
+                faceScanVideoEl.oncanplay        = () => setTimeout(revealVideo, revealDelay);
+                faceScanVideoEl.ontimeupdate     = () => setTimeout(revealVideo, revealDelay);
 
-                if (faceScanVideoEl.readyState >= 1) revealVideo();
-                setTimeout(revealVideo, 50);
+                if (faceScanVideoEl.readyState >= 1) setTimeout(revealVideo, revealDelay);
+                setTimeout(revealVideo, isIOS ? 800 : 50);
 
                 faceScanVideoEl.play().then(() => {
                     revealVideo();
