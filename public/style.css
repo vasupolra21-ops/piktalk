@@ -3606,9 +3606,13 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     object-fit: cover;
     object-position: center 38%;
     border-radius: 50%;
-    transform: scaleX(-1);
+    transform: scaleX(-1) translateZ(0);
+    -webkit-transform: scaleX(-1) translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    aspect-ratio: 1 / 1;
     opacity: 0;
-    transition: opacity 0.25s ease;
+    transition: opacity 0.3s ease;
     pointer-events: none !important;
     user-select: none !important;
     position: relative;

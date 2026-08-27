@@ -4262,15 +4262,16 @@ function startFaceScanFlow(isSettings = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    // Use explicit resolution constraints on all devices to prevent iPhone lens-switching zoom flash
-    const videoConstraints = {
-        facingMode: 'user',
-        width:  { ideal: 640, max: 1280 },
-        height: { ideal: 480, max: 960 }
-    };
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    // On iOS devices, request native front camera ({ facingMode: 'user' }) without width/height ideal constraints.
+    // Forcing 4:3 width/height ideal constraints on iPhone causes iOS WebKit camera framework to apply a 5-second digital center crop until canvas detection initializes!
+    const videoConstraints = isIOS
+        ? { facingMode: 'user' }
+        : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }));
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     getCamStream()
         .then(stream => {
@@ -4284,9 +4285,6 @@ function startFaceScanFlow(isSettings = false) {
                     revealed = true;
                     if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
                 };
-                // On iOS, delay reveal by 500ms to let the camera fully settle
-                // and prevent the lens-switching zoom-in/zoom-out flash
-                const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                 const revealDelay = isIOS ? 500 : 50;
 
                 // Listen to all readiness events for instant video reveal
@@ -4299,7 +4297,11 @@ function startFaceScanFlow(isSettings = false) {
                 setTimeout(revealVideo, isIOS ? 800 : 50);
 
                 faceScanVideoEl.play().then(() => {
-                    revealVideo();
+                    if (isIOS) {
+                        setTimeout(revealVideo, revealDelay);
+                    } else {
+                        revealVideo();
+                    }
                     if (faceScanStatusEl) {
                         faceScanStatusEl.className = 'face-status';
                         faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
