@@ -555,18 +555,232 @@ function updateThemeColor() {
     updateActiveModalViewport();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PHOTO & PDF DOWNLOAD UTILITIES
+// ═══════════════════════════════════════════════════════════════
+
+function showDownloadToast(text, iconClass) {
+    let toast = document.getElementById('piktalk-download-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'piktalk-download-toast';
+        toast.className = 'download-toast';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<i class="${iconClass || 'fas fa-check-circle'}"></i> <span>${escapeHtml(text)}</span>`;
+    toast.classList.add('show');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2800);
+}
+
+function getFormattedTimestamp() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function downloadPhotoFile(imgSrc, customFilename) {
+    const filename = customFilename || `PikTalk_Photo_${getFormattedTimestamp()}.jpg`;
+
+    if (imgSrc.startsWith('data:image/')) {
+        const a = document.createElement('a');
+        a.href = imgSrc;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showDownloadToast('Photo downloaded successfully!', 'fas fa-image');
+        return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    _fallbackFileDownload(imgSrc, filename);
+                    return;
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showDownloadToast('Photo downloaded successfully!', 'fas fa-image');
+            }, 'image/jpeg', 0.95);
+        } catch (e) {
+            _fallbackFileDownload(imgSrc, filename);
+        }
+    };
+    img.onerror = () => _fallbackFileDownload(imgSrc, filename);
+    img.src = imgSrc;
+}
+
+function _fallbackFileDownload(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showDownloadToast('Photo downloaded!', 'fas fa-image');
+}
+
+async function downloadPhotoAsPDF(imgSrc, customFilename) {
+    const filename = customFilename || `PikTalk_Photo_${getFormattedTimestamp()}.pdf`;
+    showDownloadToast('Generating PDF...', 'fas fa-spinner fa-spin');
+
+    const loadImage = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = (e) => reject(e);
+        img.src = src;
+    });
+
+    try {
+        const img = await loadImage(imgSrc);
+        const w = img.naturalWidth || img.width || 800;
+        const h = img.naturalHeight || img.height || 600;
+
+        // 1. Try window.jspdf if loaded via CDN
+        if (window.jspdf && window.jspdf.jsPDF) {
+            const ptW = Math.round(w * 0.75);
+            const ptH = Math.round(h * 0.75);
+            const orientation = w >= h ? 'landscape' : 'portrait';
+            const doc = new window.jspdf.jsPDF({
+                orientation: orientation,
+                unit: 'pt',
+                format: [ptW, ptH]
+            });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            const jpegData = canvas.toDataURL('image/jpeg', 0.95);
+            doc.addImage(jpegData, 'JPEG', 0, 0, ptW, ptH, undefined, 'FAST');
+            doc.save(filename);
+            showDownloadToast('PDF downloaded successfully!', 'fas fa-file-pdf');
+            return;
+        }
+
+        // 2. High-performance pure-JS fallback PDF generator (zero dependency)
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        const base64Data = dataUrl.split(',')[1];
+        const binaryStr = atob(base64Data);
+        const jpgBytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+            jpgBytes[i] = binaryStr.charCodeAt(i);
+        }
+
+        const pdfBlob = generatePureImagePDF(jpgBytes, w, h);
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        showDownloadToast('PDF downloaded successfully!', 'fas fa-file-pdf');
+    } catch (err) {
+        console.error('PDF generation error:', err);
+        showDownloadToast('Could not generate PDF', 'fas fa-circle-exclamation');
+    }
+}
+
+function generatePureImagePDF(jpgBytes, width, height) {
+    const ptWidth = Math.round(width * 72 / 96);
+    const ptHeight = Math.round(height * 72 / 96);
+    const streamContent = `q\n${ptWidth} 0 0 ${ptHeight} 0 0 cm\n/Im0 Do\nQ\n`;
+
+    const enc = new TextEncoder();
+    const parts = [];
+    const offsets = [];
+
+    parts.push(enc.encode('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'));
+
+    offsets[1] = parts.reduce((a, b) => a + b.length, 0);
+    parts.push(enc.encode('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'));
+
+    offsets[2] = parts.reduce((a, b) => a + b.length, 0);
+    parts.push(enc.encode('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'));
+
+    offsets[3] = parts.reduce((a, b) => a + b.length, 0);
+    parts.push(enc.encode(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${ptWidth} ${ptHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`));
+
+    offsets[4] = parts.reduce((a, b) => a + b.length, 0);
+    const imgHeader = `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpgBytes.length} >>\nstream\n`;
+    parts.push(enc.encode(imgHeader));
+    parts.push(jpgBytes);
+    parts.push(enc.encode('\nendstream\nendobj\n'));
+
+    offsets[5] = parts.reduce((a, b) => a + b.length, 0);
+    parts.push(enc.encode(`5 0 obj\n<< /Length ${streamContent.length} >>\nstream\n${streamContent}endstream\nendobj\n`));
+
+    const startXref = parts.reduce((a, b) => a + b.length, 0);
+    let xref = 'xref\n0 6\n0000000000 65535 f \n';
+    for (let i = 1; i <= 5; i++) {
+        xref += String(offsets[i]).padStart(10, '0') + ' 00000 n \n';
+    }
+    xref += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${startXref}\n%%EOF`;
+    parts.push(enc.encode(xref));
+
+    return new Blob(parts, { type: 'application/pdf' });
+}
+
+let currentLightboxSrc = null;
 
 function initLightbox() {
     const lb = document.getElementById('img-lightbox');
     const lbImg = document.getElementById('img-lightbox-img');
     const lbClose = document.getElementById('img-lightbox-close');
+    const dlPhotoBtn = document.getElementById('lightbox-dl-photo-btn');
+    const dlPdfBtn = document.getElementById('lightbox-dl-pdf-btn');
     if (!lb || !lbImg || !lbClose) return;
 
     lbClose.addEventListener('click', (e) => {
         e.stopPropagation();
         closeLightbox();
     });
-    lb.addEventListener('click', () => closeLightbox());
+    if (dlPhotoBtn) {
+        dlPhotoBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentLightboxSrc) downloadPhotoFile(currentLightboxSrc);
+        });
+    }
+    if (dlPdfBtn) {
+        dlPdfBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentLightboxSrc) downloadPhotoAsPDF(currentLightboxSrc);
+        });
+    }
+    lb.addEventListener('click', (e) => {
+        if (e.target === lb || e.target === lbImg) closeLightbox();
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeLightbox();
     });
@@ -576,6 +790,7 @@ function openLightbox(src) {
     const lb = document.getElementById('img-lightbox');
     const lbImg = document.getElementById('img-lightbox-img');
     if (!lb || !lbImg) return;
+    currentLightboxSrc = src;
     lbImg.src = src;
     lb.classList.add('open');
     document.body.style.overflow = 'hidden';
@@ -1362,7 +1577,10 @@ function setupEventListeners() {
     noFocusSteal(sendAudioBtn,       sendVoiceMessage);
 
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
-    document.addEventListener('click', () => {
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.photo-quick-dl-btn') && !e.target.closest('.photo-dl-dropdown') && !e.target.closest('.photo-action-dl-btn')) {
+            document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
+        }
         document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
         document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
         document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
@@ -2010,6 +2228,62 @@ function appendMessage(data, isSentByMe) {
         img.className = 'message-image';
         img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
+
+        // Friendly Quick Download Button on Photo
+        const quickDlBtn = document.createElement('button');
+        quickDlBtn.className = 'photo-quick-dl-btn';
+        quickDlBtn.title = 'Download Photo or PDF';
+        quickDlBtn.setAttribute('aria-label', 'Download Photo or PDF');
+        quickDlBtn.innerHTML = '<i class="fas fa-arrow-down-to-bracket"></i>';
+
+        // Friendly Download Options Dropdown
+        const dlMenu = document.createElement('div');
+        dlMenu.className = 'photo-dl-dropdown';
+        dlMenu.innerHTML = `
+            <div class="photo-dl-header">
+                <i class="fas fa-cloud-arrow-down"></i> Download Options
+            </div>
+            <button class="photo-dl-option" data-type="photo">
+                <span class="photo-dl-icon photo-icon"><i class="fas fa-image"></i></span>
+                <div class="photo-dl-meta">
+                    <span class="photo-dl-title">Download Photo</span>
+                    <span class="photo-dl-desc">High quality JPG image</span>
+                </div>
+                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+            </button>
+            <button class="photo-dl-option" data-type="pdf">
+                <span class="photo-dl-icon pdf-icon"><i class="fas fa-file-pdf"></i></span>
+                <div class="photo-dl-meta">
+                    <span class="photo-dl-title">Download PDF</span>
+                    <span class="photo-dl-desc">Document format (.pdf)</span>
+                </div>
+                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+            </button>
+        `;
+
+        dlMenu.querySelectorAll('.photo-dl-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dlMenu.classList.remove('visible');
+                if (btn.dataset.type === 'photo') {
+                    downloadPhotoFile(data.image);
+                } else {
+                    downloadPhotoAsPDF(data.image);
+                }
+            });
+        });
+
+        quickDlBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = dlMenu.classList.contains('visible');
+            document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
+            document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+            if (!isOpen) dlMenu.classList.add('visible');
+        });
+
+        bubble.appendChild(quickDlBtn);
+        bubble.appendChild(dlMenu);
+
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
         timeSpan.appendChild(document.createTextNode(timeStr));
@@ -2155,6 +2429,25 @@ function appendMessage(data, isSentByMe) {
                           : (data.message || '').slice(0, 80);
             setReply({ msgId: data.msgId, nickname: data.nickname || 'You', preview });
         });
+
+        // Download button next to photo in action bar
+        if (data.image) {
+            const barDlBtn = document.createElement('button');
+            barDlBtn.className = 'msg-action-btn photo-action-dl-btn';
+            barDlBtn.title = 'Download Photo / PDF';
+            barDlBtn.innerHTML = '<i class="fas fa-download"></i>';
+            barDlBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const menu = bubbleWrapper.querySelector('.photo-dl-dropdown');
+                if (menu) {
+                    const isOpen = menu.classList.contains('visible');
+                    document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
+                    document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+                    if (!isOpen) menu.classList.add('visible');
+                }
+            });
+            actionBar.appendChild(barDlBtn);
+        }
 
         actionBar.appendChild(reactBtn);
         actionBar.appendChild(replyBtn);

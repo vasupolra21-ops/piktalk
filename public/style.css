@@ -907,8 +907,161 @@ body.light-mode .bubble-timestamp {
     min-width: unset !important;
     width: fit-content !important;
     display: inline-block !important;
-    overflow: hidden;
     position: relative;
+}
+
+/* Quick Download Button on Photo */
+.photo-quick-dl-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.88rem;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.photo-quick-dl-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: scale(1.1);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.5);
+    color: #ffffff;
+}
+
+/* Photo Download Dropdown Menu */
+.photo-dl-dropdown {
+    position: absolute;
+    top: 46px;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    padding: 6px;
+    min-width: 210px;
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-8px) scale(0.96);
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.photo-dl-dropdown.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+.message.sent .photo-dl-dropdown {
+    right: 8px;
+}
+
+.message.received .photo-dl-dropdown {
+    right: 8px;
+}
+
+.photo-dl-header {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 6px 10px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--glass-border);
+    margin-bottom: 2px;
+}
+
+.photo-dl-option {
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-main);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, transform 0.15s ease;
+    width: 100%;
+    font-family: inherit;
+}
+
+.photo-dl-option:hover {
+    background: rgba(99, 102, 241, 0.12);
+    transform: translateX(2px);
+}
+
+.photo-dl-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.photo-dl-icon.photo-icon {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #ffffff;
+}
+
+.photo-dl-icon.pdf-icon {
+    background: linear-gradient(135deg, #ef4444, #f97316);
+    color: #ffffff;
+}
+
+.photo-dl-meta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.photo-dl-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-main);
+}
+
+.photo-dl-desc {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.photo-dl-action-icon {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.photo-dl-option:hover .photo-dl-action-icon {
+    color: var(--primary);
+    opacity: 1;
+    transform: translateY(1px);
 }
 
 .bubble-image .bubble-timestamp {
@@ -968,10 +1121,64 @@ body.light-mode .bubble-timestamp {
     pointer-events: none;
     user-select: none;
 }
-.img-lightbox-close {
+
+/* Lightbox Download Toolbar */
+.img-lightbox-toolbar {
     position: absolute;
     top: 18px;
     right: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 20;
+    cursor: default;
+}
+
+.lightbox-dl-btn {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    font-size: 0.88rem;
+    font-weight: 600;
+    padding: 9px 18px;
+    border-radius: 30px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.lightbox-dl-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+}
+
+.lightbox-dl-btn i {
+    font-size: 1rem;
+}
+
+@media (max-width: 600px) {
+    .img-lightbox-toolbar {
+        top: 12px;
+        right: 14px;
+        gap: 8px;
+    }
+    .lightbox-dl-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    .lightbox-dl-btn span {
+        display: none;
+    }
+}
+
+.img-lightbox-close {
     background: rgba(255,255,255,0.15);
     border: none;
     color: #fff;
@@ -987,6 +1194,41 @@ body.light-mode .bubble-timestamp {
     backdrop-filter: blur(6px);
 }
 .img-lightbox-close:hover { background: rgba(255,255,255,0.28); }
+
+/* Download Toast Feedback */
+.download-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border);
+    color: #ffffff;
+    padding: 11px 20px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    z-index: 100000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.download-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.download-toast i {
+    color: var(--accent, #10b981);
+    font-size: 1.15rem;
+}
 @keyframes lbFadeIn { from { opacity:0; } to { opacity:1; } }
 
 .system-message {
