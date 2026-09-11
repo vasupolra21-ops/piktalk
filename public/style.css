@@ -2035,6 +2035,30 @@ body.light-mode .waveform-bar {
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
 
+    /* Mobile performance & GPU acceleration */
+    .glass-card,
+    .modal-content,
+    .chat-card,
+    .circular-scanner {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+
+    /* Lighten heavy backdrop blur on mobile to eliminate GPU lag */
+    .glass-card,
+    .modal-content,
+    .settings-modal-box {
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+    }
+
+    .chat-messages {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+    }
+
     /* Prevent iOS Safari auto-zoom on input focus */
     input[type="text"],
     textarea {

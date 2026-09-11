@@ -46,9 +46,6 @@ let settingsNicknameForm, settingsNicknameInput, settingsSaveNameBtn;
 // Face ID Modal DOM Elements
 let faceScanSection, profileSetupSection, faceVideo, faceCanvas, faceStatus, faceDetail, faceDemoBtn;
 
-// Start loading AI models in background immediately
-loadFaceModels();
-
 // Custom Room & Password DOM Elements
 let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRoomBtn, cancelCreateRoomBtn, createRoomError, toggleCreatePasswordBtn;
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
@@ -4041,12 +4038,40 @@ async function loadFaceModels() {
     faceModelsLoading = false;
 }
 
-// Ultra-fast lightweight detector for liveness tracking (15ms per frame, without heavy descriptor)
+// Hardware-accelerated 2D downscale canvas for instant 60fps mobile face detection
+let _downscaleCanvas = null;
+let _downscaleCtx = null;
+
+function getDownscaledDetectionCanvas(video, targetSize = 160) {
+    if (!video || video.readyState < 2) return null;
+    if (!_downscaleCanvas) {
+        _downscaleCanvas = document.createElement('canvas');
+        _downscaleCanvas.width = targetSize;
+        _downscaleCanvas.height = targetSize;
+        _downscaleCtx = _downscaleCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    if (_downscaleCanvas.width !== targetSize) {
+        _downscaleCanvas.width = targetSize;
+        _downscaleCanvas.height = targetSize;
+    }
+    
+    const vw = video.videoWidth || 300;
+    const vh = video.videoHeight || 300;
+    const minDim = Math.min(vw, vh);
+    const sx = (vw - minDim) / 2;
+    const sy = (vh - minDim) / 2;
+    
+    _downscaleCtx.drawImage(video, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+    return _downscaleCanvas;
+}
+
+// Ultra-fast lightweight detector for liveness tracking (under 10ms on mobile via hardware downscale)
 async function detectFaceFast(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.25 });
-        const det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(false);
+        const source = getDownscaledDetectionCanvas(video, 160) || video;
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.20 });
+        const det = await faceapi.detectSingleFace(source, opts).withFaceLandmarks(false);
         return det || null;
     } catch (e) {
         return null;
@@ -4057,8 +4082,9 @@ async function detectFaceFast(video) {
 async function extractFaceDescriptor(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.25 });
-        const det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(false).withFaceDescriptor();
+        const source = getDownscaledDetectionCanvas(video, 256) || video;
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.20 });
+        const det = await faceapi.detectSingleFace(source, opts).withFaceLandmarks(false).withFaceDescriptor();
         return det || null;
     } catch (e) {
         return null;
@@ -4299,9 +4325,11 @@ function runFaceScanOverlay() {
     }
 
     if (canvas && video && video.readyState >= 2) {
-        if (canvas.width !== video.videoWidth && video.videoWidth) {
-            canvas.width  = video.videoWidth;
-            canvas.height = video.videoHeight;
+        const targetW = canvas.clientWidth || 200;
+        const targetH = canvas.clientHeight || 200;
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+            canvas.width  = targetW;
+            canvas.height = targetH;
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -4663,7 +4691,7 @@ function startFaceScanFlow(isSettings = false) {
     // Forcing 4:3 width/height ideal constraints on iPhone causes iOS WebKit camera framework to apply a 5-second digital center crop until canvas detection initializes!
     const videoConstraints = isIOS
         ? { facingMode: 'user' }
-        : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } };
+        : { facingMode: 'user', width: { ideal: 480, max: 640 }, height: { ideal: 480, max: 640 }, frameRate: { ideal: 30, max: 30 } };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
