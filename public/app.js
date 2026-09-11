@@ -752,6 +752,84 @@ function generatePureImagePDF(jpgBytes, width, height) {
     return new Blob(parts, { type: 'application/pdf' });
 }
 
+function openPhotoDownloadMenu(triggerBtn, imgSrc) {
+    closePhotoDownloadMenu();
+
+    const menu = document.createElement('div');
+    menu.id = 'active-photo-dl-menu';
+    menu.className = 'photo-dl-dropdown visible';
+    menu.innerHTML = `
+        <div class="photo-dl-header">
+            <i class="fas fa-cloud-arrow-down"></i>
+            <span>Download Options</span>
+        </div>
+        <button class="photo-dl-option" data-type="photo">
+            <span class="photo-dl-icon photo-icon"><i class="fas fa-image"></i></span>
+            <div class="photo-dl-meta">
+                <span class="photo-dl-title">Download Photo</span>
+                <span class="photo-dl-desc">Save as JPG image</span>
+            </div>
+            <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+        </button>
+        <button class="photo-dl-option" data-type="pdf">
+            <span class="photo-dl-icon pdf-icon"><i class="fas fa-file-pdf"></i></span>
+            <div class="photo-dl-meta">
+                <span class="photo-dl-title">Download PDF</span>
+                <span class="photo-dl-desc">Save as PDF document</span>
+            </div>
+            <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+        </button>
+    `;
+
+    document.body.appendChild(menu);
+
+    menu.querySelector('[data-type="photo"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closePhotoDownloadMenu();
+        downloadPhotoFile(imgSrc);
+    });
+
+    menu.querySelector('[data-type="pdf"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closePhotoDownloadMenu();
+        downloadPhotoAsPDF(imgSrc);
+    });
+
+    const rect = triggerBtn.getBoundingClientRect();
+    const menuWidth = 224;
+    const menuHeight = 142;
+
+    let top = rect.top - 10;
+    if (top + menuHeight > window.innerHeight - 16) {
+        top = window.innerHeight - menuHeight - 16;
+    }
+    if (top < 65) {
+        top = 65;
+    }
+
+    let left;
+    if (rect.left > window.innerWidth / 2) {
+        left = rect.left - menuWidth - 8;
+        if (left < 12) left = rect.right - menuWidth;
+    } else {
+        left = rect.right + 8;
+        if (left + menuWidth > window.innerWidth - 12) {
+            left = window.innerWidth - menuWidth - 12;
+        }
+    }
+    if (left < 12) left = 12;
+
+    menu.style.position = 'fixed';
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+    menu.style.zIndex = '99999';
+}
+
+function closePhotoDownloadMenu() {
+    const existing = document.getElementById('active-photo-dl-menu');
+    if (existing) existing.remove();
+}
+
 let currentLightboxSrc = null;
 
 function initLightbox() {
@@ -1578,13 +1656,19 @@ function setupEventListeners() {
 
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.photo-dl-dropdown') && !e.target.closest('.photo-action-dl-btn')) {
-            document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
+        if (!e.target.closest('#active-photo-dl-menu') && !e.target.closest('.photo-action-dl-btn')) {
+            closePhotoDownloadMenu();
         }
         document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
         document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
         document.querySelectorAll('.message.action-visible').forEach(m => m.classList.remove('action-visible'));
     }, { once: false, capture: true, passive: true });
+
+    if (messagesContainer) {
+        messagesContainer.addEventListener('scroll', () => {
+            closePhotoDownloadMenu();
+        }, { passive: true });
+    }
 }
 
 // ── Voice Recording Functions ──
@@ -2285,47 +2369,6 @@ function appendMessage(data, isSentByMe) {
     bubbleWrapper.className = 'bubble-wrapper';
     bubbleWrapper.appendChild(contentEl);
 
-    // Download dropdown menu for image messages (opened via action bar next to photo)
-    if (data.image) {
-        const dlMenu = document.createElement('div');
-        dlMenu.className = 'photo-dl-dropdown';
-        dlMenu.innerHTML = `
-            <div class="photo-dl-header">
-                <i class="fas fa-cloud-arrow-down"></i> Download Options
-            </div>
-            <button class="photo-dl-option" data-type="photo">
-                <span class="photo-dl-icon photo-icon"><i class="fas fa-image"></i></span>
-                <div class="photo-dl-meta">
-                    <span class="photo-dl-title">Download Photo</span>
-                    <span class="photo-dl-desc">High quality JPG image</span>
-                </div>
-                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
-            </button>
-            <button class="photo-dl-option" data-type="pdf">
-                <span class="photo-dl-icon pdf-icon"><i class="fas fa-file-pdf"></i></span>
-                <div class="photo-dl-meta">
-                    <span class="photo-dl-title">Download PDF</span>
-                    <span class="photo-dl-desc">Document format (.pdf)</span>
-                </div>
-                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
-            </button>
-        `;
-
-        dlMenu.querySelectorAll('.photo-dl-option').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dlMenu.classList.remove('visible');
-                if (btn.dataset.type === 'photo') {
-                    downloadPhotoFile(data.image);
-                } else {
-                    downloadPhotoAsPDF(data.image);
-                }
-            });
-        });
-
-        bubbleWrapper.appendChild(dlMenu);
-    }
-
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
         infoDiv.className = 'message-info';
@@ -2424,12 +2467,12 @@ function appendMessage(data, isSentByMe) {
             barDlBtn.innerHTML = '<i class="fas fa-download"></i>';
             barDlBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const menu = bubbleWrapper.querySelector('.photo-dl-dropdown');
-                if (menu) {
-                    const isOpen = menu.classList.contains('visible');
-                    document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
+                const activeMenu = document.getElementById('active-photo-dl-menu');
+                if (activeMenu) {
+                    closePhotoDownloadMenu();
+                } else {
                     document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-                    if (!isOpen) menu.classList.add('visible');
+                    openPhotoDownloadMenu(barDlBtn, data.image);
                 }
             });
             actionBar.appendChild(barDlBtn);
