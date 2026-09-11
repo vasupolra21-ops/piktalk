@@ -4685,15 +4685,14 @@ function startFaceScanFlow(isSettings = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
-    // On iOS devices, request native front camera ({ facingMode: 'user' }) without width/height ideal constraints.
-    // Forcing 4:3 width/height ideal constraints on iPhone causes iOS WebKit camera framework to apply a 5-second digital center crop until canvas detection initializes!
-    const videoConstraints = isIOS
-        ? { facingMode: 'user' }
-        : { facingMode: 'user', width: { ideal: 480, max: 640 }, height: { ideal: 480, max: 640 }, frameRate: { ideal: 30, max: 30 } };
+    const videoConstraints = {
+        facingMode: { ideal: 'user' },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+    };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     getCamStream()
@@ -4701,42 +4700,47 @@ function startFaceScanFlow(isSettings = false) {
             faceScanStream = stream;
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
+                faceScanVideoEl.muted = true;
+                faceScanVideoEl.defaultMuted = true;
+                faceScanVideoEl.playsInline = true;
+                faceScanVideoEl.setAttribute('playsinline', '');
+                faceScanVideoEl.setAttribute('webkit-playsinline', '');
+                faceScanVideoEl.setAttribute('autoplay', '');
+                faceScanVideoEl.style.display = 'block';
+                faceScanVideoEl.style.visibility = 'visible';
+                faceScanVideoEl.style.opacity = '1';
+                faceScanVideoEl.classList.add('ready');
 
-                let revealed = false;
-                const revealVideo = () => {
-                    if (revealed) return;
-                    revealed = true;
-                    if (faceScanVideoEl) faceScanVideoEl.classList.add('ready');
-                };
-                const revealDelay = isIOS ? 500 : 50;
+                const scanner = faceScanVideoEl.closest('.circular-scanner');
+                if (scanner) {
+                    scanner.classList.add('scanning', 'has-video');
+                }
 
-                // Listen to all readiness events for instant video reveal
-                faceScanVideoEl.onloadedmetadata = () => setTimeout(revealVideo, revealDelay);
-                faceScanVideoEl.onloadeddata     = () => setTimeout(revealVideo, revealDelay);
-                faceScanVideoEl.oncanplay        = () => setTimeout(revealVideo, revealDelay);
-                faceScanVideoEl.ontimeupdate     = () => setTimeout(revealVideo, revealDelay);
-
-                if (faceScanVideoEl.readyState >= 1) setTimeout(revealVideo, revealDelay);
-                setTimeout(revealVideo, isIOS ? 800 : 50);
-
-                faceScanVideoEl.play().then(() => {
-                    if (isIOS) {
-                        setTimeout(revealVideo, revealDelay);
-                    } else {
-                        revealVideo();
+                const startLoops = () => {
+                    if (faceScanVideoEl) {
+                        faceScanVideoEl.style.opacity = '1';
+                        faceScanVideoEl.classList.add('ready');
                     }
                     if (faceScanStatusEl) {
                         faceScanStatusEl.className = 'face-status';
                         faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
                     }
-                    // Start overlay draw loop (rAF)
+                    if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
-                    // Start async detection loop immediately (40ms)
-                    faceScanTimerId = setTimeout(runFaceScanLoop, 40);
-                }).catch(e => {
-                    console.error('Video play failed:', e);
-                    revealVideo();
-                });
+                    if (faceScanTimerId) clearTimeout(faceScanTimerId);
+                    faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+                };
+
+                // Trigger play immediately and start detection loops
+                const playPromise = faceScanVideoEl.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(startLoops).catch(err => {
+                        console.warn('Video play warning:', err);
+                        startLoops();
+                    });
+                } else {
+                    startLoops();
+                }
             }
         })
         .catch(err => {
@@ -4762,12 +4766,10 @@ function stopFaceScanFlow() {
     if (faceScanVideoEl) {
         try { faceScanVideoEl.pause(); } catch(e) {}
         faceScanVideoEl.classList.remove('ready');
-        faceScanVideoEl.style.opacity = '0';
-        faceScanVideoEl.style.visibility = 'hidden';
-        faceScanVideoEl.style.display = 'none';
         faceScanVideoEl.srcObject = null;
-        try { faceScanVideoEl.removeAttribute('src'); faceScanVideoEl.load(); } catch(e) {}
     }
+    const scanner = faceScanVideoEl ? faceScanVideoEl.closest('.circular-scanner') : null;
+    if (scanner) scanner.classList.remove('has-video');
 }
 
 // Success feedback state transition
