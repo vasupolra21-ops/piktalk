@@ -1578,7 +1578,7 @@ function setupEventListeners() {
 
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.photo-quick-dl-btn') && !e.target.closest('.photo-dl-dropdown') && !e.target.closest('.photo-action-dl-btn')) {
+        if (!e.target.closest('.photo-dl-dropdown') && !e.target.closest('.photo-action-dl-btn')) {
             document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
         }
         document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
@@ -2229,61 +2229,6 @@ function appendMessage(data, isSentByMe) {
         img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
 
-        // Friendly Quick Download Button on Photo
-        const quickDlBtn = document.createElement('button');
-        quickDlBtn.className = 'photo-quick-dl-btn';
-        quickDlBtn.title = 'Download Photo or PDF';
-        quickDlBtn.setAttribute('aria-label', 'Download Photo or PDF');
-        quickDlBtn.innerHTML = '<i class="fas fa-arrow-down-to-bracket"></i>';
-
-        // Friendly Download Options Dropdown
-        const dlMenu = document.createElement('div');
-        dlMenu.className = 'photo-dl-dropdown';
-        dlMenu.innerHTML = `
-            <div class="photo-dl-header">
-                <i class="fas fa-cloud-arrow-down"></i> Download Options
-            </div>
-            <button class="photo-dl-option" data-type="photo">
-                <span class="photo-dl-icon photo-icon"><i class="fas fa-image"></i></span>
-                <div class="photo-dl-meta">
-                    <span class="photo-dl-title">Download Photo</span>
-                    <span class="photo-dl-desc">High quality JPG image</span>
-                </div>
-                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
-            </button>
-            <button class="photo-dl-option" data-type="pdf">
-                <span class="photo-dl-icon pdf-icon"><i class="fas fa-file-pdf"></i></span>
-                <div class="photo-dl-meta">
-                    <span class="photo-dl-title">Download PDF</span>
-                    <span class="photo-dl-desc">Document format (.pdf)</span>
-                </div>
-                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
-            </button>
-        `;
-
-        dlMenu.querySelectorAll('.photo-dl-option').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                dlMenu.classList.remove('visible');
-                if (btn.dataset.type === 'photo') {
-                    downloadPhotoFile(data.image);
-                } else {
-                    downloadPhotoAsPDF(data.image);
-                }
-            });
-        });
-
-        quickDlBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isOpen = dlMenu.classList.contains('visible');
-            document.querySelectorAll('.photo-dl-dropdown.visible').forEach(m => m.classList.remove('visible'));
-            document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-            if (!isOpen) dlMenu.classList.add('visible');
-        });
-
-        bubble.appendChild(quickDlBtn);
-        bubble.appendChild(dlMenu);
-
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
         timeSpan.appendChild(document.createTextNode(timeStr));
@@ -2339,6 +2284,47 @@ function appendMessage(data, isSentByMe) {
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = 'bubble-wrapper';
     bubbleWrapper.appendChild(contentEl);
+
+    // Download dropdown menu for image messages (opened via action bar next to photo)
+    if (data.image) {
+        const dlMenu = document.createElement('div');
+        dlMenu.className = 'photo-dl-dropdown';
+        dlMenu.innerHTML = `
+            <div class="photo-dl-header">
+                <i class="fas fa-cloud-arrow-down"></i> Download Options
+            </div>
+            <button class="photo-dl-option" data-type="photo">
+                <span class="photo-dl-icon photo-icon"><i class="fas fa-image"></i></span>
+                <div class="photo-dl-meta">
+                    <span class="photo-dl-title">Download Photo</span>
+                    <span class="photo-dl-desc">High quality JPG image</span>
+                </div>
+                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+            </button>
+            <button class="photo-dl-option" data-type="pdf">
+                <span class="photo-dl-icon pdf-icon"><i class="fas fa-file-pdf"></i></span>
+                <div class="photo-dl-meta">
+                    <span class="photo-dl-title">Download PDF</span>
+                    <span class="photo-dl-desc">Document format (.pdf)</span>
+                </div>
+                <i class="fas fa-arrow-down photo-dl-action-icon"></i>
+            </button>
+        `;
+
+        dlMenu.querySelectorAll('.photo-dl-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dlMenu.classList.remove('visible');
+                if (btn.dataset.type === 'photo') {
+                    downloadPhotoFile(data.image);
+                } else {
+                    downloadPhotoAsPDF(data.image);
+                }
+            });
+        });
+
+        bubbleWrapper.appendChild(dlMenu);
+    }
 
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
