@@ -796,15 +796,18 @@ function openPhotoDownloadMenu(triggerBtn, imgSrc) {
     });
 
     const rect = triggerBtn.getBoundingClientRect();
+    const chatHeader = document.querySelector('.chat-header');
+    const headerBottom = chatHeader ? chatHeader.getBoundingClientRect().bottom : 70;
+    const safeTop = Math.max(headerBottom + 8, 16);
     const menuWidth = 224;
-    const menuHeight = 142;
+    const menuHeight = 150;
 
-    let top = rect.top - 10;
+    let top = rect.top;
     if (top + menuHeight > window.innerHeight - 16) {
         top = window.innerHeight - menuHeight - 16;
     }
-    if (top < 65) {
-        top = 65;
+    if (top < safeTop) {
+        top = safeTop;
     }
 
     let left;
