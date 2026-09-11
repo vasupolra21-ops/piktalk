@@ -3314,6 +3314,17 @@ function applyCrop() {
         avatarPreviewImg.style.objectFit = 'cover';
     }
     if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+    
+    // ── Immediately persist custom profile pic to localStorage ────────────
+    // This guarantees the user's chosen photo is never overwritten by
+    // saveBiometrics on the next login (which only sets camera snapshot
+    // when there is no existing saved photo).
+    try {
+        const _custProf = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
+        _custProf.profilePic = result;
+        localStorage.setItem(_profileKey(), JSON.stringify(_custProf));
+    } catch(e) { /* ignore storage errors */ }
+    
     closeCropModal();
 }
 
@@ -4575,20 +4586,32 @@ function saveBiometrics(signature, video) {
         }
         
         const avatarDataURL = thumbCanvas.toDataURL('image/jpeg', 0.85);
-        myProfilePic = avatarDataURL;
         
-        // Update nickname modal avatar preview
-        if (avatarPreviewImg) {
-            avatarPreviewImg.src = avatarDataURL;
-            avatarPreviewImg.classList.remove('hidden');
-            avatarPreviewImg.style.objectFit = 'cover';
-        }
-        if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
-        
-        // Update local profile pic
+        // ── Preserve custom profile pic ──────────────────────────────────────
+        // Only store the camera thumbnail when the user has NO existing saved photo.
+        // If they previously set a custom picture, keep it — never overwrite it.
         const currentProfile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
-        currentProfile.profilePic = avatarDataURL;
-        localStorage.setItem(_profileKey(), JSON.stringify(currentProfile));
+        if (currentProfile.profilePic) {
+            // Restore saved photo into memory and preview
+            myProfilePic = currentProfile.profilePic;
+            if (avatarPreviewImg) {
+                avatarPreviewImg.src = currentProfile.profilePic;
+                avatarPreviewImg.classList.remove('hidden');
+                avatarPreviewImg.style.objectFit = 'cover';
+            }
+            if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        } else {
+            // No saved photo yet — use camera thumbnail as default avatar
+            myProfilePic = avatarDataURL;
+            currentProfile.profilePic = avatarDataURL;
+            localStorage.setItem(_profileKey(), JSON.stringify(currentProfile));
+            if (avatarPreviewImg) {
+                avatarPreviewImg.src = avatarDataURL;
+                avatarPreviewImg.classList.remove('hidden');
+                avatarPreviewImg.style.objectFit = 'cover';
+            }
+            if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        }
     } catch(e) {
         console.error("Error saving biometrics:", e);
     }
