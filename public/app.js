@@ -1,3 +1,26 @@
+// ═══════════════════════════════════════════════════════════════
+// PERSISTENT CACHESTORAGE FOR INSTANT OFFLINE/COLD MODEL LOADING
+// ═══════════════════════════════════════════════════════════════
+const _origFetch = window.fetch;
+window.fetch = async function(...args) {
+    const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+    if (url && url.includes('@vladmandic/face-api/model') && 'caches' in window) {
+        try {
+            const cache = await caches.open('piktalk-face-models-v2');
+            const match = await cache.match(url);
+            if (match) return match;
+            const res = await _origFetch.apply(this, args);
+            if (res && res.status === 200) {
+                cache.put(url, res.clone()).catch(() => {});
+            }
+            return res;
+        } catch(e) {
+            return _origFetch.apply(this, args);
+        }
+    }
+    return _origFetch.apply(this, args);
+};
+
 // Initialize Socket.io – websocket-first for fastest connection
 let socket;
 try {
@@ -3973,9 +3996,13 @@ const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.4
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
-// ── Load face-api.js neural network models ──
+// ── Load face-api.js neural network models (with auto-retry and WebGL shader pre-warming) ──
 async function loadFaceModels() {
     if (faceModelsLoaded || faceModelsLoading) return;
+    if (typeof faceapi === 'undefined' || !faceapi.nets) {
+        setTimeout(loadFaceModels, 80);
+        return;
+    }
     faceModelsLoading = true;
     try {
         await Promise.all([
@@ -3984,28 +4011,51 @@ async function loadFaceModels() {
             faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODEL_URL)
         ]);
         faceModelsLoaded = true;
-        console.log('[FaceID] Models loaded ✓');
+        console.log('[FaceID] Models loaded in background ✓');
+
+        // Warm up WebGL shader compilation with dummy canvas so camera scan starts with 0 lag
+        try {
+            const dummy = document.createElement('canvas');
+            dummy.width = 128;
+            dummy.height = 128;
+            await faceapi.detectSingleFace(dummy, new faceapi.TinyFaceDetectorOptions({ inputSize: 128 }));
+        } catch(w) {}
     } catch (e) {
-        console.warn('[FaceID] Model load failed, will use demo mode only:', e);
+        console.warn('[FaceID] Model load error, retrying in 1s:', e);
+        faceModelsLoading = false;
+        setTimeout(loadFaceModels, 1000);
+        return;
     }
     faceModelsLoading = false;
 }
 
-// Run neural-net face detection on a video frame → returns detection or null
-async function detectFaceNN(video) {
+// Ultra-fast lightweight detector for liveness tracking (15ms per frame, without heavy descriptor)
+async function detectFaceFast(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
-        // Ultra-fast lightweight detector (inputSize: 128 optimized for instant 30ms mobile detection)
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.30 });
-        const det  = await faceapi
-            .detectSingleFace(video, opts)
-            .withFaceLandmarks(false) // Use full 68-point landmarks (false = full, true = tiny)
-            .withFaceDescriptor();
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.25 });
+        const det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(false);
         return det || null;
     } catch (e) {
-        console.warn('[FaceID] Detection failed:', e);
         return null;
     }
+}
+
+// Full descriptor extractor called ONCE upon reaching 100% liveness
+async function extractFaceDescriptor(video) {
+    if (!faceModelsLoaded || !video || video.readyState < 2) return null;
+    try {
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.25 });
+        const det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks(false).withFaceDescriptor();
+        return det || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Backward compatibility helper
+async function detectFaceNN(video) {
+    return extractFaceDescriptor(video);
 }
 
 // Measure movement between two sets of face landmarks (for liveness)
@@ -4272,7 +4322,7 @@ function runFaceScanOverlay() {
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
 }
 
-// ── Main async detection loop (runs every ~300 ms) ──
+// ── Main async detection loop (runs every ~30 ms for ultra-fast instant scan) ──
 async function runFaceScanLoop() {
     if (!faceScanActive) return;
     // Guard: stop if profile setup is visible (login scan only)
@@ -4285,23 +4335,24 @@ async function runFaceScanLoop() {
 
     // Wait for video to be ready
     if (!video || video.readyState < 2) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 80);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 40);
         return;
     }
 
-    // Show models-loading state
+    // Show models-loading state if models are still initializing
     if (!faceModelsLoaded) {
-        faceNoFaceCount = 0; // reset no-face count while AI engine loads
+        faceNoFaceCount = 0;
+        loadFaceModels();
         if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing AI Engine...';
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Downloading neural network models...';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 100);
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 60);
         return;
     }
 
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
 
-    // Run neural-net detection
-    const detection = await detectFaceNN(video);
+    // Run ultra-fast lightweight face detection for tracking (~15ms)
+    const detection = await detectFaceFast(video);
 
     if (!faceScanActive) return; // may have been stopped while awaiting
 
@@ -4323,7 +4374,7 @@ async function runFaceScanLoop() {
             faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Align your face...';
         }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Please look directly at camera';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 80);
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 50);
         return;
     }
 
@@ -4336,29 +4387,35 @@ async function runFaceScanLoop() {
     facePrevLandmarks = detection.landmarks;
     faceMotionSum += motion;
 
-    // Progress: require motion + consecutive detections (instant sub-second scan)
-    if (motion > 0.15) faceScanLivenessProgress += 50; // blink/head movement
-    else               faceScanLivenessProgress += 35; // just visible face
+    // Fast progress: completes in 2 consecutive frames (~100ms total)
+    if (motion > 0.08) faceScanLivenessProgress += 55;
+    else               faceScanLivenessProgress += 50;
     faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
-    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Keep face steady';
-
-    // Store latest descriptor for capture
-    faceCapturedDescriptor = detection.descriptor;
+    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady';
 
     // Scan complete?
     if (faceScanLivenessProgress >= 100) {
-        // Force display progress to 100 immediately
         faceScanLivenessDisplayProgress = 100;
         if (faceScanStatusEl) {
-            faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning (100%)';
+            faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Verifying...';
         }
-        faceScanLivenessVerified = true;
-        _onFaceScanComplete();
-        return;
+
+        // Extract 128-dim descriptor once upon completion
+        const fullDet = await extractFaceDescriptor(video);
+        if (fullDet && fullDet.descriptor) {
+            faceCapturedDescriptor = fullDet.descriptor;
+            faceScanLivenessVerified = true;
+            _onFaceScanComplete();
+            return;
+        } else {
+            // If momentary blur, retry next frame
+            if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+            return;
+        }
     }
 
-    if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 40);
+    if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 30);
 }
 
 // Called when liveness + face verification is complete
@@ -4539,6 +4596,7 @@ function saveBiometrics(signature, video) {
 
 // Open camera stream and kick off scan loops
 function startFaceScanFlow(isSettings = false) {
+    loadFaceModels();
     faceScanIsSettings = isSettings;
     faceScanActive     = true;
     faceScanLivenessProgress = 0;
