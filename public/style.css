@@ -1574,11 +1574,10 @@ body.light-mode .bubble-timestamp {
 
 /* Wrapper holds the avatar circle + pencil badge together */
 .avatar-wrapper {
-    position: relative;
-    width: 120px;
-    height: 120px;
-    display: inline-block;
-    /* Allow badge to overflow the boundary */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     overflow: visible;
 }
 
@@ -1591,20 +1590,9 @@ body.light-mode .bubble-timestamp {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
     overflow: hidden;
     transition: border-color 0.2s ease, background-color 0.2s ease;
     position: relative;
-}
-
-.avatar-preview:hover {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
-}
-
-.avatar-wrapper:hover .avatar-preview {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
 }
 
 .avatar-preview i {
@@ -1623,33 +1611,39 @@ body.light-mode .bubble-timestamp {
     pointer-events: none;
 }
 
-/* ── Pencil edit badge — half inside / half outside the circle ── */
-.avatar-edit-badge {
-    position: absolute;
-    bottom: 4px;
-    right: 4px;
-    /* Translate half of its own size outward so it straddles the edge */
-    transform: translate(25%, 25%);
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
+/* ── Scan button below the avatar circle ── */
+.avatar-scan-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 18px;
+    border-radius: 999px;
+    border: none;
     background: var(--primary);
     color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.78rem;
-    border: 3px solid var(--card-bg);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.45);
-    pointer-events: all;
-    transition: transform 0.18s ease, background 0.18s ease;
-    z-index: 10;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
     cursor: pointer;
+    box-shadow: 0 3px 12px rgba(99,102,241,0.45);
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.avatar-edit-badge:hover {
-    transform: translate(25%, 25%) scale(1.15);
+.avatar-scan-btn i {
+    font-size: 0.9rem;
+}
+
+.avatar-scan-btn:hover {
     background: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(99,102,241,0.5);
+}
+
+.avatar-scan-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.35);
 }
 
 .badge {
@@ -2361,8 +2355,7 @@ body.light-mode .waveform-bar {
     }
 
     .modal.keyboard-active .avatar-wrapper {
-        width: 70px !important;
-        height: 70px !important;
+        gap: 6px !important;
     }
 
     .modal.keyboard-active .avatar-preview i {

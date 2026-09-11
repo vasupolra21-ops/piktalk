@@ -1267,7 +1267,16 @@ function setupEventListeners() {
     if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
     if (homeThemeToggle) homeThemeToggle.addEventListener('click', toggleTheme);
     
-    // Rely on standard HTML label behavior for better mobile compatibility
+    // ── Scan button: navigate back to biometric face scan ──
+    const avatarScanBtn = document.getElementById('avatar-scan-btn');
+    if (avatarScanBtn) {
+        avatarScanBtn.addEventListener('click', () => {
+            if (profileSetupSection) profileSetupSection.classList.add('hidden');
+            if (faceScanSection) faceScanSection.classList.remove('hidden');
+            // Small delay so the section transition is visible before scan starts
+            setTimeout(() => startFaceScanFlow(false), 150);
+        });
+    }
 
     if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
