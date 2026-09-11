@@ -1572,6 +1572,18 @@ body.light-mode .bubble-timestamp {
     margin-bottom: 2rem;
 }
 
+/* Visually hidden file input — fully interactive for browser clicks, not display:none */
+.visually-hidden-file-input {
+    position: fixed !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    z-index: -100 !important;
+}
+
 /* Wrapper holds the avatar circle + pencil badge together */
 .avatar-wrapper {
     position: relative;
@@ -1580,6 +1592,9 @@ body.light-mode .bubble-timestamp {
     display: inline-block;
     /* Allow badge to overflow the boundary */
     overflow: visible;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .avatar-preview {
@@ -1593,63 +1608,109 @@ body.light-mode .bubble-timestamp {
     justify-content: center;
     cursor: pointer;
     overflow: hidden;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition: border-color 0.25s ease, background-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
     position: relative;
 }
 
-.avatar-preview:hover {
-    border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
-}
-
+.avatar-preview:hover,
 .avatar-wrapper:hover .avatar-preview {
     border-color: var(--primary);
-    background: rgba(99, 102, 241, 0.1);
+    background: rgba(99, 102, 241, 0.12);
+    box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
+}
+
+.avatar-wrapper:active .avatar-preview {
+    transform: scale(0.97);
 }
 
 .avatar-preview i {
     font-size: 2rem;
     color: var(--text-muted);
+    pointer-events: none;
+    transition: transform 0.2s ease;
 }
 
 .avatar-preview img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-}
-
-.avatar-preview i,
-.avatar-preview img {
     pointer-events: none;
+    transition: filter 0.2s ease;
 }
 
-/* ── Pencil edit badge — half inside / half outside the circle ── */
+/* Subtle camera change overlay on hover */
+.avatar-hover-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.65);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #ffffff;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+    backdrop-filter: blur(2px);
+}
+
+.avatar-hover-overlay i {
+    font-size: 1.3rem;
+    color: #ffffff !important;
+}
+
+.avatar-hover-overlay span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.avatar-wrapper:hover .avatar-hover-overlay {
+    opacity: 1;
+}
+
+/* ── Pencil edit badge — button element with clear touch area ── */
 .avatar-edit-badge {
     position: absolute;
-    bottom: 4px;
-    right: 4px;
-    /* Translate half of its own size outward so it straddles the edge */
+    bottom: 2px;
+    right: 2px;
     transform: translate(25%, 25%);
-    width: 34px;
-    height: 34px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     background: var(--primary);
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.78rem;
+    font-size: 0.88rem;
     border: 3px solid var(--card-bg);
-    box-shadow: 0 3px 10px rgba(0,0,0,0.45);
-    pointer-events: all;
-    transition: transform 0.18s ease, background 0.18s ease;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
+    pointer-events: auto;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, box-shadow 0.2s ease;
     z-index: 10;
     cursor: pointer;
+    outline: none;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.avatar-edit-badge:hover {
+.avatar-edit-badge i {
+    pointer-events: none;
+}
+
+.avatar-edit-badge:hover,
+.avatar-wrapper:hover .avatar-edit-badge {
     transform: translate(25%, 25%) scale(1.15);
     background: var(--accent);
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.55);
+}
+
+.avatar-edit-badge:active {
+    transform: translate(25%, 25%) scale(0.92);
 }
 
 .badge {
@@ -2367,6 +2428,13 @@ body.light-mode .waveform-bar {
 
     .modal.keyboard-active .avatar-preview i {
         font-size: 1.3rem !important;
+    }
+
+    .modal.keyboard-active .avatar-edit-badge {
+        width: 26px !important;
+        height: 26px !important;
+        font-size: 0.65rem !important;
+        border-width: 2px !important;
     }
 
     .modal.keyboard-active .modal-content input {
