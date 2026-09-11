@@ -4443,9 +4443,9 @@ async function runFaceScanLoop() {
     facePrevLandmarks = detection.landmarks;
     faceMotionSum += motion;
 
-    // Fast progress: completes in 2 consecutive frames (~100ms total)
-    if (motion > 0.08) faceScanLivenessProgress += 55;
-    else               faceScanLivenessProgress += 50;
+    // Steady progress: completes in ~7-8 frames (~700ms) for a visible scan feel
+    if (motion > 0.08) faceScanLivenessProgress += 15;
+    else               faceScanLivenessProgress += 12;
     faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
     if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady';
