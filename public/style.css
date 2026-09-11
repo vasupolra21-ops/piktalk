@@ -1572,12 +1572,12 @@ body.light-mode .bubble-timestamp {
     margin-bottom: 2rem;
 }
 
-/* Wrapper holds the avatar circle + pencil badge together */
+/* Wrapper holds the avatar circle + scan badge together */
 .avatar-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: inline-block;
     overflow: visible;
 }
 
@@ -1611,39 +1611,44 @@ body.light-mode .bubble-timestamp {
     pointer-events: none;
 }
 
-/* ── Scan button below the avatar circle ── */
+/* ── Scan badge — same position as the old pencil, but with face-scan icon ── */
 .avatar-scan-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 18px;
-    border-radius: 999px;
-    border: none;
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    transform: translate(25%, 25%);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 3px solid var(--card-bg);
     background: var(--primary);
     color: #fff;
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.45);
     cursor: pointer;
-    box-shadow: 0 3px 12px rgba(99,102,241,0.45);
-    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
     outline: none;
+    padding: 0;
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    z-index: 10;
     -webkit-tap-highlight-color: transparent;
 }
 
 .avatar-scan-btn i {
-    font-size: 0.9rem;
+    pointer-events: none;
+    font-size: 1.05rem;
 }
 
 .avatar-scan-btn:hover {
     background: var(--accent);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(99,102,241,0.5);
+    transform: translate(25%, 25%) scale(1.15);
+    box-shadow: 0 5px 15px rgba(99,102,241,0.55);
 }
 
 .avatar-scan-btn:active {
-    transform: scale(0.95);
-    box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+    transform: translate(25%, 25%) scale(0.92);
 }
 
 .badge {
@@ -2355,7 +2360,8 @@ body.light-mode .waveform-bar {
     }
 
     .modal.keyboard-active .avatar-wrapper {
-        gap: 6px !important;
+        width: 70px !important;
+        height: 70px !important;
     }
 
     .modal.keyboard-active .avatar-preview i {
