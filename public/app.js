@@ -101,7 +101,7 @@ function initDOMElements() {
     profilePicInput = document.getElementById('profile-pic-input');
     avatarPreviewContainer = document.getElementById('avatar-preview-container');
     avatarPreviewImg = document.getElementById('avatar-preview-img');
-    avatarPreviewIcon = document.getElementById('avatar-preview-icon') || (avatarPreviewContainer ? avatarPreviewContainer.querySelector('i') : null);
+    avatarPreviewIcon = avatarPreviewContainer ? avatarPreviewContainer.querySelector('i') : null;
     micBtn = document.getElementById('mic-btn');
     voiceRecordingBar = document.getElementById('voice-recording-bar');
     cancelRecordingBtn = document.getElementById('cancel-recording-btn');
@@ -1267,62 +1267,17 @@ function setupEventListeners() {
     if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
     if (homeThemeToggle) homeThemeToggle.addEventListener('click', toggleTheme);
     
-    // ── Profile Picture Picker Event Wiring (Edit badge & Avatar preview) ──
-    const avatarEditBadge = document.getElementById('avatar-edit-badge');
-    const avatarWrapper = document.getElementById('avatar-wrapper');
+    // Rely on standard HTML label behavior for better mobile compatibility
 
-    function openProfilePicPicker(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        if (profilePicInput) {
-            profilePicInput.disabled = false;
-            profilePicInput.value = ''; // Clear value so re-selecting same file triggers change
-            profilePicInput.click();
-        }
-    }
-
-    if (avatarEditBadge) {
-        avatarEditBadge.addEventListener('click', openProfilePicPicker);
-    }
-    if (avatarPreviewContainer) {
-        avatarPreviewContainer.addEventListener('click', openProfilePicPicker);
-        avatarPreviewContainer.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                openProfilePicPicker(e);
-            }
-        });
-    }
-    if (avatarWrapper) {
-        avatarWrapper.addEventListener('click', (e) => {
-            if (e.target === avatarWrapper) {
-                openProfilePicPicker(e);
-            }
-        });
-    }
-
-    if (profilePicInput) {
-        profilePicInput.addEventListener('change', (e) => {
-            const file = e.target.files && e.target.files[0];
-            if (!file) return;
-            if (file.size > 20000000) { 
-                alert('Image too large (Max 20MB)'); 
-                return; 
-            }
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                if (ev.target && ev.target.result) {
-                    openCropModal(ev.target.result);
-                }
-            };
-            reader.onerror = () => {
-                alert('Could not read the selected image. Please try another image.');
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 20000000) { alert('Image too large (Max 20MB)'); return; }
+        const reader = new FileReader();
+        reader.onload = (ev) => openCropModal(ev.target.result);
+        reader.readAsDataURL(file);
+        profilePicInput.value = '';
+    });
 
     if (sendBtn) {
         // Prevent send button from stealing focus from the textarea on mobile
@@ -3359,15 +3314,6 @@ function applyCrop() {
         avatarPreviewImg.style.objectFit = 'cover';
     }
     if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
-
-    // Immediately persist custom profile picture to localStorage
-    try {
-        const _custProf = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
-        _custProf.profilePic = result;
-        localStorage.setItem(_profileKey(), JSON.stringify(_custProf));
-        localStorage.setItem('piktalk_has_custom_pic', '1');
-    } catch(e) {}
-
     closeCropModal();
 }
 
@@ -4629,28 +4575,20 @@ function saveBiometrics(signature, video) {
         }
         
         const avatarDataURL = thumbCanvas.toDataURL('image/jpeg', 0.85);
+        myProfilePic = avatarDataURL;
         
-        // Preserve user's custom profile picture if already set
-        const currentProfile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
-        const hasCustomPic = localStorage.getItem('piktalk_has_custom_pic') === '1';
-
-        if (hasCustomPic && currentProfile.profilePic) {
-            myProfilePic = currentProfile.profilePic;
-        } else if (currentProfile.profilePic) {
-            myProfilePic = currentProfile.profilePic;
-        } else {
-            myProfilePic = avatarDataURL;
-            currentProfile.profilePic = avatarDataURL;
-            localStorage.setItem(_profileKey(), JSON.stringify(currentProfile));
-        }
-
         // Update nickname modal avatar preview
         if (avatarPreviewImg) {
-            avatarPreviewImg.src = myProfilePic;
+            avatarPreviewImg.src = avatarDataURL;
             avatarPreviewImg.classList.remove('hidden');
             avatarPreviewImg.style.objectFit = 'cover';
         }
         if (avatarPreviewIcon) avatarPreviewIcon.classList.add('hidden');
+        
+        // Update local profile pic
+        const currentProfile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
+        currentProfile.profilePic = avatarDataURL;
+        localStorage.setItem(_profileKey(), JSON.stringify(currentProfile));
     } catch(e) {
         console.error("Error saving biometrics:", e);
     }
@@ -4867,7 +4805,6 @@ function handleScanSuccess(statusText) {
             // Transition view
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
-            updateInputsState();
         } else {
             // First time login - clear previous nickname only. Keep the freshly captured face photo!
             if (nicknameInput) nicknameInput.value = '';
@@ -4890,7 +4827,6 @@ function handleScanSuccess(statusText) {
 
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
-            updateInputsState();
         }
     }, 300);
 }
@@ -5211,7 +5147,6 @@ function removeFaceCredentials() {
         if (faceId) localStorage.removeItem(`piktalk_profile_${faceId}`);
         localStorage.removeItem('piktalk_profile_guest');
         localStorage.removeItem('piktalk_face_userid');
-        localStorage.removeItem('piktalk_has_custom_pic');
         myNickname   = '';
         myProfilePic = '';
 
