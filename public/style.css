@@ -3900,7 +3900,8 @@ video::-picture-in-picture-button,
     background: linear-gradient(90deg, var(--primary), #10b981);
     border-radius: 10px;
     box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
-    transition: width 0.15s ease-out;
+    /* No CSS transition — JS rAF interpolation already smooths animation;
+       a CSS transition causes visible lag when the bar snaps to 100% */
 }
 
 .face-status {

@@ -4313,7 +4313,7 @@ function runFaceScanOverlay() {
         progressBar.style.width = displayPercent + '%';
     }
 
-    if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified) {
+    if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified && faceScanLivenessProgress < 100) {
         faceScanStatusEl.className = 'face-status';
         faceScanStatusEl.innerHTML =
             `<i class="fas fa-circle-notch fa-spin"></i> Scanning (${displayPercent}%)`;
