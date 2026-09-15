@@ -1321,10 +1321,17 @@ function setupEventListeners() {
         }, { passive: false });
         sendBtn.addEventListener('click', sendMessage);
     }
+    function resizeMessageInput() {
+        if (!messageInput) return;
+        messageInput.style.height = 'auto';
+        const newHeight = Math.min(Math.max(messageInput.scrollHeight, 38), 120);
+        messageInput.style.height = newHeight + 'px';
+        messageInput.style.overflowY = messageInput.scrollHeight > 120 ? 'auto' : 'hidden';
+    }
+
     if (messageInput) {
         messageInput.addEventListener('input', () => {
-            messageInput.style.height = 'auto';
-            messageInput.style.height = (messageInput.scrollHeight) + 'px';
+            resizeMessageInput();
 
             // Emit typing event (optimized throttle)
             if (socket && currentRoomID && myNickname) {

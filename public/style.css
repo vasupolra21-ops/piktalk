@@ -2294,8 +2294,8 @@ body.light-mode .waveform-bar {
         padding: 8px 30px 8px 30px !important;
         font-size: 16px !important;
         line-height: 1.35 !important;
-        height: 38px !important;
         min-height: 38px !important;
+        max-height: 120px !important;
     }
 
     .chat-input-area .input-wrapper-chat textarea::placeholder,
@@ -2307,11 +2307,17 @@ body.light-mode .waveform-bar {
 
     .chat-input-area .input-wrapper-chat .btn-icon-small.left {
         left: 7px !important;
+        bottom: 8px !important;
+        top: auto !important;
+        transform: none !important;
         font-size: 1rem !important;
     }
 
     .chat-input-area .input-wrapper-chat .btn-icon-small.right {
         right: 7px !important;
+        bottom: 8px !important;
+        top: auto !important;
+        transform: none !important;
         font-size: 1rem !important;
     }
 
