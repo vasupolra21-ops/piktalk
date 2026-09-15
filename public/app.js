@@ -2572,7 +2572,13 @@ function appendMessage(data, isSentByMe) {
     // Build message DOM
     const bubbleWrapper = document.createElement('div');
     bubbleWrapper.className = 'bubble-wrapper';
-    bubbleWrapper.appendChild(contentEl);
+
+    // Bubble container: holds the bubble + action bar (reply/react), guaranteeing action bar
+    // is always vertically centered against the message bubble itself, even when reactions exist
+    const bubbleContainer = document.createElement('div');
+    bubbleContainer.className = 'bubble-container';
+    bubbleContainer.appendChild(contentEl);
+    bubbleWrapper.appendChild(bubbleContainer);
 
     if (!isSentByMe) {
         const infoDiv = document.createElement('div');
@@ -2634,7 +2640,7 @@ function appendMessage(data, isSentByMe) {
         });
         quickMenu.appendChild(plusBtn);
         
-        bubbleWrapper.appendChild(quickMenu);
+        bubbleContainer.appendChild(quickMenu);
 
         // React button
         const reactBtn = document.createElement('button');
@@ -2685,7 +2691,7 @@ function appendMessage(data, isSentByMe) {
 
         actionBar.appendChild(replyBtn);
         actionBar.appendChild(reactBtn);
-        bubbleWrapper.appendChild(actionBar);
+        bubbleContainer.appendChild(actionBar);
     }
 
     // ── Long-press for mobile ──

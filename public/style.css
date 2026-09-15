@@ -3466,6 +3466,22 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     align-items: flex-start;
 }
 
+/* ── Bubble Container: wraps bubble + action bar so action bar centers on bubble only ── */
+.bubble-container {
+    position: relative;
+    display: inline-flex;
+    max-width: 100%;
+}
+
+.message.sent .bubble-container {
+    align-items: flex-end;
+    margin-left: auto;
+}
+
+.message.received .bubble-container {
+    align-items: flex-start;
+}
+
 /* ── Premium Connecting Overlay & Reaction Tooltip Avatar Styles ── */
 #connecting-overlay {
     position: fixed;
