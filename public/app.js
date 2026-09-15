@@ -968,8 +968,13 @@ function renderEmojiPicker() {
                 if (messageInput) {
                     messageInput.value += emoji;
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    // Scroll to bottom so newest emoji + cursor is always visible
+                    messageInput.scrollTop = messageInput.scrollHeight;
                     setTimeout(() => {
-                        if (messageInput && !messageInput.disabled) messageInput.focus();
+                        if (messageInput && !messageInput.disabled) {
+                            messageInput.focus();
+                            messageInput.scrollTop = messageInput.scrollHeight;
+                        }
                     }, 50);
                 }
             });
@@ -1327,6 +1332,8 @@ function setupEventListeners() {
         const newHeight = Math.min(Math.max(messageInput.scrollHeight, 38), 120);
         messageInput.style.height = newHeight + 'px';
         messageInput.style.overflowY = messageInput.scrollHeight > 120 ? 'auto' : 'hidden';
+        // Always scroll to bottom so cursor/latest emoji stays visible
+        messageInput.scrollTop = messageInput.scrollHeight;
     }
 
     if (messageInput) {
