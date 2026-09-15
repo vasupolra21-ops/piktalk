@@ -2278,7 +2278,18 @@ body.light-mode .waveform-bar {
     body.keyboard-active .chat-input-area {
         padding-bottom: 8px !important;
     }
-    
+
+    /* Tighten row gap and textarea padding so "Type a message" is fully visible on mobile */
+    .chat-input-row {
+        gap: 6px !important;
+    }
+
+    .chat-input-area .input-wrapper-chat input,
+    .chat-input-area .input-wrapper-chat textarea {
+        padding: 8px 36px !important;
+        font-size: 0.95rem !important;
+    }
+
     .btn-mic,
     .btn-send,
     .btn-ai {
