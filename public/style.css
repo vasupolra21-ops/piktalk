@@ -2358,7 +2358,7 @@ body.light-mode .waveform-bar {
 
     .chat-input-area .input-wrapper-chat input,
     .chat-input-area .input-wrapper-chat textarea {
-        padding: 8px 28px 8px 28px !important;
+        padding: 8px 36px 8px 38px !important; /* Proper spacing so cursor and placeholder never touch paperclip icon */
         font-size: 16px !important;
         line-height: 1.35 !important;
         min-height: 38px !important;
@@ -2373,34 +2373,42 @@ body.light-mode .waveform-bar {
     }
 
     .chat-input-area .input-wrapper-chat .btn-icon-small.left {
-        left: 7px !important;
-        bottom: 8px !important;
+        left: 8px !important;
+        bottom: 7px !important;
         top: auto !important;
         transform: none !important;
-        font-size: 1rem !important;
+        font-size: 1.05rem !important;
     }
 
     .chat-input-area .input-wrapper-chat .btn-icon-small.right {
-        right: 7px !important;
-        bottom: 8px !important;
+        right: 8px !important;
+        bottom: 7px !important;
         top: auto !important;
         transform: none !important;
-        font-size: 1rem !important;
+        font-size: 1.05rem !important;
     }
 
     .btn-mic,
     .btn-send,
     .btn-ai {
-        width: 34px !important;
-        height: 34px !important;
-        min-width: 34px !important;
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px !important;
+        max-width: 36px !important;
         font-size: 0.85rem !important;
         flex-shrink: 0 !important;
         padding: 0 !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
     }
 
     .btn-ai {
-        font-size: 0.75rem !important;
+        font-size: 0.72rem !important;
+        gap: 2px !important;
+        letter-spacing: -0.2px !important;
     }
     
     .emoji-picker {
@@ -3721,12 +3729,23 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     transition: all 0.2s ease;
     flex-shrink: 0;
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08);
+}
+
+.btn-ai i {
+    font-size: 0.75rem;
+}
+
+.btn-ai span {
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
 }
 
 .btn-ai:hover {
