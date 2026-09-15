@@ -547,7 +547,7 @@ function updateInputsState() {
 // - INDIGO/NAVY (#0f172a) when in Dark Mode chat, matching the deep dark interface.
 function updateThemeColor() {
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
-    const isLightMode = document.body.classList.contains('light-mode');
+    const isLightMode = document.body.classList.contains('light-mode') || document.documentElement.classList.contains('light-mode-active');
     
     // Check if any modal is currently visible
     const isNicknameActive = nicknameModal && nicknameModal.classList.contains('active');
@@ -564,7 +564,7 @@ function updateThemeColor() {
     if (isAnyModalActive) {
         document.documentElement.classList.add('modal-open');
         document.body.classList.add('modal-open');
-        if (metaThemeColor) metaThemeColor.setAttribute('content', '#000000');
+        if (metaThemeColor) metaThemeColor.setAttribute('content', isLightMode ? '#ffffff' : '#000000');
     } else {
         document.documentElement.classList.remove('modal-open');
         document.body.classList.remove('modal-open');

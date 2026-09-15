@@ -83,6 +83,18 @@ body.modal-open .animated-bg {
     opacity: 0.15 !important;
 }
 
+/* Light Mode: keep left, right, and page background clean white when modals are open */
+html.light-mode-active.modal-open,
+html.light-mode-active body.modal-open,
+body.light-mode.modal-open {
+    background-color: #ffffff !important;
+}
+
+html.light-mode-active body.modal-open .animated-bg,
+body.light-mode.modal-open .animated-bg {
+    opacity: 1 !important;
+}
+
 body {
     background-color: var(--bg-dark);
     color: var(--text-main);
@@ -1479,6 +1491,24 @@ body.light-mode .bubble-timestamp {
     justify-content: center;
     align-items: center;
     z-index: 1000;
+}
+
+/* In Light Mode: clean white translucent backdrop with soft blur so left & right stay white */
+html.light-mode-active .modal,
+body.light-mode .modal,
+html.light-mode-active #phone-modal,
+body.light-mode #phone-modal,
+html.light-mode-active .settings-modal-overlay,
+body.light-mode .settings-modal-overlay,
+html.light-mode-active .crop-modal-overlay,
+body.light-mode .crop-modal-overlay,
+html.light-mode-active .members-modal-overlay,
+body.light-mode .members-modal-overlay,
+html.light-mode-active .image-editor-modal-overlay,
+body.light-mode .image-editor-modal-overlay {
+    background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .modal.active {
