@@ -1353,7 +1353,7 @@ body.light-mode .bubble-timestamp {
 .chat-input-row {
     display: flex;
     flex-direction: row;
-    align-items: center;
+    align-items: flex-end; /* Keep buttons pinned at the bottom even when textarea grows with multiple lines */
     gap: 8px;
     width: 100%;
 }
@@ -2348,6 +2348,7 @@ body.light-mode .waveform-bar {
     /* Tighten row gap and textarea padding so "Type a message" is fully visible on mobile */
     .chat-input-row {
         gap: 5px !important;
+        align-items: flex-end !important; /* Keep buttons fixed at bottom even when user types long messages */
     }
 
     .chat-input-area .input-wrapper-chat {
