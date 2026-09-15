@@ -72,7 +72,7 @@ html {
 
 html.modal-open,
 body.modal-open {
-    background-color: #000000 !important;
+    background-color: #0f172a !important;
     overflow: hidden !important;
     position: fixed !important;
     width: 100% !important;
@@ -80,7 +80,7 @@ body.modal-open {
 }
 
 body.modal-open .animated-bg {
-    opacity: 0.15 !important;
+    opacity: 1 !important;
 }
 
 /* Light Mode: keep left, right, and page background clean white when modals are open */
@@ -1507,6 +1507,24 @@ body.light-mode .members-modal-overlay,
 html.light-mode-active .image-editor-modal-overlay,
 body.light-mode .image-editor-modal-overlay {
     background: rgba(255, 255, 255, 0.82) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* In Dark Mode: soft dark translucent backdrop so left & right show navy bg, not pitch black */
+html:not(.light-mode-active) .modal,
+body:not(.light-mode) .modal,
+html:not(.light-mode-active) #phone-modal,
+body:not(.light-mode) #phone-modal,
+html:not(.light-mode-active) .settings-modal-overlay,
+body:not(.light-mode) .settings-modal-overlay,
+html:not(.light-mode-active) .crop-modal-overlay,
+body:not(.light-mode) .crop-modal-overlay,
+html:not(.light-mode-active) .members-modal-overlay,
+body:not(.light-mode) .members-modal-overlay,
+html:not(.light-mode-active) .image-editor-modal-overlay,
+body:not(.light-mode) .image-editor-modal-overlay {
+    background: rgba(15, 23, 42, 0.75) !important;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
 }
