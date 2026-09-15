@@ -2041,13 +2041,6 @@ function sendMessage() {
                 message: text,
                 replyTo: replyingTo || null
             });
-
-            // Smooth send button effect
-            if (sendBtn) {
-                sendBtn.classList.add('sending');
-                setTimeout(() => { if (sendBtn) sendBtn.classList.remove('sending'); }, 350);
-            }
-
             messageInput.value = '';
             messageInput.style.height = '38px';
             clearReply();
@@ -2564,14 +2557,7 @@ function appendMessage(data, isSentByMe) {
     // (Global menu closing listener handled in setupEventListeners)
 
     messagesContainer.appendChild(msgDiv);
-    try {
-        messagesContainer.scrollTo({
-            top: messagesContainer.scrollHeight,
-            behavior: 'smooth'
-        });
-    } catch (e) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
 // ── EMOJI PICKER CATEGORIES ──
