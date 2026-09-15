@@ -728,13 +728,13 @@ body.light-mode .btn-icon {
 
 /* Only new messages get animation + GPU hint — removed after animation via JS */
 .message.msg-new {
-    animation: slideUp 0.2s ease-out forwards;
-    will-change: opacity, transform;
+    animation: msgFadeIn 0.18s ease-out forwards;
+    will-change: opacity;
 }
 
-@keyframes slideUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+@keyframes msgFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 .message.sent {

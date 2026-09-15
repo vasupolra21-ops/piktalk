@@ -2088,6 +2088,10 @@ function sendMessage() {
             });
             messageInput.value = '';
             messageInput.style.height = '38px';
+            messageInput.style.overflowY = 'hidden';
+            // Lock scroll to bottom immediately: prevents the layout shift (textarea shrink
+            // expands messagesContainer) from making messages appear to bounce up then back down
+            if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
             clearReply();
 
             const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
@@ -2601,18 +2605,13 @@ function appendMessage(data, isSentByMe) {
 
     // (Global menu closing listener handled in setupEventListeners)
 
-    // Add msg-new class: triggers animation + will-change only on this new bubble
+    // Add msg-new class: triggers opacity fade + will-change only on this new bubble
     msgDiv.classList.add('msg-new');
 
     messagesContainer.appendChild(msgDiv);
 
-    // Double rAF: first rAF runs before paint, second runs after first paint completes
-    // This prevents the scroll-jump from fighting the entrance animation on iOS
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        });
-    });
+    // Scroll to bottom immediately — opacity-only animation has no layout impact
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
     // Clean up will-change after animation ends to free GPU layers
     msgDiv.addEventListener('animationend', () => {
