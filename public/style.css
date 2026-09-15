@@ -699,7 +699,7 @@ body.light-mode .btn-icon {
     flex-direction: column;
     gap: 4px;
     scrollbar-width: thin;
-    scrollbar-color: var(--primary) transparent;
+    scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
     /* Smooth native momentum scroll on iOS */
     -webkit-overflow-scrolling: touch;
     /* Prevent scroll-chaining (page bounce behind messages) */
@@ -715,8 +715,12 @@ body.light-mode .btn-icon {
 }
 
 .messages-container::-webkit-scrollbar-thumb {
-    background: var(--primary);
+    background: rgba(148, 163, 184, 0.45);
     border-radius: 10px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.7);
 }
 
 /* Base message: NO will-change globally (saves GPU layers on mobile) */
@@ -2281,13 +2285,20 @@ body.light-mode .waveform-bar {
         gap: 2px;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
-        /* Hide scrollbar on mobile — touch scrolling is already obvious */
-        scrollbar-width: none !important;
+        /* Elegant thin grey scrollbar on mobile */
+        scrollbar-width: thin !important;
+        scrollbar-color: rgba(148, 163, 184, 0.4) transparent !important;
         /* No fixed height — height is derived from remaining flex space */
     }
 
     .messages-container::-webkit-scrollbar {
-        display: none !important;
+        width: 4px !important;
+        display: block !important;
+    }
+
+    .messages-container::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.45) !important;
+        border-radius: 10px !important;
     }
 
     .chat-input-area {

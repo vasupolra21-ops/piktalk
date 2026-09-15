@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=236" as="style">
+    <link rel="preload" href="/style.css?v=237" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=236" as="script">
+    <link rel="preload" href="/app.js?v=237" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=236">
+    <link rel="stylesheet" href="/style.css?v=237">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -337,7 +337,7 @@
                             <i class="fas fa-user-plus"></i>
                         </div>
                         <button type="button" id="avatar-scan-btn" class="avatar-scan-btn" title="Tap to re-scan face" aria-label="Scan face">
-                            <img src="/face-scan-icon.png?v=236" alt="Scan Face" class="avatar-scan-icon-img">
+                            <img src="/face-scan-icon.png?v=237" alt="Scan Face" class="avatar-scan-icon-img">
                         </button>
                     </div>
                 </div>
@@ -416,6 +416,22 @@
                         </div>
                         <label class="toggle-switch">
                             <input type="checkbox" id="settings-theme-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                <!-- Sound Effects / Mute Toggle -->
+                <div class="settings-section-card">
+                    <div class="settings-row">
+                        <div class="settings-row-icon" style="background: linear-gradient(135deg, #10b981, #06b6d4)">
+                            <i class="fas fa-volume-high" id="sound-icon-indicator"></i>
+                        </div>
+                        <div class="settings-row-label">
+                            <span class="settings-row-title">Chat Sound</span>
+                            <span class="settings-row-sub" id="sound-label">Sound On</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="settings-sound-toggle" checked>
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -554,6 +570,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=236" defer></script>
+    <script src="/app.js?v=237" defer></script>
 </body>
 </html>

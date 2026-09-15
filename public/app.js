@@ -22,16 +22,22 @@ window.fetch = async function(...args) {
 };
 
 // ─────────────────────────────────────────────────────────────
-// SOUND MANAGER — respects device silent/mute state
-// On Android: system volume controls media audio natively.
-// On iOS:     we use AudioContext state to detect if audio
-//             is blocked or suppressed by the browser/OS.
+// SOUND MANAGER — respects device silent/mute state & settings
 // ─────────────────────────────────────────────────────────────
 const SoundManager = (() => {
     let _audioCtx = null;
     let _muted = false;          // true = audio is blocked or device is muted
     let _muteCheckAt = 0;        // timestamp of last check
-    const MUTE_RECHECK_MS = 4000;// re-check every 4 seconds
+    const MUTE_RECHECK_MS = 3000;// re-check every 3 seconds
+
+    function isSoundEnabled() {
+        const pref = localStorage.getItem('piktalk_sound_enabled');
+        return pref === null ? true : pref === 'true';
+    }
+
+    function setSoundEnabled(enabled) {
+        localStorage.setItem('piktalk_sound_enabled', enabled ? 'true' : 'false');
+    }
 
     function _getCtx() {
         try {
@@ -42,7 +48,7 @@ const SoundManager = (() => {
         } catch(e) { return null; }
     }
 
-    // Try to resume a suspended AudioContext (required after user gesture on mobile)
+    // Try to resume a suspended AudioContext
     async function _ensureRunning(ctx) {
         if (ctx.state === 'suspended') {
             try { await ctx.resume(); } catch(e) {}
@@ -50,30 +56,31 @@ const SoundManager = (() => {
         return ctx.state === 'running';
     }
 
-    // Play a 1-frame silent buffer and measure how much AudioContext time advanced.
-    // If the context clock barely moved → audio output is suppressed → treat as muted.
+    // Check if device output is suppressed/silent
     async function _checkMuted(ctx) {
         return new Promise(resolve => {
             try {
-                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate); // 100ms buffer
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
                 const src = ctx.createBufferSource();
                 src.buffer = buf;
                 src.connect(ctx.destination);
                 const t0 = ctx.currentTime;
                 src.start();
-                // After 120ms, see if the context clock has advanced ≥ 80ms
                 setTimeout(() => {
                     const elapsed = (ctx.currentTime - t0) * 1000;
-                    resolve(elapsed < 50); // < 50ms advancement = likely muted/blocked
-                }, 120);
+                    resolve(elapsed < 20); // if context clock didn't tick, audio is muted/blocked
+                }, 60);
             } catch(e) {
-                resolve(false); // assume not muted if check fails
+                resolve(false);
             }
         });
     }
 
     async function play(audioEl) {
-        // Never play if app is in background (saves battery + avoids surprise sounds)
+        // 1. Don't play if sound is disabled by user setting
+        if (!isSoundEnabled()) return;
+
+        // 2. Never play if tab/app is hidden in background
         if (document.hidden) return;
         if (!audioEl) return;
 
@@ -88,25 +95,29 @@ const SoundManager = (() => {
                 if (running) {
                     _muted = await _checkMuted(ctx);
                 } else {
-                    _muted = true; // suspended and couldn't resume = muted/blocked
+                    _muted = true;
                 }
             }
         }
 
-        if (_muted) return; // device is muted or audio is blocked — skip sound
+        if (_muted) return; // Silent mode or suppressed
 
         try {
             audioEl.currentTime = 0;
-            await audioEl.play();
+            const playPromise = audioEl.play();
+            if (playPromise !== undefined) {
+                await playPromise;
+            }
         } catch(e) {
-            // play() was rejected — audio blocked or device went silent since last check
+            // Audio blocked or device in silent mode
             _muted = true;
-            _muteCheckAt = 0; // force re-check next time
+            _muteCheckAt = 0;
         }
     }
 
-    return { play };
+    return { play, isSoundEnabled, setSoundEnabled };
 })();
+
 
 
 
@@ -5756,6 +5767,26 @@ function _initSettingsEnhancements() {
         settingsThemeToggle.addEventListener('change', () => {
             if (typeof toggleTheme === 'function') toggleTheme();
             setTimeout(syncSettingsTheme, 50);
+        });
+    }
+
+    // Sound toggle in settings
+    const settingsSoundToggle = document.getElementById('settings-sound-toggle');
+    const soundLabel = document.getElementById('sound-label');
+    const soundIcon = document.getElementById('sound-icon-indicator');
+
+    function syncSettingsSound() {
+        const isEnabled = SoundManager.isSoundEnabled();
+        if (settingsSoundToggle) settingsSoundToggle.checked = isEnabled;
+        if (soundLabel) soundLabel.textContent = isEnabled ? 'Sound On' : 'Muted';
+        if (soundIcon) soundIcon.className = isEnabled ? 'fas fa-volume-high' : 'fas fa-volume-xmark';
+    }
+    syncSettingsSound();
+
+    if (settingsSoundToggle) {
+        settingsSoundToggle.addEventListener('change', () => {
+            SoundManager.setSoundEnabled(settingsSoundToggle.checked);
+            syncSettingsSound();
         });
     }
 
