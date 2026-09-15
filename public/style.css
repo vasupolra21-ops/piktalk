@@ -2944,15 +2944,15 @@ body.light-mode .member-admin-badge {
     transform: translateY(-50%);
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
     z-index: 20;
 }
 
-.message.sent .msg-action-bar  { right: calc(100% + 6px); flex-direction: row-reverse; }
-.message.received .msg-action-bar { left: calc(100% + 6px); }
+.message.sent .msg-action-bar  { right: calc(100% + 8px); flex-direction: row; }
+.message.received .msg-action-bar { left: calc(100% + 8px); flex-direction: row; }
 
 /* Bridge the hover gap between bubble and action bar */
 .msg-action-bar::before {
@@ -2982,24 +2982,25 @@ body.light-mode .member-admin-badge {
     background: var(--card-bg);
     border: 1px solid var(--glass-border);
     border-radius: 50%;
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    transition: all 0.2s;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    font-size: 0.82rem;
+    color: var(--text-main);
+    transition: all 0.18s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 .msg-action-btn:hover {
-    color: var(--accent);
+    color: var(--primary);
     transform: scale(1.15);
-    background: rgba(99,102,241,0.15);
-    border-color: rgba(99,102,241,0.3);
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.4);
 }
 
 /* ── Quick Emoji Picker ── */

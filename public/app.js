@@ -2683,8 +2683,8 @@ function appendMessage(data, isSentByMe) {
             actionBar.appendChild(barDlBtn);
         }
 
-        actionBar.appendChild(reactBtn);
         actionBar.appendChild(replyBtn);
+        actionBar.appendChild(reactBtn);
         bubbleWrapper.appendChild(actionBar);
     }
 
