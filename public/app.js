@@ -21,6 +21,95 @@ window.fetch = async function(...args) {
     return _origFetch.apply(this, args);
 };
 
+// ─────────────────────────────────────────────────────────────
+// SOUND MANAGER — respects device silent/mute state
+// On Android: system volume controls media audio natively.
+// On iOS:     we use AudioContext state to detect if audio
+//             is blocked or suppressed by the browser/OS.
+// ─────────────────────────────────────────────────────────────
+const SoundManager = (() => {
+    let _audioCtx = null;
+    let _muted = false;          // true = audio is blocked or device is muted
+    let _muteCheckAt = 0;        // timestamp of last check
+    const MUTE_RECHECK_MS = 4000;// re-check every 4 seconds
+
+    function _getCtx() {
+        try {
+            if (!_audioCtx || _audioCtx.state === 'closed') {
+                _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return _audioCtx;
+        } catch(e) { return null; }
+    }
+
+    // Try to resume a suspended AudioContext (required after user gesture on mobile)
+    async function _ensureRunning(ctx) {
+        if (ctx.state === 'suspended') {
+            try { await ctx.resume(); } catch(e) {}
+        }
+        return ctx.state === 'running';
+    }
+
+    // Play a 1-frame silent buffer and measure how much AudioContext time advanced.
+    // If the context clock barely moved → audio output is suppressed → treat as muted.
+    async function _checkMuted(ctx) {
+        return new Promise(resolve => {
+            try {
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate); // 100ms buffer
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                src.connect(ctx.destination);
+                const t0 = ctx.currentTime;
+                src.start();
+                // After 120ms, see if the context clock has advanced ≥ 80ms
+                setTimeout(() => {
+                    const elapsed = (ctx.currentTime - t0) * 1000;
+                    resolve(elapsed < 50); // < 50ms advancement = likely muted/blocked
+                }, 120);
+            } catch(e) {
+                resolve(false); // assume not muted if check fails
+            }
+        });
+    }
+
+    async function play(audioEl) {
+        // Never play if app is in background (saves battery + avoids surprise sounds)
+        if (document.hidden) return;
+        if (!audioEl) return;
+
+        const now = Date.now();
+        const needsCheck = now - _muteCheckAt > MUTE_RECHECK_MS;
+
+        if (needsCheck) {
+            _muteCheckAt = now;
+            const ctx = _getCtx();
+            if (ctx) {
+                const running = await _ensureRunning(ctx);
+                if (running) {
+                    _muted = await _checkMuted(ctx);
+                } else {
+                    _muted = true; // suspended and couldn't resume = muted/blocked
+                }
+            }
+        }
+
+        if (_muted) return; // device is muted or audio is blocked — skip sound
+
+        try {
+            audioEl.currentTime = 0;
+            await audioEl.play();
+        } catch(e) {
+            // play() was rejected — audio blocked or device went silent since last check
+            _muted = true;
+            _muteCheckAt = 0; // force re-check next time
+        }
+    }
+
+    return { play };
+})();
+
+
+
 // Initialize Socket.io – websocket-first for fastest connection
 let socket;
 try {
@@ -2114,7 +2203,7 @@ if (socket) {
         hideTyping();
         appendMessage(data, data.id === socket.id);
         saveMsgToHistory(data);
-        if (msgSound) msgSound.play().catch(() => {});
+        if (msgSound) SoundManager.play(msgSound);
 
         // Auto-refresh smart replies in real time if suggestions bar is currently open
         if (aiRepliesBar && !aiRepliesBar.classList.contains('hidden') && typeof refreshAISuggestions === 'function') {
