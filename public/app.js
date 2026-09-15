@@ -954,6 +954,21 @@ function renderEmojiPicker() {
         return;
     }
 
+    // Track user cursor position so clicking an emoji inserts at exact cursor location
+    let savedCursorPos = null;
+    if (messageInput) {
+        const updateCursor = () => {
+            if (document.activeElement === messageInput) {
+                savedCursorPos = messageInput.selectionStart;
+            }
+        };
+        messageInput.addEventListener('keyup', updateCursor);
+        messageInput.addEventListener('mouseup', updateCursor);
+        messageInput.addEventListener('touchend', updateCursor);
+        messageInput.addEventListener('click', updateCursor);
+        messageInput.addEventListener('select', updateCursor);
+    }
+
     function loadCategory(catName) {
         container.innerHTML = '';
         EMOJI_CATEGORIES[catName].forEach(emoji => {
@@ -966,14 +981,30 @@ function renderEmojiPicker() {
             span.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (messageInput) {
-                    messageInput.value += emoji;
+                    let start = savedCursorPos;
+                    if (start === null || start === undefined || start < 0) {
+                        start = messageInput.selectionStart != null ? messageInput.selectionStart : messageInput.value.length;
+                    }
+                    const end = (messageInput.selectionEnd != null && messageInput.selectionEnd >= start) ? messageInput.selectionEnd : start;
+                    const val = messageInput.value;
+                    
+                    messageInput.value = val.slice(0, start) + emoji + val.slice(end);
+                    const newCursor = start + emoji.length;
+                    savedCursorPos = newCursor;
+
                     messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    // Scroll to bottom so newest emoji + cursor is always visible
-                    messageInput.scrollTop = messageInput.scrollHeight;
+
+                    messageInput.focus();
+                    try {
+                        messageInput.setSelectionRange(newCursor, newCursor);
+                    } catch(err) {}
+
                     setTimeout(() => {
                         if (messageInput && !messageInput.disabled) {
                             messageInput.focus();
-                            messageInput.scrollTop = messageInput.scrollHeight;
+                            try {
+                                messageInput.setSelectionRange(newCursor, newCursor);
+                            } catch(err) {}
                         }
                     }, 50);
                 }
