@@ -1356,6 +1356,7 @@ body.light-mode .bubble-timestamp {
     max-height: 120px;
     line-height: 1.35;
     scrollbar-width: none;
+    caret-color: var(--primary);
 }
 
 .chat-input-area .input-wrapper-chat textarea::-webkit-scrollbar {
@@ -1366,6 +1367,7 @@ body.light-mode .bubble-timestamp {
 .chat-input-area .input-wrapper-chat textarea:focus {
     border: none;
     outline: none;
+    caret-color: var(--primary);
 }
 
 .btn-icon-small {
