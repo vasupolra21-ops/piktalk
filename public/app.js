@@ -373,21 +373,35 @@ function initViewportHandler() {
     const chatView = document.getElementById('chat-view');
     let vpResizeHandler = null;
 
+    function scrollToBottom() {
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            requestAnimationFrame(() => {
+                if (messagesContainer) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+            });
+        }
+    }
+
     function applyKeyboardHeight() {
         if (!window.visualViewport || !chatView) return;
         const vv = window.visualViewport;
-        const vh = vv.height;
-        const top = vv.offsetTop || 0;
+        const vh = Math.round(vv.height);
 
-        // Set CSS variable on root and element with !important priority
+        // Keep page scroll locked at 0 on iOS to prevent view shift
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+        if (document.body.scrollTop !== 0) document.body.scrollTop = 0;
+
+        // Only set height — never set top. Keep position:fixed;top:0 from CSS.
+        // Setting top from vv.offsetTop causes the view to jump on iOS.
         document.documentElement.style.setProperty('--viewport-height', vh + 'px');
         chatView.style.setProperty('height', vh + 'px', 'important');
-        chatView.style.setProperty('top', top + 'px', 'important');
+        chatView.style.setProperty('top', '0px', 'important');
+        chatView.style.setProperty('left', '0px', 'important');
 
         // Scroll to bottom so latest message stays visible above keyboard
-        if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
+        scrollToBottom();
         updateActiveModalViewport();
     }
 
@@ -397,6 +411,9 @@ function initViewportHandler() {
         // Remove inline styles — CSS 100dvh takes back over
         chatView.style.removeProperty('height');
         chatView.style.removeProperty('top');
+        chatView.style.removeProperty('left');
+        // Scroll to bottom after keyboard dismisses too
+        setTimeout(scrollToBottom, 50);
     }
 
     // Prevent iOS page scroll (it creates white gaps)
@@ -420,27 +437,31 @@ function initViewportHandler() {
     if (messageInput) {
         messageInput.addEventListener('focus', () => {
             document.body.classList.add('keyboard-active');
-            // Start listening to viewport resize ONLY while keyboard is open
+            // Start listening to visualViewport resize ONLY while keyboard is open
             if (window.visualViewport && !vpResizeHandler) {
                 vpResizeHandler = applyKeyboardHeight;
                 window.visualViewport.addEventListener('resize', vpResizeHandler);
             }
-            // Staggered calls to catch Safari's slow keyboard animation (300-400ms)
-            setTimeout(applyKeyboardHeight, 100);
+            // Immediate + staggered calls to catch Safari's slow keyboard animation (300-500ms)
+            applyKeyboardHeight();
+            setTimeout(applyKeyboardHeight, 50);
+            setTimeout(applyKeyboardHeight, 150);
             setTimeout(applyKeyboardHeight, 300);
             setTimeout(applyKeyboardHeight, 500);
+            setTimeout(applyKeyboardHeight, 700);
         });
 
         messageInput.addEventListener('blur', () => {
             document.body.classList.remove('keyboard-active');
-            // Stop listening to viewport resize — prevent false positives from chrome changes
+            // Stop listening to viewport resize — prevent false positives
             if (window.visualViewport && vpResizeHandler) {
                 window.visualViewport.removeEventListener('resize', vpResizeHandler);
                 vpResizeHandler = null;
             }
-            // Restore CSS 100dvh after keyboard dismisses
+            // Restore CSS 100dvh after keyboard dismisses (iOS takes ~400ms)
             setTimeout(clearKeyboardHeight, 100);
-            setTimeout(clearKeyboardHeight, 300);
+            setTimeout(clearKeyboardHeight, 400);
+            setTimeout(clearKeyboardHeight, 600);
         });
     }
 }
