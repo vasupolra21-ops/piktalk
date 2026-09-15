@@ -2601,8 +2601,23 @@ function appendMessage(data, isSentByMe) {
 
     // (Global menu closing listener handled in setupEventListeners)
 
+    // Add msg-new class: triggers animation + will-change only on this new bubble
+    msgDiv.classList.add('msg-new');
+
     messagesContainer.appendChild(msgDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    // Double rAF: first rAF runs before paint, second runs after first paint completes
+    // This prevents the scroll-jump from fighting the entrance animation on iOS
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+    });
+
+    // Clean up will-change after animation ends to free GPU layers
+    msgDiv.addEventListener('animationend', () => {
+        msgDiv.classList.remove('msg-new');
+    }, { once: true });
 }
 
 // ── EMOJI PICKER CATEGORIES ──

@@ -706,6 +706,8 @@ body.light-mode .btn-icon {
     overscroll-behavior: contain;
     /* Isolate layout so new messages don't reflow rest of page */
     contain: layout paint;
+    /* Own compositing layer for the scroll container on mobile */
+    transform: translateZ(0);
 }
 
 .messages-container::-webkit-scrollbar {
@@ -717,18 +719,22 @@ body.light-mode .btn-icon {
     border-radius: 10px;
 }
 
+/* Base message: NO will-change globally (saves GPU layers on mobile) */
 .message {
     max-width: 65%;
     display: flex;
     flex-direction: column;
-    animation: slideUp 0.25s ease forwards;
-    /* GPU-hint so the slide animation is composited */
+}
+
+/* Only new messages get animation + GPU hint — removed after animation via JS */
+.message.msg-new {
+    animation: slideUp 0.2s ease-out forwards;
     will-change: opacity, transform;
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .message.sent {
@@ -2259,7 +2265,13 @@ body.light-mode .waveform-bar {
         gap: 2px;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
+        /* Hide scrollbar on mobile — touch scrolling is already obvious */
+        scrollbar-width: none !important;
         /* No fixed height — height is derived from remaining flex space */
+    }
+
+    .messages-container::-webkit-scrollbar {
+        display: none !important;
     }
 
     .chat-input-area {
