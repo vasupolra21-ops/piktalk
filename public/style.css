@@ -2266,9 +2266,9 @@ body.light-mode .waveform-bar {
         flex-shrink: 0 !important;
         width: 100% !important;
         box-sizing: border-box !important;
-        padding: 8px 10px !important;
+        padding: 6px 8px !important;
         /* Push content above iPhone home bar / bottom indicator */
-        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)) !important;
         gap: 6px;
         position: relative;
         z-index: 2;
@@ -2276,28 +2276,58 @@ body.light-mode .waveform-bar {
 
     /* When keyboard is open: remove safe-area bottom padding (keyboard handles that space) */
     body.keyboard-active .chat-input-area {
-        padding-bottom: 8px !important;
+        padding-bottom: 6px !important;
     }
 
     /* Tighten row gap and textarea padding so "Type a message" is fully visible on mobile */
     .chat-input-row {
-        gap: 6px !important;
+        gap: 5px !important;
+    }
+
+    .chat-input-area .input-wrapper-chat {
+        min-width: 0 !important;
+        border-radius: 18px !important;
     }
 
     .chat-input-area .input-wrapper-chat input,
     .chat-input-area .input-wrapper-chat textarea {
-        padding: 8px 34px !important;
+        padding: 8px 30px 8px 30px !important;
         font-size: 16px !important;
+        line-height: 1.35 !important;
+        height: 38px !important;
+        min-height: 38px !important;
+    }
+
+    .chat-input-area .input-wrapper-chat textarea::placeholder,
+    .chat-input-area .input-wrapper-chat input::placeholder {
+        color: var(--text-muted) !important;
+        opacity: 0.75 !important;
+        font-size: 0.92rem !important;
+    }
+
+    .chat-input-area .input-wrapper-chat .btn-icon-small.left {
+        left: 7px !important;
+        font-size: 1rem !important;
+    }
+
+    .chat-input-area .input-wrapper-chat .btn-icon-small.right {
+        right: 7px !important;
+        font-size: 1rem !important;
     }
 
     .btn-mic,
     .btn-send,
     .btn-ai {
-        width: 38px !important;
-        height: 38px !important;
-        min-width: 38px !important;
-        font-size: 0.9rem !important;
+        width: 34px !important;
+        height: 34px !important;
+        min-width: 34px !important;
+        font-size: 0.85rem !important;
         flex-shrink: 0 !important;
+        padding: 0 !important;
+    }
+
+    .btn-ai {
+        font-size: 0.75rem !important;
     }
     
     .emoji-picker {
