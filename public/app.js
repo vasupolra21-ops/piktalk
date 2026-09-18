@@ -4887,14 +4887,15 @@ function startFaceScanFlow(isSettings = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    // On iPhone/iPad: native front camera { facingMode: 'user' } opens in < 150ms without AVFoundation negotiation delay
-    const videoConstraints = isIOS
-        ? { facingMode: 'user' }
-        : { facingMode: { ideal: 'user' }, width: { ideal: 640 }, height: { ideal: 480 } };
+    const videoConstraints = {
+        facingMode: 'user',
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        aspectRatio: { ideal: 4 / 3 }
+    };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
