@@ -2186,6 +2186,13 @@ function sendMessage() {
                 message: text,
                 replyTo: replyingTo || null
             });
+            if (sendBtn) {
+                sendBtn.classList.remove('btn-send-pop');
+                void sendBtn.offsetWidth; // Force reflow
+                sendBtn.classList.add('btn-send-pop');
+                sendBtn.addEventListener('animationend', () => sendBtn.classList.remove('btn-send-pop'), { once: true });
+            }
+
             messageInput.value = '';
             messageInput.style.height = '38px';
             messageInput.style.overflowY = 'hidden';
