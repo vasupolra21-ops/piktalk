@@ -4521,7 +4521,7 @@ function runFaceScanOverlay() {
 
     // Smooth interpolation of displayed percentage
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.25;
+        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.15;
         if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
@@ -4638,8 +4638,8 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Smooth scanning progression: takes ~1.5 seconds for realistic, natural face detection
-        faceScanLivenessProgress += 2.5;
+        // Steady, slower scanning progression (~3.5 seconds total for thorough, natural face scanning)
+        faceScanLivenessProgress += 0.85;
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
@@ -4670,7 +4670,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, 25);
+            faceScanTimerId = setTimeout(runFaceScanLoop, 30);
         }
     }
 }
