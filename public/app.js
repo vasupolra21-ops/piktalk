@@ -159,6 +159,7 @@ let replyBarEl = null;     // the reply preview bar DOM element
 let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
+let _lastOptimisticMsgText = null; // tracks optimistically-rendered sent message text
 
 // AI Smart Reply variables
 let aiBtn, aiRepliesBar, aiRepliesList, closeAiBtn;
@@ -2181,6 +2182,19 @@ function sendMessage() {
             isCurrentlyTyping = false;
             socket.emit('stop-typing');
 
+            // Optimistic UI: render message instantly without waiting for server echo
+            const optimisticData = {
+                msgId: '_opt_' + Date.now(),
+                id: socket.id,
+                nickname: myNickname || 'Me',
+                message: text,
+                profilePic: myProfilePic || null,
+                replyTo: replyingTo || null
+            };
+            appendMessage(optimisticData, true);
+            saveMsgToHistory(optimisticData);
+            _lastOptimisticMsgText = text;
+
             socket.emit('send-message', {
                 roomID: currentRoomID,
                 message: text,
@@ -2196,8 +2210,6 @@ function sendMessage() {
             messageInput.value = '';
             messageInput.style.height = '38px';
             messageInput.style.overflowY = 'hidden';
-            // Lock scroll to bottom immediately: prevents the layout shift (textarea shrink
-            // expands messagesContainer) from making messages appear to bounce up then back down
             if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
             clearReply();
 
@@ -2219,6 +2231,12 @@ function sendMessage() {
 if (socket) {
     socket.on('receive-message', (data) => {
         hideTyping();
+        // Skip own messages — already rendered optimistically in sendMessage()
+        if (data.id === socket.id && _lastOptimisticMsgText !== null && data.message === _lastOptimisticMsgText) {
+            _lastOptimisticMsgText = null;
+            if (msgSound) SoundManager.play(msgSound);
+            return;
+        }
         appendMessage(data, data.id === socket.id);
         saveMsgToHistory(data);
         if (msgSound) SoundManager.play(msgSound);
