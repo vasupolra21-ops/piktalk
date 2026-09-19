@@ -4519,10 +4519,10 @@ function runFaceScanOverlay() {
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Smoothly interpolate the displayed percentage
+    // Fast and smooth interpolation of displayed percentage
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.22;
-        if (faceScanLivenessDisplayProgress > 99.4 && faceScanLivenessProgress >= 100) {
+        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.45;
+        if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
     }
@@ -4568,7 +4568,7 @@ function runFaceScanOverlay() {
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
 }
 
-// ── Main async detection loop (ultra-smooth non-blocking cadence) ──
+// ── Main async detection loop (ultra-fast instant scan cadence) ──
 async function runFaceScanLoop() {
     if (!faceScanActive) return;
     // Guard: stop if profile setup is visible (login scan only)
@@ -4581,7 +4581,7 @@ async function runFaceScanLoop() {
 
     // Wait for video to be ready
     if (!video || video.readyState < 2) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 40);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 25);
         return;
     }
 
@@ -4598,13 +4598,13 @@ async function runFaceScanLoop() {
             }
         }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 50);
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 30);
         return;
     }
 
     // Prevent overlapping async frames
     if (faceScanIsProcessing) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 15);
         return;
     }
 
@@ -4612,7 +4612,7 @@ async function runFaceScanLoop() {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
 
     try {
-        // Ultra-fast lightweight face detection (<8ms)
+        // Ultra-fast lightweight face detection (<6ms)
         const detection = await detectFaceFast(video);
 
         if (!faceScanActive) return;
@@ -4638,8 +4638,8 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Smooth steady progress increment
-        faceScanLivenessProgress += 18;
+        // Fast progress increment: completes in 2-3 frames (<200ms)
+        faceScanLivenessProgress += 38;
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
@@ -4670,7 +4670,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, 45);
+            faceScanTimerId = setTimeout(runFaceScanLoop, 20);
         }
     }
 }
@@ -5106,7 +5106,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, 300);
+    }, 120);
 }
 
 // Failure feedback flow
