@@ -4219,15 +4219,16 @@ async function loadFaceModels() {
         faceModelsLoaded = true;
         console.log('[FaceID] Models loaded in background ✓');
 
-        // Pre-warm WebGL shader compilation for detector, landmarks, and recognition networks
-        // Eliminates first-time inference freezes on mobile GPUs
-        try {
-            const dummy = document.createElement('canvas');
-            dummy.width = 128;
-            dummy.height = 128;
-            const dummyOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.1 });
-            await faceapi.detectSingleFace(dummy, dummyOpts).withFaceLandmarks().withFaceDescriptor();
-        } catch(w) {}
+        // Pre-warm WebGL shader compilation asynchronously in background without freezing UI/camera
+        setTimeout(async () => {
+            try {
+                const dummy = document.createElement('canvas');
+                dummy.width = 128;
+                dummy.height = 128;
+                const dummyOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.1 });
+                await faceapi.detectSingleFace(dummy, dummyOpts);
+            } catch(w) {}
+        }, 100);
     } catch (e) {
         console.warn('[FaceID] Model load error, retrying in 1s:', e);
         faceModelsLoading = false;
@@ -4941,13 +4942,20 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                 faceScanVideoEl.muted = true;
                 faceScanVideoEl.defaultMuted = true;
                 faceScanVideoEl.playsInline = true;
-                faceScanVideoEl.setAttribute('playsinline', '');
-                faceScanVideoEl.setAttribute('webkit-playsinline', '');
+                faceScanVideoEl.setAttribute('playsinline', 'true');
+                faceScanVideoEl.setAttribute('webkit-playsinline', 'true');
                 faceScanVideoEl.setAttribute('autoplay', '');
                 faceScanVideoEl.style.display = 'block';
                 faceScanVideoEl.style.visibility = 'visible';
                 faceScanVideoEl.style.opacity = '1';
                 faceScanVideoEl.classList.add('ready');
+
+                faceScanVideoEl.onloadedmetadata = () => {
+                    if (faceScanVideoEl) {
+                        faceScanVideoEl.style.transform = 'translate(-50%, -50%) scaleX(-1)';
+                        faceScanVideoEl.style.webkitTransform = 'translate(-50%, -50%) scaleX(-1)';
+                    }
+                };
 
                 const scanner = faceScanVideoEl.closest('.circular-scanner');
                 if (scanner) {
