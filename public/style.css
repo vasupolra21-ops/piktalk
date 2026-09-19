@@ -4099,17 +4099,51 @@ video::-picture-in-picture-button,
     position: absolute;
     left: 0;
     right: 0;
+    top: 0;
     height: 3px;
-    background: linear-gradient(90deg, transparent, #10b981, transparent);
-    box-shadow: 0 0 10px #10b981, 0 0 20px #10b981;
-    z-index: 3;
-    animation: laserScan 2.5s infinite ease-in-out;
+    background: linear-gradient(90deg, transparent, #10b981 30%, #34d399 50%, #10b981 70%, transparent);
+    box-shadow: 0 0 12px #10b981, 0 0 24px rgba(16, 185, 129, 0.8);
+    z-index: 4;
+    animation: laserScan 2s infinite ease-in-out;
     pointer-events: none;
     display: none;
+    transform: translateZ(0);
 }
 
 .circular-scanner.scanning .scan-laser {
     display: block;
+}
+
+@keyframes laserScan {
+    0% {
+        transform: translateY(10px) translateZ(0);
+        opacity: 0.2;
+    }
+    15% {
+        opacity: 0.95;
+    }
+    50% {
+        transform: translateY(190px) translateZ(0);
+        opacity: 0.95;
+    }
+    85% {
+        opacity: 0.95;
+    }
+    100% {
+        transform: translateY(10px) translateZ(0);
+        opacity: 0.2;
+    }
+}
+
+@keyframes scannerGlow {
+    0%, 100% {
+        border-color: rgba(99, 102, 241, 0.6);
+        box-shadow: 0 0 25px rgba(99, 102, 241, 0.25);
+    }
+    50% {
+        border-color: rgba(16, 185, 129, 0.85);
+        box-shadow: 0 0 35px rgba(16, 185, 129, 0.4);
+    }
 }
 
 /* User-Friendly Biometric Progress Bar */
