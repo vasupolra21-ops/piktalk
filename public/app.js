@@ -1425,7 +1425,7 @@ function setupEventListeners() {
     function triggerFaceReScan() {
         if (profileSetupSection) profileSetupSection.classList.add('hidden');
         if (faceScanSection) faceScanSection.classList.remove('hidden');
-        setTimeout(() => startFaceScanFlow(false), 150);
+        setTimeout(() => startFaceScanFlow(false, true), 150);
     }
     const avatarScanBtn = document.getElementById('avatar-scan-btn');
     if (avatarScanBtn) {
@@ -4175,6 +4175,7 @@ let faceScanLivenessProgress = 0;
 let faceScanLivenessDisplayProgress = 0;
 let faceScanLivenessVerified = false;
 let faceScanIsSettings  = false;
+let faceScanIsReScan    = false;
 let faceScanDemoRunning = false;
 let faceScanLastFrameData = null; // Uint8Array for motion tracking
 
@@ -4519,9 +4520,10 @@ function runFaceScanOverlay() {
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Fast and smooth interpolation of displayed percentage
+    // Interpolation of displayed percentage (smooth for re-scan, fast for login)
+    const interpFactor = (faceScanIsReScan || faceScanIsSettings) ? 0.2 : 0.5;
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.5;
+        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * interpFactor;
         if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
@@ -4638,11 +4640,15 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Fast, snappy scanning progression (~200ms)
-        faceScanLivenessProgress += 22;
+        // Scan progress: slower for re-scan (~2.5s so user can set their face), snappy for regular login
+        if (faceScanIsReScan || faceScanIsSettings) {
+            faceScanLivenessProgress += 1.1;
+            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
+        } else {
+            faceScanLivenessProgress += 22;
+            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
+        }
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
-
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
 
         // Scan complete?
         if (faceScanLivenessProgress >= 100) {
@@ -4670,7 +4676,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, 15);
+            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? 25 : 15);
         }
     }
 }
@@ -4852,9 +4858,10 @@ function saveBiometrics(signature, video) {
 }
 
 // Open camera stream and kick off scan loops
-function startFaceScanFlow(isSettings = false) {
+function startFaceScanFlow(isSettings = false, isReScan = false) {
     loadFaceModels();
     faceScanIsSettings = isSettings;
+    faceScanIsReScan   = isReScan;
     faceScanActive     = true;
     faceScanLivenessProgress = 0;
     faceScanLivenessDisplayProgress = 0;
@@ -5106,7 +5113,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, 150);
+    }, faceScanIsReScan ? 350 : 150);
 }
 
 // Failure feedback flow
