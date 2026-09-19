@@ -4858,6 +4858,25 @@ function saveBiometrics(signature, video) {
     }
 }
 
+function enforceCameraZoom(stream) {
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    const applyZoomConstraint = () => {
+        try {
+            if (track.getCapabilities && track.applyConstraints) {
+                const caps = track.getCapabilities();
+                if (caps && caps.zoom) {
+                    const minZoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
+                    track.applyConstraints({ advanced: [{ zoom: minZoom }] }).catch(() => {});
+                }
+            }
+        } catch(e) {}
+    };
+    applyZoomConstraint();
+    [80, 200, 500, 1000, 2000].forEach(delay => setTimeout(applyZoomConstraint, delay));
+}
+
 // Open camera stream and kick off scan loops
 function startFaceScanFlow(isSettings = false, isReScan = false) {
     loadFaceModels();
@@ -4911,32 +4930,22 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-    // On iOS (iPhone/iPad Safari & Chrome): unconstrained facingMode: 'user' gives full sensor FOV natively.
-    // Explicit width/height/aspectRatio (e.g. 640x480 / 4:3) forces iOS AVFoundation to apply a digital crop/zoom.
-    const videoConstraints = isIOS
-        ? { facingMode: 'user' }
-        : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } };
+    const videoConstraints = {
+        facingMode: 'user',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+    };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     getCamStream()
         .then(stream => {
             faceScanStream = stream;
+            enforceCameraZoom(stream);
 
-            // Ensure hardware zoom is locked at minimum (1.0x) if supported
-            try {
-                const track = stream.getVideoTracks()[0];
-                if (track && track.getCapabilities && track.applyConstraints) {
-                    const caps = track.getCapabilities();
-                    if (caps.zoom) {
-                        track.applyConstraints({ advanced: [{ zoom: caps.zoom.min || 1 }] }).catch(() => {});
-                    }
-                }
-            } catch(e) {}
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.muted = true;
@@ -4951,6 +4960,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                 faceScanVideoEl.classList.add('ready');
 
                 faceScanVideoEl.onloadedmetadata = () => {
+                    enforceCameraZoom(stream);
                     if (faceScanVideoEl) {
                         faceScanVideoEl.style.transform = 'translate(-50%, -50%) scaleX(-1)';
                         faceScanVideoEl.style.webkitTransform = 'translate(-50%, -50%) scaleX(-1)';
