@@ -4557,7 +4557,12 @@ function runFaceScanOverlay() {
 
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified && faceScanLivenessProgress < 100) {
         faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Scanning (${displayPercent}%)`;
+        let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+        if (!textSpan || !faceScanStatusEl.querySelector('.fa-circle-notch')) {
+            faceScanStatusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (${displayPercent}%)</span>`;
+        } else {
+            textSpan.textContent = `Scanning (${displayPercent}%)`;
+        }
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
@@ -4584,7 +4589,14 @@ async function runFaceScanLoop() {
     if (!faceModelsLoaded) {
         faceNoFaceCount = 0;
         loadFaceModels();
-        if (faceScanStatusEl) faceScanStatusEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Initializing AI Engine...';
+        if (faceScanStatusEl) {
+            let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+            if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
+                textSpan.textContent = 'Initializing AI Engine...';
+            } else {
+                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Initializing AI Engine...</span>';
+            }
+        }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
         if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 50);
         return;
@@ -4636,7 +4648,12 @@ async function runFaceScanLoop() {
         if (faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
             if (faceScanStatusEl) {
-                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Authenticating...';
+                let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+                if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
+                    textSpan.textContent = 'Authenticating...';
+                } else {
+                    faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Authenticating...</span>';
+                }
             }
 
             // Extract 128-dim descriptor once upon completion
@@ -4870,7 +4887,7 @@ function startFaceScanFlow(isSettings = false) {
 
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Scanning (0%)';
+        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
     }
     const initialBar = document.getElementById(isSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
     if (initialBar) initialBar.style.width = '0%';
@@ -4937,7 +4954,12 @@ function startFaceScanFlow(isSettings = false) {
                     }
                     if (faceScanStatusEl) {
                         faceScanStatusEl.className = 'face-status';
-                        faceScanStatusEl.innerHTML = '<i class="fas fa-magnifying-glass fa-spin"></i> Looking for face...';
+                        let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+                        if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
+                            textSpan.textContent = 'Scanning (0%)';
+                        } else {
+                            faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
+                        }
                     }
                     if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);

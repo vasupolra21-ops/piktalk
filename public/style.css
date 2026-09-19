@@ -4183,18 +4183,37 @@ video::-picture-in-picture-button,
     overflow: visible;
 }
 
-/* Guarantee the spinner icon rotates during scanning regardless of fa-spin class */
+/* Guarantee the circle-notch spinner icon rotates continuously with GPU acceleration */
+.face-status i.fa-circle-notch,
 .face-status i.fa-spinner,
 .face-status i.fa-spin,
+.settings-scan-status i.fa-circle-notch,
 .settings-scan-status i.fa-spinner,
 .settings-scan-status i.fa-spin {
     display: inline-block;
-    animation: faceScanSpin 1s linear infinite;
+    animation: faceScanSpin 0.85s linear infinite !important;
+    -webkit-animation: faceScanSpin 0.85s linear infinite !important;
+    transform-origin: center center;
+    -webkit-transform-origin: center center;
+    will-change: transform;
 }
 
 @keyframes faceScanSpin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg) translateZ(0);
+    }
+    100% {
+        transform: rotate(360deg) translateZ(0);
+    }
+}
+
+@-webkit-keyframes faceScanSpin {
+    0% {
+        -webkit-transform: rotate(0deg) translateZ(0);
+    }
+    100% {
+        -webkit-transform: rotate(360deg) translateZ(0);
+    }
 }
 
 .face-status.success {
