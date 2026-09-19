@@ -4095,46 +4095,6 @@ video::-picture-in-picture-button,
     transform: scaleX(-1);
 }
 
-.scan-laser {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, #10b981 30%, #34d399 50%, #10b981 70%, transparent);
-    box-shadow: 0 0 12px #10b981, 0 0 24px rgba(16, 185, 129, 0.8);
-    z-index: 4;
-    animation: laserScan 2s infinite ease-in-out;
-    pointer-events: none;
-    display: none;
-    transform: translateZ(0);
-}
-
-.circular-scanner.scanning .scan-laser {
-    display: block;
-}
-
-@keyframes laserScan {
-    0% {
-        transform: translateY(10px) translateZ(0);
-        opacity: 0.2;
-    }
-    15% {
-        opacity: 0.95;
-    }
-    50% {
-        transform: translateY(190px) translateZ(0);
-        opacity: 0.95;
-    }
-    85% {
-        opacity: 0.95;
-    }
-    100% {
-        transform: translateY(10px) translateZ(0);
-        opacity: 0.2;
-    }
-}
-
 @keyframes scannerGlow {
     0%, 100% {
         border-color: rgba(99, 102, 241, 0.6);
@@ -4510,11 +4470,6 @@ video::-picture-in-picture-button,
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
-
-@keyframes laserScan {
-    0%, 100% { top: 0%; }
-    50% { top: 100%; }
-}
 
 @keyframes scannerGlow {
     0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.1); }
