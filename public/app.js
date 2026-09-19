@@ -4887,21 +4887,32 @@ function startFaceScanFlow(isSettings = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const videoConstraints = {
-        facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        aspectRatio: { ideal: 4 / 3 }
-    };
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    // On iOS (iPhone/iPad Safari & Chrome): unconstrained facingMode: 'user' gives full sensor FOV natively.
+    // Explicit width/height/aspectRatio (e.g. 640x480 / 4:3) forces iOS AVFoundation to apply a digital crop/zoom.
+    const videoConstraints = isIOS
+        ? { facingMode: 'user' }
+        : { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     getCamStream()
         .then(stream => {
             faceScanStream = stream;
+
+            // Ensure hardware zoom is locked at minimum (1.0x) if supported
+            try {
+                const track = stream.getVideoTracks()[0];
+                if (track && track.getCapabilities && track.applyConstraints) {
+                    const caps = track.getCapabilities();
+                    if (caps.zoom) {
+                        track.applyConstraints({ advanced: [{ zoom: caps.zoom.min || 1 }] }).catch(() => {});
+                    }
+                }
+            } catch(e) {}
             if (faceScanVideoEl) {
                 faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.muted = true;
