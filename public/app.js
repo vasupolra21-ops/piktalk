@@ -4521,7 +4521,7 @@ function runFaceScanOverlay() {
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
     // Interpolation of displayed percentage (smooth for re-scan, fast for login)
-    const interpFactor = (faceScanIsReScan || faceScanIsSettings) ? 0.2 : 0.5;
+    const interpFactor = (faceScanIsReScan || faceScanIsSettings) ? 0.35 : 0.5;
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
         faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * interpFactor;
         if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
@@ -4640,9 +4640,9 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Scan progress: slower for re-scan (~2.5s so user can set their face), snappy for regular login
+        // Scan progress: moderately paced for re-scan (~1.0s - 1.2s), snappy for regular login
         if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += 1.1;
+            faceScanLivenessProgress += 2.8;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
         } else {
             faceScanLivenessProgress += 22;
@@ -4676,7 +4676,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? 25 : 15);
+            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? 20 : 15);
         }
     }
 }
