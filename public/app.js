@@ -4519,9 +4519,9 @@ function runFaceScanOverlay() {
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Smooth interpolation of displayed percentage
+    // Fast and smooth interpolation of displayed percentage
     if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.15;
+        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * 0.5;
         if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
@@ -4638,8 +4638,8 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Steady, slower scanning progression (~3.5 seconds total for thorough, natural face scanning)
-        faceScanLivenessProgress += 0.85;
+        // Fast, snappy scanning progression (~200ms)
+        faceScanLivenessProgress += 22;
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
@@ -4670,7 +4670,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+            faceScanTimerId = setTimeout(runFaceScanLoop, 15);
         }
     }
 }
@@ -5106,7 +5106,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, 450);
+    }, 150);
 }
 
 // Failure feedback flow
