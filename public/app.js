@@ -4557,11 +4557,7 @@ function runFaceScanOverlay() {
 
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified && faceScanLivenessProgress < 100) {
         faceScanStatusEl.className = 'face-status';
-        if (displayPercent > 0) {
-            faceScanStatusEl.innerHTML = `<i class="fas fa-shield-halved fa-beat"></i> Scanning (${displayPercent}%)`;
-        } else {
-            faceScanStatusEl.innerHTML = `<i class="fas fa-camera"></i> Align face in frame`;
-        }
+        faceScanStatusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> Scanning (${displayPercent}%)`;
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
