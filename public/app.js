@@ -4955,11 +4955,10 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    const videoConstraints = {
-        facingMode: 'user',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-    };
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const videoConstraints = isIOS
+        ? { facingMode: 'user' }
+        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }))
@@ -4987,8 +4986,8 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                 faceScanVideoEl.onloadedmetadata = () => {
                     enforceCameraZoom(stream);
                     if (faceScanVideoEl) {
-                        faceScanVideoEl.style.transform = 'translate(-50%, -50%) scaleX(-1)';
-                        faceScanVideoEl.style.webkitTransform = 'translate(-50%, -50%) scaleX(-1)';
+                        faceScanVideoEl.style.transform = 'scaleX(-1)';
+                        faceScanVideoEl.style.webkitTransform = 'scaleX(-1)';
                     }
                 };
 
