@@ -4883,13 +4883,16 @@ function saveBiometrics(signature, video) {
     }
 }
 
+let _zoomLockInterval = null;
+
 function enforceCameraZoom(stream) {
     if (!stream) return;
     const track = stream.getVideoTracks()[0];
     if (!track) return;
+
     const applyZoomConstraint = () => {
         try {
-            if (track.getCapabilities && track.applyConstraints) {
+            if (track && track.readyState === 'live' && track.getCapabilities && track.applyConstraints) {
                 const caps = track.getCapabilities();
                 if (caps && caps.zoom) {
                     const minZoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
@@ -4898,8 +4901,22 @@ function enforceCameraZoom(stream) {
             }
         } catch(e) {}
     };
+
     applyZoomConstraint();
-    [80, 200, 500, 1000, 2000].forEach(delay => setTimeout(applyZoomConstraint, delay));
+    [50, 150, 300, 600, 1000, 1500, 2500].forEach(delay => setTimeout(applyZoomConstraint, delay));
+
+    if (_zoomLockInterval) clearInterval(_zoomLockInterval);
+    _zoomLockInterval = setInterval(() => {
+        if (!faceScanActive || !track || track.readyState !== 'live') {
+            if (_zoomLockInterval) { clearInterval(_zoomLockInterval); _zoomLockInterval = null; }
+            return;
+        }
+        applyZoomConstraint();
+    }, 400);
+
+    try {
+        track.onunmute = () => applyZoomConstraint();
+    } catch(e) {}
 }
 
 // Open camera stream and kick off scan loops
@@ -4963,8 +4980,9 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
     };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }))
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', aspectRatio: { ideal: 1.7777777778 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
@@ -5045,6 +5063,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
 
 function stopFaceScanFlow() {
     faceScanActive = false;
+    if (_zoomLockInterval) { clearInterval(_zoomLockInterval); _zoomLockInterval = null; }
     if (faceScanTimerId) { clearTimeout(faceScanTimerId); faceScanTimerId = null; }
     if (faceScanAnimationId) { cancelAnimationFrame(faceScanAnimationId); faceScanAnimationId = null; }
     if (faceScanStream) {

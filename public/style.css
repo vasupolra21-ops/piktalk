@@ -4151,8 +4151,8 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     object-fit: cover;
     object-position: center center;
     border-radius: 50%;
-    transform: scaleX(-1);
-    -webkit-transform: scaleX(-1);
+    transform: scaleX(-1) !important;
+    -webkit-transform: scaleX(-1) !important;
     transform-origin: center center;
     -webkit-transform-origin: center center;
     -webkit-backface-visibility: hidden;
@@ -4160,6 +4160,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     opacity: 1;
     pointer-events: none !important;
     user-select: none !important;
+    transition: none !important;
     z-index: 2;
 }
 
