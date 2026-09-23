@@ -5022,19 +5022,37 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.style.opacity = '1';
                         faceScanVideoEl.classList.add('ready');
                     }
+
+                    // Show stabilizing message while camera hardware settles (iOS auto-zoom fix)
                     if (faceScanStatusEl) {
                         faceScanStatusEl.className = 'face-status';
-                        let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
-                        if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
-                            textSpan.textContent = 'Scanning (0%)';
-                        } else {
-                            faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
-                        }
+                        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Stabilizing camera...</span>';
                     }
+                    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold phone at arm\'s length';
+
+                    // Start overlay animation immediately
                     if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
+
+                    // Wait 2000ms for iOS camera hardware to settle to wide angle BEFORE starting face detection
+                    const WARMUP_MS = 2000;
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
-                    faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+                    faceScanTimerId = setTimeout(() => {
+                        if (!faceScanActive) return;
+                        // Update status to scanning after warmup
+                        if (faceScanStatusEl) {
+                            faceScanStatusEl.className = 'face-status';
+                            let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+                            if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
+                                textSpan.textContent = 'Scanning (0%)';
+                            } else {
+                                faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
+                            }
+                        }
+                        if (faceScanDetailEl && !faceScanIsSettings) faceScanDetailEl.textContent = 'Hold steady...';
+                        if (faceScanTimerId) clearTimeout(faceScanTimerId);
+                        faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+                    }, WARMUP_MS);
                 };
 
                 // Trigger play immediately and start detection loops
