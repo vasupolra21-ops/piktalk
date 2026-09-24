@@ -394,20 +394,20 @@ io.on('connection', (socket) => {
 
     socket.on('send-message', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || data.roomID;
+        const roomID = (user && user.roomID) || (data && data.roomID);
         if (roomID) {
             const messageData = {
-                msgId: uuidv4(),
+                msgId: (data && data.msgId) ? data.msgId : uuidv4(),
                 id: socket.id,
-                nickname: data.nickname || (user && user.nickname) || 'Anonymous',
-                message: data.message,
-                image: data.image,
+                nickname: (data && data.nickname) || (user && user.nickname) || 'Anonymous',
+                message: data.message || '',
+                image: data.image || null,
                 file: data.file || null,
                 poll: data.poll || null,
                 location: data.location || null,
-                audio: data.audio,
-                audioDuration: data.audioDuration,
-                profilePic: data.profilePic || (user && user.profilePic) || null,
+                audio: data.audio || null,
+                audioDuration: data.audioDuration || null,
+                profilePic: (data && data.profilePic) || (user && user.profilePic) || null,
                 replyTo: data.replyTo || null,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };

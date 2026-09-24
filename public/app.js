@@ -126,10 +126,11 @@ let socket;
 try {
     socket = io({
         transports: ['websocket', 'polling'],
+        upgrade: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 400,
-        reconnectionDelayMax: 2000,
+        reconnectionDelay: 200,
+        reconnectionDelayMax: 1000,
         timeout: 10000
     });
 } catch (e) {
@@ -2416,18 +2417,12 @@ function startRecording() {
                 recordedAudioBlob = blob;
                 _precomputedAudioDataUrl = null;
 
-                // Pre-convert to base64 NOW (during preview) so send tap is instant
-                blob.arrayBuffer().then(buffer => {
-                    const bytes = new Uint8Array(buffer);
-                    let binary = '';
-                    const chunkSize = 8192;
-                    for (let i = 0; i < bytes.length; i += chunkSize) {
-                        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-                    }
-                    _precomputedAudioDataUrl = `data:${blob.type || 'audio/webm'};base64,${btoa(binary)}`;
-                }).catch(() => {
-                    _precomputedAudioDataUrl = null;
-                });
+                // Pre-convert to base64 immediately using fast native FileReader
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    _precomputedAudioDataUrl = e.target.result;
+                };
+                reader.readAsDataURL(blob);
 
                 showAudioPreview(blob, recordingSeconds);
             };
@@ -2826,21 +2821,10 @@ function sendVoiceMessage() {
         return;
     }
 
-    // Pre-conversion still in progress (very short recording) → convert now
-    recordedAudioBlob.arrayBuffer().then(buffer => {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        const chunkSize = 8192;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-        }
-        const dataUrl = `data:${recordedAudioBlob.type || 'audio/webm'};base64,${btoa(binary)}`;
-        doSend(dataUrl);
-    }).catch(() => {
-        const reader = new FileReader();
-        reader.onload = (e) => doSend(e.target.result);
-        reader.readAsDataURL(recordedAudioBlob);
-    });
+    // Direct fast FileReader conversion
+    const reader = new FileReader();
+    reader.onload = (e) => doSend(e.target.result);
+    reader.readAsDataURL(recordedAudioBlob);
 }
 
 function applyTheme(theme) {
