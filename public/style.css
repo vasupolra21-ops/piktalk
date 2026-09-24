@@ -5565,3 +5565,466 @@ body.light-mode .editor-select {
     transition: transform 0.15s, opacity 0.15s;
 }
 .file-attach-dl:active { transform: scale(0.92); opacity: 0.85; }
+
+/* ═══════════════════════════════════════════════
+   WHATSAPP ATTACHMENT MENU & PLUS BUTTON
+═══════════════════════════════════════════════ */
+.attach-plus-btn {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s !important;
+}
+.attach-plus-btn i {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.attach-plus-btn.menu-open i {
+    transform: rotate(45deg);
+    color: var(--primary);
+}
+
+.attach-menu {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 12px;
+    z-index: 100;
+    padding: 16px 14px;
+    border-radius: 20px;
+    background: rgba(20, 26, 46, 0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    animation: attachMenuSlideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: bottom left;
+}
+.light-mode .attach-menu,
+.light-mode-active .attach-menu {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
+}
+
+.attach-menu.hidden {
+    display: none !important;
+}
+
+@keyframes attachMenuSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.attach-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px 18px;
+}
+
+.attach-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: inherit;
+    transition: transform 0.15s ease;
+}
+.attach-item:active {
+    transform: scale(0.92);
+}
+
+.attach-icon-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.attach-item:hover .attach-icon-circle {
+    transform: translateY(-2px);
+}
+
+.attach-doc-bg      { background: linear-gradient(135deg, #7c3aed, #6366f1); }
+.attach-cam-bg      { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+.attach-gallery-bg  { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+.attach-poll-bg     { background: linear-gradient(135deg, #f59e0b, #ea580c); }
+.attach-location-bg { background: linear-gradient(135deg, #10b981, #059669); }
+.attach-audio-bg    { background: linear-gradient(135deg, #06b6d4, #3b82f6); }
+
+.attach-item span {
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: var(--text-main);
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════
+   POLL MODAL & POLL CHAT CARD
+═══════════════════════════════════════════════ */
+#poll-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 16px;
+}
+#poll-modal.active {
+    display: flex;
+    animation: fadeIn 0.25s ease;
+}
+
+.poll-modal-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 24px;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.poll-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.poll-modal-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.poll-modal-title i {
+    color: #f59e0b;
+}
+
+.poll-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.poll-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.poll-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.poll-text-input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid var(--glass-border);
+    background: var(--input-bg);
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.poll-text-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.poll-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.poll-option-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--input-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 0 10px;
+    transition: border-color 0.2s;
+}
+.poll-option-row:focus-within {
+    border-color: var(--primary);
+}
+
+.poll-opt-icon {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.poll-option-input {
+    flex: 1;
+    padding: 10px 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+}
+
+.poll-opt-remove {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 6px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.poll-opt-remove:hover { opacity: 1; }
+
+.poll-add-btn {
+    background: none;
+    border: 1px dashed var(--glass-border);
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: inherit;
+    transition: background 0.2s, border-color 0.2s;
+}
+.poll-add-btn:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--primary);
+}
+
+.poll-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px;
+}
+.poll-toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.poll-toggle-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.poll-toggle-sub {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+}
+
+/* Chat Poll Message Card */
+.bubble-poll {
+    padding: 14px 16px !important;
+    min-width: 260px;
+    max-width: 320px;
+}
+.poll-msg-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+.poll-msg-icon {
+    color: #f59e0b;
+    font-size: 1.1rem;
+    margin-top: 2px;
+}
+.poll-msg-question {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.35;
+    flex: 1;
+}
+.poll-msg-type {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.poll-msg-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.poll-option-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.poll-option-card:active {
+    transform: scale(0.98);
+}
+.poll-option-card.voted {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.poll-option-progress {
+    position: absolute;
+    inset: 0;
+    background: rgba(99, 102, 241, 0.22);
+    width: 0%;
+    transition: width 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+
+.poll-option-content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.poll-option-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.poll-radio-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--glass-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.poll-radio-dot.multi {
+    border-radius: 4px;
+}
+.poll-option-card.voted .poll-radio-dot {
+    border-color: var(--primary);
+    background: var(--primary);
+}
+.poll-radio-dot::after {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #fff;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.2s;
+}
+.poll-option-card.voted .poll-radio-dot::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.poll-option-text {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-main);
+    word-break: break-word;
+}
+.poll-option-stats {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.poll-msg-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--glass-border);
+    padding-top: 8px;
+    margin-top: 4px;
+}
+
+/* Location Message Card */
+.bubble-location {
+    padding: 12px 14px !important;
+}
+.location-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+}
+.location-icon-box {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+.location-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.location-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
+}
+.location-sub {
+    font-size: 0.75rem;
+    color: var(--primary);
+}

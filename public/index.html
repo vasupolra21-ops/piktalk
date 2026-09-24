@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=282" as="style">
+    <link rel="preload" href="/style.css?v=283" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=282" as="script">
+    <link rel="preload" href="/app.js?v=283" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=282">
+    <link rel="stylesheet" href="/style.css?v=283">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -212,12 +212,62 @@
                     <div class="ai-replies-list" id="ai-replies-list"></div>
                 </div>
 
+                <!-- WhatsApp Style Attachment Menu -->
+                <div id="attach-menu" class="attach-menu glass-card hidden" role="menu" aria-label="Attachment options">
+                    <div class="attach-menu-grid">
+                        <label class="attach-item" for="attach-doc-input">
+                            <div class="attach-icon-circle attach-doc-bg">
+                                <i class="fas fa-file-lines"></i>
+                            </div>
+                            <span>Document</span>
+                            <input type="file" id="attach-doc-input" accept="application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
+                        </label>
+                        
+                        <label class="attach-item" for="attach-camera-input">
+                            <div class="attach-icon-circle attach-cam-bg">
+                                <i class="fas fa-camera"></i>
+                            </div>
+                            <span>Camera</span>
+                            <input type="file" id="attach-camera-input" accept="image/*" capture="environment" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
+                        </label>
+                        
+                        <label class="attach-item" for="attach-gallery-input">
+                            <div class="attach-icon-circle attach-gallery-bg">
+                                <i class="fas fa-images"></i>
+                            </div>
+                            <span>Photos</span>
+                            <input type="file" id="attach-gallery-input" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
+                        </label>
+                        
+                        <button type="button" class="attach-item" id="attach-poll-btn">
+                            <div class="attach-icon-circle attach-poll-bg">
+                                <i class="fas fa-chart-simple"></i>
+                            </div>
+                            <span>Poll</span>
+                        </button>
+
+                        <button type="button" class="attach-item" id="attach-location-btn">
+                            <div class="attach-icon-circle attach-location-bg">
+                                <i class="fas fa-location-dot"></i>
+                            </div>
+                            <span>Location</span>
+                        </button>
+
+                        <label class="attach-item" for="attach-audio-input">
+                            <div class="attach-icon-circle attach-audio-bg">
+                                <i class="fas fa-headphones"></i>
+                            </div>
+                            <span>Audio</span>
+                            <input type="file" id="attach-audio-input" accept="audio/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
+                        </label>
+                    </div>
+                </div>
+
                 <div class="chat-input-row">
                     <div class="input-wrapper-chat">
-                        <label id="attach-btn" for="file-input" class="btn-icon-small left" style="cursor:pointer;-webkit-tap-highlight-color:transparent;position:absolute;overflow:hidden;">
-                            <i class="fas fa-paperclip" style="pointer-events:none;"></i>
-                            <input type="file" id="file-input" accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.mp4,.mov" style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0;z-index:5;-webkit-appearance:none;display:block;">
-                        </label>
+                        <button type="button" id="attach-btn" class="btn-icon-small left attach-plus-btn" aria-label="Attachments" title="Attach">
+                            <i class="fas fa-plus"></i>
+                        </button>
                         <textarea id="message-input" placeholder="Type a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-form-type="other" rows="1"></textarea>
                         <button id="emoji-btn" class="btn-icon-small right">
                             <i class="far fa-smile"></i>
@@ -336,7 +386,7 @@
                             <i class="fas fa-user-plus"></i>
                         </div>
                         <button type="button" id="avatar-scan-btn" class="avatar-scan-btn" title="Tap to re-scan face" aria-label="Scan face">
-                            <img src="/face-scan-icon.png?v=282" alt="Scan Face" class="avatar-scan-icon-img">
+                            <img src="/face-scan-icon.png?v=283" alt="Scan Face" class="avatar-scan-icon-img">
                         </button>
                     </div>
                 </div>
@@ -567,7 +617,57 @@
         </div>
     </div>
 
+    <!-- Create Poll Modal -->
+    <div id="poll-modal" class="modal" role="dialog" aria-modal="true" aria-label="Create Poll">
+        <div class="poll-modal-card glass-card animate-scaleUp">
+            <div class="poll-modal-header">
+                <span class="poll-modal-title"><i class="fas fa-chart-simple"></i> Create Poll</span>
+                <button type="button" class="settings-cancel-btn" id="close-poll-btn" aria-label="Close">&times;</button>
+            </div>
+            <div class="poll-modal-body">
+                <div class="poll-input-group">
+                    <label class="poll-label">Question</label>
+                    <input type="text" id="poll-question-input" class="poll-text-input" placeholder="Ask a question..." maxlength="120" autocomplete="off">
+                </div>
+
+                <div class="poll-input-group">
+                    <label class="poll-label">Options</label>
+                    <div id="poll-options-list" class="poll-options-list">
+                        <div class="poll-option-row">
+                            <i class="fas fa-circle-dot poll-opt-icon"></i>
+                            <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="60" autocomplete="off">
+                        </div>
+                        <div class="poll-option-row">
+                            <i class="fas fa-circle-dot poll-opt-icon"></i>
+                            <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="60" autocomplete="off">
+                        </div>
+                    </div>
+                    <button type="button" id="poll-add-option-btn" class="poll-add-btn">
+                        <i class="fas fa-plus"></i> Add Option
+                    </button>
+                </div>
+
+                <div class="poll-toggle-row">
+                    <div class="poll-toggle-label">
+                        <span class="poll-toggle-title">Allow multiple answers</span>
+                        <span class="poll-toggle-sub">Voters can pick more than one option</span>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="poll-multiple-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <div id="poll-error" class="phone-error hidden"></div>
+
+                <button type="button" id="poll-submit-btn" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 8px;">
+                    <i class="fas fa-paper-plane"></i> Send Poll
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=282" defer></script>
+    <script src="/app.js?v=283" defer></script>
 </body>
 </html>

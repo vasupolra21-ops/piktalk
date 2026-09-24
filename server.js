@@ -395,6 +395,9 @@ io.on('connection', (socket) => {
                 nickname: data.nickname || (user && user.nickname) || 'Anonymous',
                 message: data.message,
                 image: data.image,
+                file: data.file || null,
+                poll: data.poll || null,
+                location: data.location || null,
                 audio: data.audio,
                 audioDuration: data.audioDuration,
                 profilePic: data.profilePic || (user && user.profilePic) || null,
@@ -402,6 +405,20 @@ io.on('connection', (socket) => {
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             io.to(roomID).emit('receive-message', messageData);
+        }
+    });
+
+    // Real-time Poll Voting
+    socket.on('vote-poll', ({ msgId, optionIndex, roomID }) => {
+        const user = users[socket.id];
+        const rID = (user && user.roomID) || roomID;
+        if (rID && msgId && optionIndex !== undefined) {
+            io.to(rID).emit('poll-voted', {
+                msgId,
+                optionIndex,
+                userId: socket.id,
+                nickname: (user && user.nickname) || 'Anonymous'
+            });
         }
     });
 

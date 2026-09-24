@@ -188,6 +188,9 @@ function addFastClickListener(element, handler) {
 // DOM Elements
 let homeView, chatView, createRoomBtn, nicknameModal, nicknameInput, joinChatBtn, roomDisplayId, onlineStatus, messagesContainer, messageInput, sendBtn, inviteBtn, shareSection, roomLinkInput, copyBtn, leaveBtn, msgSound, emojiBtn, themeToggle, homeThemeToggle, attachBtn, imgInput, joinRoomInput, joinRoomBtn, emojiPicker, profilePicInput, avatarPreviewContainer, avatarPreviewImg, avatarPreviewIcon;
 let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPreviewBar, discardAudioBtn, playPreviewBtn, audioProgressBar, audioPreviewDuration, sendAudioBtn;
+let attachMenu, attachDocInput, attachCameraInput, attachGalleryInput, attachPollBtn, attachLocationBtn, attachAudioInput;
+let pollModal, closePollBtn, pollQuestionInput, pollOptionsList, pollAddOptionBtn, pollMultipleToggle, pollSubmitBtn, pollError;
+const _pollData = {};
 
 // Settings DOM Elements
 let settingsBtn, settingsModal, settingsCloseBtn, settingsNickname, settingsBioStatus, settingsRemoveFaceBtn, settingsRegisterFaceBtn;
@@ -243,7 +246,25 @@ function initDOMElements() {
     themeToggle = document.getElementById('theme-toggle');
     homeThemeToggle = document.getElementById('home-theme-toggle');
     attachBtn = document.getElementById('attach-btn');
-    imgInput = document.getElementById('file-input');
+    attachMenu = document.getElementById('attach-menu');
+    attachDocInput = document.getElementById('attach-doc-input');
+    attachCameraInput = document.getElementById('attach-camera-input');
+    attachGalleryInput = document.getElementById('attach-gallery-input');
+    attachPollBtn = document.getElementById('attach-poll-btn');
+    attachLocationBtn = document.getElementById('attach-location-btn');
+    attachAudioInput = document.getElementById('attach-audio-input');
+
+    // Poll Modal Elements
+    pollModal = document.getElementById('poll-modal');
+    closePollBtn = document.getElementById('close-poll-btn');
+    pollQuestionInput = document.getElementById('poll-question-input');
+    pollOptionsList = document.getElementById('poll-options-list');
+    pollAddOptionBtn = document.getElementById('poll-add-option-btn');
+    pollMultipleToggle = document.getElementById('poll-multiple-toggle');
+    pollSubmitBtn = document.getElementById('poll-submit-btn');
+    pollError = document.getElementById('poll-error');
+
+    imgInput = attachGalleryInput || attachDocInput;
     joinRoomInput = document.getElementById('join-room-input');
     joinRoomBtn = document.getElementById('join-room-btn');
     emojiPicker = document.getElementById('emoji-picker');
@@ -1671,7 +1692,34 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionupdate', emitMyTyping);
     }
 
-    // attachBtn is now a <label for="file-input"> — no JS click handler needed (works natively on mobile)
+    // WhatsApp Attachment Menu Toggle
+    if (attachBtn && attachMenu) {
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !attachMenu.classList.contains('hidden');
+            if (isOpen) {
+                attachMenu.classList.add('hidden');
+                attachBtn.classList.remove('menu-open');
+            } else {
+                attachMenu.classList.remove('hidden');
+                attachBtn.classList.add('menu-open');
+                // Close emoji picker if open
+                if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
+                    emojiPicker.classList.add('hidden');
+                }
+            }
+        });
+
+        // Close attachment menu when tapping anywhere else
+        document.addEventListener('click', (e) => {
+            if (attachMenu && !attachMenu.classList.contains('hidden')) {
+                if (!attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
+                    attachMenu.classList.add('hidden');
+                    attachBtn.classList.remove('menu-open');
+                }
+            }
+        });
+    }
     
     // AI smart replies trigger
     if (aiBtn) {
@@ -1989,25 +2037,85 @@ function setupEventListeners() {
         });
     }
 
-    if (imgInput) imgInput.addEventListener('change', () => {
-        const file = imgInput.files && imgInput.files[0];
+    // ── WhatsApp Attachment Menu Actions ──
+    const closeAttachMenu = () => {
+        if (attachMenu) attachMenu.classList.add('hidden');
+        if (attachBtn) attachBtn.classList.remove('menu-open');
+    };
+
+    const handleAttachmentFile = (file) => {
         if (!file) return;
+        closeAttachMenu();
 
         if (file.type && file.type.startsWith('image/')) {
-            // Images → open editor as before
             if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
             openImageEditor(file);
         } else {
-            // Documents, PDFs, ZIPs, etc. → send directly as file attachment
             if (file.size > 25000000) { alert('File too large (Max 25MB)'); return; }
             sendFileAttachment(file);
         }
+    };
 
-        // Reset value after a short delay so same file can be re-selected without breaking iOS read
-        setTimeout(() => {
-            try { if (imgInput) imgInput.value = ''; } catch(e) {}
-        }, 300);
+    // Attach File Inputs (Doc, Camera, Gallery, Audio)
+    [attachDocInput, attachCameraInput, attachGalleryInput, attachAudioInput].forEach(inputEl => {
+        if (inputEl) {
+            inputEl.addEventListener('change', () => {
+                const file = inputEl.files && inputEl.files[0];
+                handleAttachmentFile(file);
+                setTimeout(() => { try { inputEl.value = ''; } catch(e) {} }, 300);
+            });
+        }
     });
+
+    // Attach Location Action
+    if (attachLocationBtn) {
+        attachLocationBtn.addEventListener('click', () => {
+            closeAttachMenu();
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    if (socket && currentRoomID) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            location: {
+                                lat: pos.coords.latitude,
+                                lng: pos.coords.longitude
+                            },
+                            replyTo: replyingTo || null
+                        });
+                        clearReply();
+                    }
+                },
+                (err) => {
+                    alert('Could not retrieve location: ' + (err.message || 'Permission denied'));
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }
+
+    // Attach Poll Action
+    if (attachPollBtn) {
+        attachPollBtn.addEventListener('click', () => {
+            closeAttachMenu();
+            openPollModal();
+        });
+    }
+
+    // Poll Modal Event Listeners
+    if (closePollBtn) {
+        closePollBtn.addEventListener('click', closePollModal);
+    }
+    if (pollAddOptionBtn) {
+        pollAddOptionBtn.addEventListener('click', () => addPollOptionRow());
+    }
+    if (pollSubmitBtn) {
+        pollSubmitBtn.addEventListener('click', submitPoll);
+    }
 
     // ── Voice message listeners ──
     if (micBtn) {
@@ -2270,6 +2378,160 @@ function sendFileAttachment(file) {
             clearReply();
         };
         reader.readAsDataURL(file);
+    });
+}
+
+// ── Poll Creation & Voting Engine ──
+function openPollModal() {
+    if (!pollModal) return;
+    pollModal.classList.add('active');
+    document.body.classList.add('modal-open');
+    if (pollQuestionInput) {
+        pollQuestionInput.value = '';
+        setTimeout(() => pollQuestionInput.focus(), 300);
+    }
+    if (pollOptionsList) {
+        pollOptionsList.innerHTML = `
+            <div class="poll-option-row">
+                <i class="fas fa-circle-dot poll-opt-icon"></i>
+                <input type="text" class="poll-option-input" placeholder="Option 1" maxlength="60" autocomplete="off">
+            </div>
+            <div class="poll-option-row">
+                <i class="fas fa-circle-dot poll-opt-icon"></i>
+                <input type="text" class="poll-option-input" placeholder="Option 2" maxlength="60" autocomplete="off">
+            </div>
+        `;
+    }
+    if (pollMultipleToggle) pollMultipleToggle.checked = false;
+    if (pollError) pollError.classList.add('hidden');
+}
+
+function closePollModal() {
+    if (pollModal) pollModal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+    if (pollError) pollError.classList.add('hidden');
+}
+
+function addPollOptionRow() {
+    if (!pollOptionsList) return;
+    const rows = pollOptionsList.querySelectorAll('.poll-option-row');
+    if (rows.length >= 10) {
+        alert('Maximum 10 options allowed in a poll.');
+        return;
+    }
+    const idx = rows.length + 1;
+    const row = document.createElement('div');
+    row.className = 'poll-option-row';
+    row.innerHTML = `
+        <i class="fas fa-circle-dot poll-opt-icon"></i>
+        <input type="text" class="poll-option-input" placeholder="Option ${idx}" maxlength="60" autocomplete="off">
+        <button type="button" class="poll-opt-remove" title="Remove option"><i class="fas fa-xmark"></i></button>
+    `;
+    const removeBtn = row.querySelector('.poll-opt-remove');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+            row.remove();
+            pollOptionsList.querySelectorAll('.poll-option-row').forEach((r, i) => {
+                const inp = r.querySelector('.poll-option-input');
+                if (inp && !inp.value) inp.placeholder = `Option ${i + 1}`;
+            });
+        });
+    }
+    pollOptionsList.appendChild(row);
+    const newInp = row.querySelector('.poll-option-input');
+    if (newInp) newInp.focus();
+}
+
+function submitPoll() {
+    if (!socket || !currentRoomID) { alert('Not connected.'); return; }
+    const question = (pollQuestionInput ? pollQuestionInput.value.trim() : '');
+    if (!question) {
+        if (pollError) { pollError.textContent = 'Please enter a poll question.'; pollError.classList.remove('hidden'); }
+        if (pollQuestionInput) pollQuestionInput.focus();
+        return;
+    }
+
+    const optInputs = pollOptionsList ? pollOptionsList.querySelectorAll('.poll-option-input') : [];
+    const options = [];
+    optInputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val) options.push({ text: val, votes: [] });
+    });
+
+    if (options.length < 2) {
+        if (pollError) { pollError.textContent = 'Please enter at least 2 options.'; pollError.classList.remove('hidden'); }
+        return;
+    }
+
+    const allowMultiple = pollMultipleToggle ? pollMultipleToggle.checked : false;
+
+    socket.emit('send-message', {
+        roomID: currentRoomID,
+        message: '',
+        poll: {
+            question,
+            options,
+            allowMultiple,
+            voters: {}
+        },
+        replyTo: replyingTo || null
+    });
+
+    clearReply();
+    closePollModal();
+}
+
+function _renderPollCardHTML(msgId, poll, isMine) {
+    const totalVotes = Object.values(poll.voters || {}).reduce((acc, userVotes) => acc + (userVotes ? userVotes.length : 0), 0);
+    const myVotes = (poll.voters && socket && poll.voters[socket.id]) || [];
+
+    const optionsHTML = (poll.options || []).map((opt, idx) => {
+        const optVotes = (opt.votes && opt.votes.length) || 0;
+        const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+        const isVoted = myVotes.includes(idx);
+        const radioClass = poll.allowMultiple ? 'poll-radio-dot multi' : 'poll-radio-dot';
+
+        return `
+            <div class="poll-option-card ${isVoted ? 'voted' : ''}" onclick="_handlePollVote('${msgId}', ${idx})">
+                <div class="poll-option-progress" style="width: ${pct}%;"></div>
+                <div class="poll-option-content">
+                    <div class="poll-option-left">
+                        <div class="${radioClass}"></div>
+                        <span class="poll-option-text">${escapeHtml(opt.text)}</span>
+                    </div>
+                    <span class="poll-option-stats">${optVotes > 0 ? `${optVotes} (${pct}%)` : ''}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="poll-msg-header">
+            <i class="fas fa-chart-simple poll-msg-icon"></i>
+            <span class="poll-msg-question">${escapeHtml(poll.question)}</span>
+        </div>
+        <div class="poll-msg-type">
+            <i class="fas ${poll.allowMultiple ? 'fa-check-double' : 'fa-check'}"></i>
+            ${poll.allowMultiple ? 'Select one or more' : 'Select 1 option'}
+        </div>
+        <div class="poll-msg-options">
+            ${optionsHTML}
+        </div>
+        <div class="poll-msg-footer">
+            <span>${totalVotes} ${totalVotes === 1 ? 'vote' : 'votes'}</span>
+            <span>Tap option to vote</span>
+        </div>
+    `;
+}
+
+function _handlePollVote(msgId, optionIndex) {
+    const poll = _pollData[msgId];
+    if (!poll || !socket || !currentRoomID) return;
+    
+    socket.emit('vote-poll', {
+        msgId,
+        optionIndex,
+        roomID: currentRoomID
     });
 }
 
@@ -2579,6 +2841,58 @@ if (socket) {
 
     socket.on('user-voice-stop-recording', () => {
         hideTyping();
+    });
+
+    // Real-time Poll Voting Sync
+    socket.on('poll-voted', ({ msgId, optionIndex, userId, nickname }) => {
+        const poll = _pollData[msgId];
+        if (!poll) return;
+
+        if (!poll.voters) poll.voters = {};
+        if (!poll.options[optionIndex]) return;
+
+        const currentVotes = poll.voters[userId] || [];
+        if (poll.allowMultiple) {
+            if (currentVotes.includes(optionIndex)) {
+                // Toggle off
+                poll.voters[userId] = currentVotes.filter(i => i !== optionIndex);
+                if (poll.options[optionIndex].votes) {
+                    poll.options[optionIndex].votes = poll.options[optionIndex].votes.filter(id => id !== userId);
+                }
+            } else {
+                // Toggle on
+                poll.voters[userId] = [...currentVotes, optionIndex];
+                if (!poll.options[optionIndex].votes) poll.options[optionIndex].votes = [];
+                if (!poll.options[optionIndex].votes.includes(userId)) {
+                    poll.options[optionIndex].votes.push(userId);
+                }
+            }
+        } else {
+            // Single choice
+            if (currentVotes.length > 0) {
+                const prevIdx = currentVotes[0];
+                if (poll.options[prevIdx] && poll.options[prevIdx].votes) {
+                    poll.options[prevIdx].votes = poll.options[prevIdx].votes.filter(id => id !== userId);
+                }
+            }
+            if (currentVotes.includes(optionIndex)) {
+                poll.voters[userId] = [];
+            } else {
+                poll.voters[userId] = [optionIndex];
+                if (!poll.options[optionIndex].votes) poll.options[optionIndex].votes = [];
+                if (!poll.options[optionIndex].votes.includes(userId)) {
+                    poll.options[optionIndex].votes.push(userId);
+                }
+            }
+        }
+
+        // Re-render poll card in message bubble
+        const el = document.getElementById(`poll-msg-${msgId}`);
+        if (el) {
+            const timeSpan = el.querySelector('.bubble-timestamp');
+            const timeHTML = timeSpan ? timeSpan.outerHTML : '';
+            el.innerHTML = _renderPollCardHTML(msgId, poll, false) + timeHTML;
+        }
     });
 
     socket.on('room-users', (usersList) => {
@@ -2913,6 +3227,46 @@ function appendMessage(data, isSentByMe) {
         bubble.appendChild(timeSpan);
         contentEl = bubble;
 
+    } else if (data.poll) {
+        const p = data.poll;
+        const msgId = data.msgId || ('poll_' + Math.random().toString(36).substring(2, 9));
+        _pollData[msgId] = {
+            question: p.question,
+            options: p.options || [],
+            allowMultiple: !!p.allowMultiple,
+            voters: p.voters || {}
+        };
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble bubble-poll';
+        bubble.id = `poll-msg-${msgId}`;
+        bubble.innerHTML = _renderPollCardHTML(msgId, _pollData[msgId], isSentByMe);
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.appendChild(document.createTextNode(timeStr));
+        bubble.appendChild(timeSpan);
+        contentEl = bubble;
+
+    } else if (data.location) {
+        const loc = data.location;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble bubble-location';
+        const mapsUrl = `https://www.google.com/maps?q=${loc.lat},${loc.lng}`;
+        bubble.innerHTML = `
+            <a class="location-card" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">
+                <div class="location-icon-box"><i class="fas fa-location-dot"></i></div>
+                <div class="location-info">
+                    <div class="location-title">Live Location</div>
+                    <div class="location-sub">View on Google Maps &rarr;</div>
+                </div>
+            </a>`;
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.appendChild(document.createTextNode(timeStr));
+        bubble.appendChild(timeSpan);
+        contentEl = bubble;
+
     } else {
         const bubble = document.createElement('div');
         const singleEmoji = isSingleEmoji(data.message);
@@ -3055,6 +3409,9 @@ function appendMessage(data, isSentByMe) {
             msgDiv.classList.remove('action-visible');
             const preview = data.audio ? '🎤 Voice message'
                           : data.image ? '🖼️ Image'
+                          : data.file ? `📁 ${(data.file.name || 'File')}`
+                          : data.poll ? `📊 Poll: ${(data.poll.question || '')}`
+                          : data.location ? '📍 Live Location'
                           : (data.message || '').slice(0, 80);
             setReply({ msgId: data.msgId, nickname: data.nickname || 'You', preview });
         });
