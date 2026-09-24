@@ -413,29 +413,37 @@ io.on('connection', (socket) => {
 
     socket.on('typing', (data) => {
         const user = users[socket.id];
-        if (user) {
-            socket.to(user.roomID).emit('user-typing', { nickname: user.nickname, profilePic: user.profilePic });
+        const roomID = (user && user.roomID) || (data && data.roomID);
+        const nickname = (user && user.nickname) || (data && data.nickname) || 'Someone';
+        const profilePic = (user && user.profilePic) || (data && data.profilePic) || null;
+        if (roomID) {
+            socket.to(roomID).emit('user-typing', { nickname, profilePic });
         }
     });
 
     socket.on('stop-typing', (data) => {
         const user = users[socket.id];
-        if (user) {
-            socket.to(user.roomID).emit('user-stop-typing');
+        const roomID = (user && user.roomID) || (data && data.roomID);
+        if (roomID) {
+            socket.to(roomID).emit('user-stop-typing');
         }
     });
 
     socket.on('voice-recording-start', (data) => {
         const user = users[socket.id];
-        if (user) {
-            socket.to(user.roomID).emit('user-voice-recording', { nickname: user.nickname, profilePic: user.profilePic });
+        const roomID = (user && user.roomID) || (data && data.roomID);
+        const nickname = (user && user.nickname) || (data && data.nickname) || 'Someone';
+        const profilePic = (user && user.profilePic) || (data && data.profilePic) || null;
+        if (roomID) {
+            socket.to(roomID).emit('user-voice-recording', { nickname, profilePic });
         }
     });
 
-    socket.on('voice-recording-stop', () => {
+    socket.on('voice-recording-stop', (data) => {
         const user = users[socket.id];
-        if (user) {
-            socket.to(user.roomID).emit('user-voice-stop-recording');
+        const roomID = (user && user.roomID) || (data && data.roomID);
+        if (roomID) {
+            socket.to(roomID).emit('user-voice-stop-recording');
         }
     });
 

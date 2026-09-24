@@ -1552,21 +1552,37 @@ function setupEventListeners() {
         messageInput.scrollTop = messageInput.scrollHeight;
     }
 
+    function emitMyTyping() {
+        if (socket && currentRoomID) {
+            const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+            socket.emit('typing', {
+                roomID: currentRoomID,
+                nickname: currentName,
+                profilePic: myProfilePic || null
+            });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                if (socket && currentRoomID) {
+                    socket.emit('stop-typing', { roomID: currentRoomID });
+                }
+            }, 2500);
+        }
+    }
+
+    function emitMyStopTyping() {
+        clearTimeout(typingTimeout);
+        if (socket && currentRoomID) {
+            socket.emit('stop-typing', { roomID: currentRoomID });
+        }
+    }
+
     if (messageInput) {
         messageInput.addEventListener('input', () => {
             resizeMessageInput();
-
-            // Emit typing event (optimized throttle)
-            if (socket && currentRoomID && myNickname) {
-                if (!isCurrentlyTyping) {
-                    isCurrentlyTyping = true;
-                    socket.emit('typing', { nickname: myNickname });
-                }
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    isCurrentlyTyping = false;
-                    socket.emit('stop-typing');
-                }, 2000);
+            if (messageInput.value.trim().length > 0) {
+                emitMyTyping();
+            } else {
+                emitMyStopTyping();
             }
         });
 
@@ -1574,12 +1590,15 @@ function setupEventListeners() {
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             if (!isMobile && e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                clearTimeout(typingTimeout);
-                isCurrentlyTyping = false;
-                if (socket) socket.emit('stop-typing');
+                emitMyStopTyping();
                 sendMessage();
+            } else {
+                emitMyTyping();
             }
         });
+
+        messageInput.addEventListener('compositionstart', emitMyTyping);
+        messageInput.addEventListener('compositionupdate', emitMyTyping);
     }
 
     if (attachBtn) {
@@ -1995,8 +2014,13 @@ function startRecording() {
             voiceRecordingBar.classList.remove('hidden');
 
             // Notify others that we are recording
-            if (socket && currentRoomID && myNickname) {
-                socket.emit('voice-recording-start', { nickname: myNickname, profilePic: myProfilePic });
+            if (socket && currentRoomID) {
+                const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+                socket.emit('voice-recording-start', {
+                    roomID: currentRoomID,
+                    nickname: currentName,
+                    profilePic: myProfilePic || null
+                });
             }
 
             recordingTimerInterval = setInterval(() => {
@@ -2019,7 +2043,7 @@ function stopRecording() {
     micBtn.classList.remove('recording');
     voiceRecordingBar.classList.add('hidden');
     recordingTimerEl.textContent = '0:00';
-    if (socket) socket.emit('voice-recording-stop');
+    if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
     setTimeout(() => {
         if (messageInput && !messageInput.disabled) messageInput.focus();
     }, 50);
@@ -2038,7 +2062,7 @@ function cancelRecording() {
     recordingTimerEl.textContent = '0:00';
     audioChunks = [];
     recordedAudioBlob = null;
-    if (socket) socket.emit('voice-recording-stop');
+    if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
     setTimeout(() => {
         if (messageInput && !messageInput.disabled) messageInput.focus();
     }, 50);
@@ -2470,11 +2494,15 @@ if (socket) {
     });
 }
 
+let _typingHideTimer = null;
+
 function showTyping(name, profilePic, mode) {
     const indicator = document.getElementById('typing-indicator');
-    const typingText = document.getElementById('typing-text');
     const avatarEl   = document.getElementById('typing-avatar');
-    if (!indicator || !typingText) return;
+    const bubbleEl   = indicator ? indicator.querySelector('.typing-bubble') : null;
+    if (!indicator || !bubbleEl) return;
+
+    const cleanName = name || 'Someone';
 
     // Render avatar
     if (avatarEl) {
@@ -2482,32 +2510,63 @@ function showTyping(name, profilePic, mode) {
         if (profilePic) {
             const img = document.createElement('img');
             img.src = profilePic;
-            img.alt = name;
+            img.alt = cleanName;
             avatarEl.appendChild(img);
             avatarEl.style.background = 'transparent';
         } else {
-            const initial = name ? name.charAt(0).toUpperCase() : '?';
+            const initial = cleanName ? cleanName.charAt(0).toUpperCase() : '?';
             avatarEl.textContent = initial;
-            avatarEl.style.background = getNicknameColor(name);
+            avatarEl.style.background = getNicknameColor(cleanName);
         }
     }
 
-    // Label differs for voice vs text
     if (mode === 'voice') {
-        typingText.textContent = name + ' \uD83C\uDFA4 recording\u2026';
+        bubbleEl.className = 'typing-bubble wa-typing-bubble wa-voice-mode';
+        bubbleEl.innerHTML = `
+            <i class="fas fa-microphone wa-mic-icon"></i>
+            <div class="wa-typing-label">
+                <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
+                <span class="wa-voice-sub">recording audio...</span>
+            </div>
+            <div class="wa-audio-bars">
+                <span></span><span></span><span></span><span></span>
+            </div>
+        `;
+        if (onlineStatus) {
+            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)} recording audio...</span>`;
+        }
     } else {
-        typingText.textContent = name + ' is typing\u2026';
+        bubbleEl.className = 'typing-bubble wa-typing-bubble';
+        bubbleEl.innerHTML = `
+            <div class="wa-typing-label">
+                <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
+                <span class="wa-typing-sub">typing...</span>
+            </div>
+            <div class="wa-typing-dots">
+                <span></span><span></span><span></span>
+            </div>
+        `;
+        if (onlineStatus) {
+            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)} typing...</span>`;
+        }
     }
 
     indicator.classList.add('visible');
     const container = document.getElementById('messages-container');
     if (container) container.scrollTop = container.scrollHeight;
+
+    // Auto-hide safety timeout
+    if (_typingHideTimer) clearTimeout(_typingHideTimer);
+    _typingHideTimer = setTimeout(hideTyping, 3500);
 }
 
 function hideTyping() {
+    if (_typingHideTimer) { clearTimeout(_typingHideTimer); _typingHideTimer = null; }
     const indicator = document.getElementById('typing-indicator');
-    if (!indicator) return;
-    indicator.classList.remove('visible');
+    if (indicator) indicator.classList.remove('visible');
+    if (onlineStatus) {
+        onlineStatus.innerHTML = currentRoomUsersCount > 0 ? `${currentRoomUsersCount} online` : 'Online';
+    }
 }
 
 // Detect if a string is a single emoji (no other text)
