@@ -1643,25 +1643,33 @@ function setupEventListeners() {
         messageInput.scrollTop = messageInput.scrollHeight;
     }
 
+    let _lastTypingEmitTime = 0;
+
     function emitMyTyping() {
         if (socket && currentRoomID) {
-            const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
-            socket.emit('typing', {
-                roomID: currentRoomID,
-                nickname: currentName,
-                profilePic: myProfilePic || null
-            });
+            const now = Date.now();
+            // Emit immediately on first keystroke or if 1.2s has passed
+            if (now - _lastTypingEmitTime > 1200) {
+                _lastTypingEmitTime = now;
+                const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+                socket.emit('typing', {
+                    roomID: currentRoomID,
+                    nickname: currentName,
+                    profilePic: myProfilePic || null
+                });
+            }
+
+            // Fast stop-typing debounce: fires 400ms after user pauses typing
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
-                if (socket && currentRoomID) {
-                    socket.emit('stop-typing', { roomID: currentRoomID });
-                }
-            }, 800);
+                emitMyStopTyping();
+            }, 400);
         }
     }
 
     function emitMyStopTyping() {
         clearTimeout(typingTimeout);
+        _lastTypingEmitTime = 0;
         if (socket && currentRoomID) {
             socket.emit('stop-typing', { roomID: currentRoomID });
         }
@@ -1688,8 +1696,13 @@ function setupEventListeners() {
             }
         });
 
+        messageInput.addEventListener('blur', () => {
+            emitMyStopTyping();
+        });
+
         messageInput.addEventListener('compositionstart', emitMyTyping);
         messageInput.addEventListener('compositionupdate', emitMyTyping);
+        messageInput.addEventListener('compositionend', emitMyTyping);
     }
 
     // WhatsApp Attachment Menu Toggle
@@ -2178,12 +2191,23 @@ function startRecording() {
         return;
     }
 
+    // Immediately activate UI & notify room (0ms latency)
+    if (micBtn) micBtn.classList.add('recording');
+    if (voiceRecordingBar) voiceRecordingBar.classList.remove('hidden');
+    if (socket && currentRoomID) {
+        const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+        socket.emit('voice-recording-start', {
+            roomID: currentRoomID,
+            nickname: currentName,
+            profilePic: myProfilePic || null
+        });
+    }
+
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then(stream => {
             audioChunks = [];
             recordingSeconds = 0;
 
-            // Prefer webm/opus; fall back to first supported type
             const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg',''].find(t => !t || MediaRecorder.isTypeSupported(t));
             mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
 
@@ -2192,7 +2216,7 @@ function startRecording() {
                 stream.getTracks().forEach(t => t.stop());
                 const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                 recordedAudioBlob = blob;
-                _precomputedAudioDataUrl = null; // reset while converting
+                _precomputedAudioDataUrl = null;
 
                 // Pre-convert to base64 NOW (during preview) so send tap is instant
                 blob.arrayBuffer().then(buffer => {
@@ -2204,7 +2228,6 @@ function startRecording() {
                     }
                     _precomputedAudioDataUrl = `data:${blob.type || 'audio/webm'};base64,${btoa(binary)}`;
                 }).catch(() => {
-                    // fallback: will convert on send
                     _precomputedAudioDataUrl = null;
                 });
 
@@ -2212,23 +2235,12 @@ function startRecording() {
             };
 
             mediaRecorder.start(100);
-            micBtn.classList.add('recording');
-            voiceRecordingBar.classList.remove('hidden');
 
-            // Notify others that we are recording
-            if (socket && currentRoomID) {
-                const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
-                socket.emit('voice-recording-start', {
-                    roomID: currentRoomID,
-                    nickname: currentName,
-                    profilePic: myProfilePic || null
-                });
-            }
-
+            if (recordingTimerInterval) clearInterval(recordingTimerInterval);
             recordingTimerInterval = setInterval(() => {
                 recordingSeconds++;
-                recordingTimerEl.textContent = formatSeconds(recordingSeconds);
-                // Re-emit heartbeat every 1.5s so other user's indicator stays visible
+                if (recordingTimerEl) recordingTimerEl.textContent = formatSeconds(recordingSeconds);
+                // Heartbeat every 2s
                 if (recordingSeconds % 2 === 0 && socket && currentRoomID) {
                     const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
                     socket.emit('voice-recording-start', {
@@ -2237,24 +2249,29 @@ function startRecording() {
                         profilePic: myProfilePic || null
                     });
                 }
-                // Auto-stop at 3 minutes
                 if (recordingSeconds >= 180) stopRecording();
             }, 1000);
         })
         .catch(err => {
             console.error('Mic permission denied:', err);
+            if (micBtn) micBtn.classList.remove('recording');
+            if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
+            if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
             alert('Microphone access denied. Please allow microphone access to record voice messages.');
         });
 }
 
 function stopRecording() {
-    if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
-    clearInterval(recordingTimerInterval);
-    mediaRecorder.stop();
-    micBtn.classList.remove('recording');
-    voiceRecordingBar.classList.add('hidden');
-    recordingTimerEl.textContent = '0:00';
+    // Immediately emit stop event and reset UI
     if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
+    if (micBtn) micBtn.classList.remove('recording');
+    if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
+    if (recordingTimerEl) recordingTimerEl.textContent = '0:00';
+    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
     setTimeout(() => {
         if (messageInput && !messageInput.disabled) messageInput.focus();
     }, 50);
@@ -3068,7 +3085,7 @@ function showTyping(name, profilePic, mode) {
     // Auto-hide safety timeout — skip for voice mode (heartbeat keeps it alive)
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
     if (currentMode !== 'voice') {
-        _typingHideTimer = setTimeout(hideTyping, 2000);
+        _typingHideTimer = setTimeout(hideTyping, 900);
     }
 }
 
