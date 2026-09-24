@@ -2095,6 +2095,15 @@ function startRecording() {
             recordingTimerInterval = setInterval(() => {
                 recordingSeconds++;
                 recordingTimerEl.textContent = formatSeconds(recordingSeconds);
+                // Re-emit heartbeat every 1.5s so other user's indicator stays visible
+                if (recordingSeconds % 2 === 0 && socket && currentRoomID) {
+                    const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+                    socket.emit('voice-recording-start', {
+                        roomID: currentRoomID,
+                        nickname: currentName,
+                        profilePic: myProfilePic || null
+                    });
+                }
                 // Auto-stop at 3 minutes
                 if (recordingSeconds >= 180) stopRecording();
             }, 1000);
@@ -2599,14 +2608,13 @@ function showTyping(name, profilePic, mode) {
             <i class="fas fa-microphone wa-mic-icon"></i>
             <div class="wa-typing-label">
                 <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
-                <span class="wa-voice-sub">recording audio...</span>
             </div>
             <div class="wa-audio-bars">
                 <span></span><span></span><span></span><span></span>
             </div>
         `;
         if (onlineStatus) {
-            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)} recording audio...</span>`;
+            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)}</span>`;
         }
     } else {
         bubbleEl.className = 'typing-bubble wa-typing-bubble';
@@ -2633,9 +2641,11 @@ function showTyping(name, profilePic, mode) {
     indicator.classList.add('visible');
     if (container) container.scrollTop = container.scrollHeight;
 
-    // Auto-hide safety timeout
+    // Auto-hide safety timeout — skip for voice mode (heartbeat keeps it alive)
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
-    _typingHideTimer = setTimeout(hideTyping, 2000);
+    if (mode !== 'voice') {
+        _typingHideTimer = setTimeout(hideTyping, 2000);
+    }
 }
 
 function hideTyping() {
