@@ -2201,7 +2201,7 @@ function setupEventListeners() {
 
     // Attach Location Action
     if (attachLocationBtn) {
-        attachLocationBtn.addEventListener('click', () => {
+        addFastClickListener(attachLocationBtn, () => {
             closeAttachMenu();
             if (!navigator.geolocation) {
                 alert('Geolocation is not supported by your browser.');
@@ -2212,6 +2212,8 @@ function setupEventListeners() {
                     if (socket && currentRoomID) {
                         socket.emit('send-message', {
                             roomID: currentRoomID,
+                            nickname: myNickname || 'Anonymous',
+                            profilePic: myProfilePic || null,
                             message: '',
                             location: {
                                 lat: pos.coords.latitude,
@@ -2232,7 +2234,7 @@ function setupEventListeners() {
 
     // Attach Poll Action
     if (attachPollBtn) {
-        attachPollBtn.addEventListener('click', () => {
+        addFastClickListener(attachPollBtn, () => {
             closeAttachMenu();
             openPollModal();
         });
@@ -2240,13 +2242,18 @@ function setupEventListeners() {
 
     // Poll Modal Event Listeners
     if (closePollBtn) {
-        closePollBtn.addEventListener('click', closePollModal);
+        addFastClickListener(closePollBtn, closePollModal);
     }
     if (pollAddOptionBtn) {
-        pollAddOptionBtn.addEventListener('click', () => addPollOptionRow());
+        addFastClickListener(pollAddOptionBtn, () => addPollOptionRow());
     }
     if (pollSubmitBtn) {
-        pollSubmitBtn.addEventListener('click', submitPoll);
+        addFastClickListener(pollSubmitBtn, submitPoll);
+    }
+    if (pollModal) {
+        pollModal.addEventListener('click', (e) => {
+            if (e.target === pollModal) closePollModal();
+        });
     }
 
     // ── Voice message listeners ──
@@ -2463,58 +2470,57 @@ function discardPreview() {
 }
 
 // ── File Attachment Send ──
+// ── File Attachment Send ──
 function _getFileIcon(mimeType, name) {
-    if (mimeType === 'application/pdf' || name.endsWith('.pdf')) return 'fa-file-pdf';
-    if (mimeType.includes('word') || name.match(/\.docx?$/)) return 'fa-file-word';
-    if (mimeType.includes('excel') || name.match(/\.xlsx?$/)) return 'fa-file-excel';
-    if (mimeType.includes('powerpoint') || name.match(/\.pptx?$/)) return 'fa-file-powerpoint';
-    if (mimeType.includes('zip') || name.match(/\.(zip|rar|7z)$/)) return 'fa-file-zipper';
-    if (mimeType.includes('text') || name.endsWith('.txt')) return 'fa-file-lines';
-    if (mimeType.includes('video')) return 'fa-file-video';
+    if (!mimeType) mimeType = '';
+    if (!name) name = '';
+    if (mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) return 'fa-file-pdf';
+    if (mimeType.includes('word') || name.match(/\.docx?$/i)) return 'fa-file-word';
+    if (mimeType.includes('excel') || name.match(/\.xlsx?$/i)) return 'fa-file-excel';
+    if (mimeType.includes('powerpoint') || name.match(/\.pptx?$/i)) return 'fa-file-powerpoint';
+    if (mimeType.includes('zip') || name.match(/\.(zip|rar|7z|tar|gz)$/i)) return 'fa-file-zipper';
+    if (mimeType.includes('text') || name.match(/\.(txt|md|csv|json|js|html|css)$/i)) return 'fa-file-lines';
+    if (mimeType.includes('audio') || name.match(/\.(mp3|wav|ogg|m4a|aac|flac|wma)$/i)) return 'fa-music';
+    if (mimeType.includes('video') || name.match(/\.(mp4|webm|mov|avi|mkv)$/i)) return 'fa-file-video';
     return 'fa-file';
 }
 
 function _formatFileSize(bytes) {
+    if (!bytes) return '0 B';
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 function sendFileAttachment(file) {
-    if (!socket || !currentRoomID) { alert('Not connected.'); return; }
+    if (!socket || !currentRoomID) { alert('Not connected to chat room.'); return; }
+    if (file.size > 50000000) { alert('File too large (Max 50MB)'); return; }
+
     const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
 
-    file.arrayBuffer().then(buffer => {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        const chunk = 8192;
-        for (let i = 0; i < bytes.length; i += chunk) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-        }
-        const base64 = btoa(binary);
-        const dataUrl = `data:${file.type || 'application/octet-stream'};base64,${base64}`;
-
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
         socket.emit('send-message', {
             roomID: currentRoomID,
+            nickname: currentName,
+            profilePic: myProfilePic || null,
             message: '',
-            file: { name: file.name, size: file.size, type: file.type, data: dataUrl },
+            file: {
+                name: file.name,
+                size: file.size,
+                type: file.type || 'application/octet-stream',
+                data: dataUrl
+            },
             replyTo: replyingTo || null
         });
         clearReply();
         if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-    }).catch(() => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            socket.emit('send-message', {
-                roomID: currentRoomID,
-                message: '',
-                file: { name: file.name, size: file.size, type: file.type, data: e.target.result },
-                replyTo: replyingTo || null
-            });
-            clearReply();
-        };
-        reader.readAsDataURL(file);
-    });
+    };
+    reader.onerror = () => {
+        alert('Could not read file. Please try again.');
+    };
+    reader.readAsDataURL(file);
 }
 
 // ── Poll Creation & Voting Engine ──
@@ -2565,7 +2571,7 @@ function addPollOptionRow() {
     `;
     const removeBtn = row.querySelector('.poll-opt-remove');
     if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
+        addFastClickListener(removeBtn, () => {
             row.remove();
             pollOptionsList.querySelectorAll('.poll-option-row').forEach((r, i) => {
                 const inp = r.querySelector('.poll-option-input');
@@ -2603,6 +2609,8 @@ function submitPoll() {
 
     socket.emit('send-message', {
         roomID: currentRoomID,
+        nickname: myNickname || 'Anonymous',
+        profilePic: myProfilePic || null,
         message: '',
         poll: {
             question,
@@ -2628,7 +2636,7 @@ function _renderPollCardHTML(msgId, poll, isMine) {
         const radioClass = poll.allowMultiple ? 'poll-radio-dot multi' : 'poll-radio-dot';
 
         return `
-            <div class="poll-option-card ${isVoted ? 'voted' : ''}" onclick="_handlePollVote('${msgId}', ${idx})">
+            <div class="poll-option-card ${isVoted ? 'voted' : ''}" onclick="window._handlePollVote && window._handlePollVote('${msgId}', ${idx})">
                 <div class="poll-option-progress" style="width: ${pct}%;"></div>
                 <div class="poll-option-content">
                     <div class="poll-option-left">
@@ -2670,6 +2678,12 @@ function _handlePollVote(msgId, optionIndex) {
         roomID: currentRoomID
     });
 }
+
+// Expose poll handlers to window for inline onclick handlers
+window._handlePollVote = _handlePollVote;
+window.openPollModal = openPollModal;
+window.closePollModal = closePollModal;
+window.submitPoll = submitPoll;
 
 function sendVoiceMessage() {
     if (!recordedAudioBlob) return;
@@ -3360,18 +3374,51 @@ function appendMessage(data, isSentByMe) {
         const f = data.file;
         const bubble = document.createElement('div');
         bubble.className = 'bubble bubble-file';
+        const isAudioFile = (f.type && f.type.startsWith('audio/')) || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name || '');
+        const isPdfFile = (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
         const icon = _getFileIcon(f.type || '', f.name || '');
-        bubble.innerHTML = `
-            <div class="file-attach-card">
-                <div class="file-attach-icon"><i class="fas ${icon}"></i></div>
-                <div class="file-attach-info">
-                    <div class="file-attach-name">${escapeHtml(f.name || 'file')}</div>
-                    <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
-                </div>
-                <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'file')}" title="Download">
-                    <i class="fas fa-arrow-down"></i>
-                </a>
-            </div>`;
+
+        if (isAudioFile) {
+            bubble.innerHTML = `
+                <div class="file-attach-card audio-attach-card" style="min-width:220px;">
+                    <div class="file-attach-icon audio-icon-box"><i class="fas fa-music"></i></div>
+                    <div class="file-attach-info" style="width:100%;">
+                        <div class="file-attach-name">${escapeHtml(f.name || 'Audio')}</div>
+                        <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
+                        <audio controls src="${f.data}" preload="metadata" style="width:100%;height:32px;margin-top:6px;border-radius:16px;outline:none;"></audio>
+                    </div>
+                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'audio')}" title="Download">
+                        <i class="fas fa-arrow-down"></i>
+                    </a>
+                </div>`;
+        } else if (isPdfFile) {
+            bubble.innerHTML = `
+                <div class="file-attach-card pdf-attach-card">
+                    <div class="file-attach-icon pdf-icon-box"><i class="fas fa-file-pdf"></i></div>
+                    <div class="file-attach-info">
+                        <div class="file-attach-name">${escapeHtml(f.name || 'Document.pdf')}</div>
+                        <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
+                        <a class="pdf-preview-link" href="${f.data}" target="_blank" rel="noopener noreferrer" style="font-size:0.75rem;color:var(--primary);display:inline-flex;align-items:center;gap:4px;margin-top:4px;text-decoration:none;font-weight:600;">
+                            <i class="fas fa-eye"></i> Open PDF
+                        </a>
+                    </div>
+                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'document.pdf')}" title="Download">
+                        <i class="fas fa-arrow-down"></i>
+                    </a>
+                </div>`;
+        } else {
+            bubble.innerHTML = `
+                <div class="file-attach-card">
+                    <div class="file-attach-icon"><i class="fas ${icon}"></i></div>
+                    <div class="file-attach-info">
+                        <div class="file-attach-name">${escapeHtml(f.name || 'file')}</div>
+                        <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
+                    </div>
+                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'file')}" title="Download">
+                        <i class="fas fa-arrow-down"></i>
+                    </a>
+                </div>`;
+        }
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
         timeSpan.appendChild(document.createTextNode(timeStr));
