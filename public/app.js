@@ -414,6 +414,7 @@ let audioChunks = [];
 let recordingTimerInterval = null;
 let recordingSeconds = 0;
 let recordedAudioBlob = null;
+let _precomputedAudioDataUrl = null; // pre-built base64 ready for instant send
 let previewAudio = null;
 let previewPlaying = false;
 
@@ -2075,6 +2076,22 @@ function startRecording() {
                 stream.getTracks().forEach(t => t.stop());
                 const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                 recordedAudioBlob = blob;
+                _precomputedAudioDataUrl = null; // reset while converting
+
+                // Pre-convert to base64 NOW (during preview) so send tap is instant
+                blob.arrayBuffer().then(buffer => {
+                    const bytes = new Uint8Array(buffer);
+                    let binary = '';
+                    const chunkSize = 8192;
+                    for (let i = 0; i < bytes.length; i += chunkSize) {
+                        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+                    }
+                    _precomputedAudioDataUrl = `data:${blob.type || 'audio/webm'};base64,${btoa(binary)}`;
+                }).catch(() => {
+                    // fallback: will convert on send
+                    _precomputedAudioDataUrl = null;
+                });
+
                 showAudioPreview(blob, recordingSeconds);
             };
 
@@ -2187,6 +2204,7 @@ function discardPreview() {
     audioPreviewBar.classList.add('hidden');
     audioProgressBar.style.width = '0%';
     recordedAudioBlob = null;
+    _precomputedAudioDataUrl = null;
     setTimeout(() => {
         if (messageInput && !messageInput.disabled) messageInput.focus();
     }, 50);
@@ -2194,18 +2212,8 @@ function discardPreview() {
 
 function sendVoiceMessage() {
     if (!recordedAudioBlob) return;
-    // Use arrayBuffer for much faster blob→base64 than FileReader
-    recordedAudioBlob.arrayBuffer().then(buffer => {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        const chunkSize = 8192;
-        for (let i = 0; i < bytes.length; i += chunkSize) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-        }
-        const base64 = btoa(binary);
-        const mimeType = recordedAudioBlob.type || 'audio/webm';
-        const dataUrl = `data:${mimeType};base64,${base64}`;
 
+    const doSend = (dataUrl) => {
         if (socket) {
             socket.emit('voice-recording-stop');
             socket.emit('send-message', {
@@ -2218,29 +2226,34 @@ function sendVoiceMessage() {
             clearReply();
             discardPreview();
             if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+            _precomputedAudioDataUrl = null;
             setTimeout(() => {
                 if (messageInput && !messageInput.disabled) messageInput.focus();
             }, 50);
         } else {
             alert("Not connected to server. Voice message could not be sent.");
         }
+    };
+
+    // If pre-conversion finished during preview → INSTANT send, zero wait
+    if (_precomputedAudioDataUrl) {
+        doSend(_precomputedAudioDataUrl);
+        return;
+    }
+
+    // Pre-conversion still in progress (very short recording) → convert now
+    recordedAudioBlob.arrayBuffer().then(buffer => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        const dataUrl = `data:${recordedAudioBlob.type || 'audio/webm'};base64,${btoa(binary)}`;
+        doSend(dataUrl);
     }).catch(() => {
-        // Fallback to FileReader if arrayBuffer not supported
         const reader = new FileReader();
-        reader.onload = (e) => {
-            if (socket) {
-                socket.emit('voice-recording-stop');
-                socket.emit('send-message', {
-                    roomID: currentRoomID,
-                    message: '',
-                    audio: e.target.result,
-                    audioDuration: recordingSeconds,
-                    replyTo: replyingTo || null
-                });
-                clearReply();
-                discardPreview();
-            }
-        };
+        reader.onload = (e) => doSend(e.target.result);
         reader.readAsDataURL(recordedAudioBlob);
     });
 }
