@@ -154,14 +154,27 @@ window.addEventListener('pageshow', ensureSocketLive);
 window.addEventListener('online', ensureSocketLive);
 document.addEventListener('touchstart', ensureSocketLive, { passive: true });
 
-// Zero-delay fast click handler for mobile and desktop (eliminates 300ms tap delay)
+// Zero-delay fast click handler for mobile and desktop (eliminates 300ms tap delay & handles fast taps smoothly)
 function addFastClickListener(element, handler) {
     if (!element) return;
     let touchHandled = false;
+    let startX = 0, startY = 0;
     element.addEventListener('touchstart', (e) => {
-        touchHandled = true;
-        handler(e);
-        setTimeout(() => { touchHandled = false; }, 350);
+        if (e.touches && e.touches.length === 1) {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+    element.addEventListener('touchend', (e) => {
+        if (e.changedTouches && e.changedTouches.length === 1) {
+            const dx = Math.abs(e.changedTouches[0].clientX - startX);
+            const dy = Math.abs(e.changedTouches[0].clientY - startY);
+            if (dx < 12 && dy < 12) {
+                touchHandled = true;
+                handler(e);
+                setTimeout(() => { touchHandled = false; }, 350);
+            }
+        }
     }, { passive: true });
     element.addEventListener('click', (e) => {
         if (touchHandled) {
@@ -1069,19 +1082,19 @@ function initLightbox() {
     const dlPdfBtn = document.getElementById('lightbox-dl-pdf-btn');
     if (!lb || !lbImg || !lbClose) return;
 
-    lbClose.addEventListener('click', (e) => {
-        e.stopPropagation();
+    addFastClickListener(lbClose, (e) => {
+        if (e && e.stopPropagation) e.stopPropagation();
         closeLightbox();
     });
     if (dlPhotoBtn) {
-        dlPhotoBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        addFastClickListener(dlPhotoBtn, (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
             if (currentLightboxSrc) downloadPhotoFile(currentLightboxSrc);
         });
     }
     if (dlPdfBtn) {
-        dlPdfBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
+        addFastClickListener(dlPdfBtn, (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
             if (currentLightboxSrc) downloadPhotoAsPDF(currentLightboxSrc);
         });
     }
@@ -1234,19 +1247,19 @@ function initPasswordToggle(inputEl, btnEl) {
 function setupEventListeners() {
     // Settings toggles
     if (settingsBtn) {
-        settingsBtn.addEventListener('click', openSettings);
+        addFastClickListener(settingsBtn, openSettings);
     }
     if (settingsCloseBtn) {
-        settingsCloseBtn.addEventListener('click', closeSettings);
+        addFastClickListener(settingsCloseBtn, closeSettings);
     }
     if (settingsRemoveFaceBtn) {
-        settingsRemoveFaceBtn.addEventListener('click', removeFaceCredentials);
+        addFastClickListener(settingsRemoveFaceBtn, removeFaceCredentials);
     }
     if (settingsRegisterFaceBtn) {
-        settingsRegisterFaceBtn.addEventListener('click', startSettingsFaceRegistration);
+        addFastClickListener(settingsRegisterFaceBtn, startSettingsFaceRegistration);
     }
     if (settingsScanDemoBtn) {
-        settingsScanDemoBtn.addEventListener('click', simulateSettingsFaceScan);
+        addFastClickListener(settingsScanDemoBtn, simulateSettingsFaceScan);
     }
 
     // Settings backdrop click to close settings modal
@@ -1260,18 +1273,18 @@ function setupEventListeners() {
 
     // Face ID Modal buttons
     if (faceDemoBtn) {
-        faceDemoBtn.addEventListener('click', simulateFaceScan);
+        addFastClickListener(faceDemoBtn, simulateFaceScan);
     }
 
     // Settings nickname save button
     if (settingsSaveNameBtn) {
-        settingsSaveNameBtn.addEventListener('click', saveSettingsNickname);
+        addFastClickListener(settingsSaveNameBtn, saveSettingsNickname);
     }
 
     // Face-not-found retry button
     const faceRetryBtn = document.getElementById('face-retry-btn');
     if (faceRetryBtn) {
-        faceRetryBtn.addEventListener('click', () => {
+        addFastClickListener(faceRetryBtn, () => {
             const faceNotFoundEl = document.getElementById('face-not-found');
             if (faceNotFoundEl) {
                 faceNotFoundEl.classList.add('hidden');
@@ -1291,7 +1304,7 @@ function setupEventListeners() {
     // Settings Face-not-found retry button
     const settingsFaceRetryBtn = document.getElementById('settings-face-retry-btn');
     if (settingsFaceRetryBtn) {
-        settingsFaceRetryBtn.addEventListener('click', () => {
+        addFastClickListener(settingsFaceRetryBtn, () => {
             const settingsFaceNotFoundEl = document.getElementById('settings-face-not-found');
             if (settingsFaceNotFoundEl) {
                 settingsFaceNotFoundEl.classList.add('hidden');
@@ -1431,34 +1444,36 @@ function setupEventListeners() {
         });
     }
 
-    if (joinChatBtn) joinChatBtn.addEventListener('click', () => {
-        const nick = nicknameInput.value.trim();
-        if (nick) {
-            myNickname = nick;
-            saveProfileLocally(myNickname, myProfilePic);
-            // Sync nickname + profilePic to server so cross-device face match returns correct profile
-            const faceId = localStorage.getItem('piktalk_face_userid');
-            const savedDescRaw = localStorage.getItem('piktalk_face_descriptor');
-            if (faceId && savedDescRaw) {
-                try {
-                    const desc = JSON.parse(savedDescRaw);
-                    _syncFaceToServer(faceId, desc, myNickname, myProfilePic);
-                } catch(e) {}
+    if (joinChatBtn) {
+        addFastClickListener(joinChatBtn, () => {
+            const nick = nicknameInput.value.trim();
+            if (nick) {
+                myNickname = nick;
+                saveProfileLocally(myNickname, myProfilePic);
+                // Sync nickname + profilePic to server so cross-device face match returns correct profile
+                const faceId = localStorage.getItem('piktalk_face_userid');
+                const savedDescRaw = localStorage.getItem('piktalk_face_descriptor');
+                if (faceId && savedDescRaw) {
+                    try {
+                        const desc = JSON.parse(savedDescRaw);
+                        _syncFaceToServer(faceId, desc, myNickname, myProfilePic);
+                    } catch(e) {}
+                }
+                showChat();
+                if (socket) {
+                    socket.emit('join-room', {
+                        roomID: currentRoomID,
+                        nickname: myNickname,
+                        profilePic: myProfilePic,
+                        userId: myUserId,
+                        password: currentRoomPassword
+                    });
+                } else {
+                    console.warn("Socket not initialized. Attempting fallback join...");
+                }
             }
-            showChat();
-            if (socket) {
-                socket.emit('join-room', {
-                    roomID: currentRoomID,
-                    nickname: myNickname,
-                    profilePic: myProfilePic,
-                    userId: myUserId,
-                    password: currentRoomPassword
-                });
-            } else {
-                console.warn("Socket not initialized. Attempting fallback join...");
-            }
-        }
-    });
+        });
+    }
 
     if (nicknameInput) nicknameInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1466,70 +1481,78 @@ function setupEventListeners() {
         }
     });
 
-    if (inviteBtn) inviteBtn.addEventListener('click', () => {
-        if (shareSection) {
-            shareSection.classList.toggle('hidden');
-            if (!shareSection.classList.contains('hidden')) {
-                if (currentRoomPassword && amIAdmin) {
-                    if (sharePasswordArea) sharePasswordArea.style.display = 'block';
-                    if (sharePasswordInput) sharePasswordInput.value = currentRoomPassword;
-                } else {
-                    if (sharePasswordArea) sharePasswordArea.style.display = 'none';
+    if (inviteBtn) {
+        addFastClickListener(inviteBtn, () => {
+            if (shareSection) {
+                shareSection.classList.toggle('hidden');
+                if (!shareSection.classList.contains('hidden')) {
+                    if (currentRoomPassword && amIAdmin) {
+                        if (sharePasswordArea) sharePasswordArea.style.display = 'block';
+                        if (sharePasswordInput) sharePasswordInput.value = currentRoomPassword;
+                    } else {
+                        if (sharePasswordArea) sharePasswordArea.style.display = 'none';
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 
-    if (copyBtn) copyBtn.addEventListener('click', () => {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(roomLinkInput.value).then(() => {
+    if (copyBtn) {
+        addFastClickListener(copyBtn, () => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(roomLinkInput.value).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+                }).catch(() => {
+                    fallbackCopy();
+                });
+            } else {
+                fallbackCopy();
+            }
+
+            // Internal helper to support clipboard-incompatible environments
+            function fallbackCopy() {
+                const wasDisabled = roomLinkInput.disabled;
+                roomLinkInput.disabled = false;
+                roomLinkInput.select();
+                document.execCommand('copy');
+                roomLinkInput.disabled = wasDisabled;
                 copyBtn.textContent = 'Copied!';
                 setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-            }).catch(() => {
-                fallbackCopy();
-            });
-        } else {
-            fallbackCopy();
-        }
+            }
+        });
+    }
 
-        // Internal helper to support clipboard-incompatible environments
-        function fallbackCopy() {
-            const wasDisabled = roomLinkInput.disabled;
-            roomLinkInput.disabled = false;
-            roomLinkInput.select();
-            document.execCommand('copy');
-            roomLinkInput.disabled = wasDisabled;
-            copyBtn.textContent = 'Copied!';
-            setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
-        }
-    });
+    if (copyPasswordBtn) {
+        addFastClickListener(copyPasswordBtn, () => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(sharePasswordInput.value).then(() => {
+                    copyPasswordBtn.textContent = 'Copied!';
+                    setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
+                }).catch(() => {
+                    fallbackCopyPassword();
+                });
+            } else {
+                fallbackCopyPassword();
+            }
 
-    if (copyPasswordBtn) copyPasswordBtn.addEventListener('click', () => {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(sharePasswordInput.value).then(() => {
+            function fallbackCopyPassword() {
+                const wasDisabled = sharePasswordInput.disabled;
+                sharePasswordInput.disabled = false;
+                sharePasswordInput.select();
+                document.execCommand('copy');
+                sharePasswordInput.disabled = wasDisabled;
                 copyPasswordBtn.textContent = 'Copied!';
                 setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
-            }).catch(() => {
-                fallbackCopyPassword();
-            });
-        } else {
-            fallbackCopyPassword();
-        }
+            }
+        });
+    }
 
-        function fallbackCopyPassword() {
-            const wasDisabled = sharePasswordInput.disabled;
-            sharePasswordInput.disabled = false;
-            sharePasswordInput.select();
-            document.execCommand('copy');
-            sharePasswordInput.disabled = wasDisabled;
-            copyPasswordBtn.textContent = 'Copied!';
-            setTimeout(() => { copyPasswordBtn.textContent = 'Copy'; }, 2000);
-        }
-    });
-
-    if (leaveBtn) leaveBtn.addEventListener('click', () => {
-        window.location.href = '/';
-    });
+    if (leaveBtn) {
+        addFastClickListener(leaveBtn, () => {
+            window.location.href = '/';
+        });
+    }
 
     if (emojiBtn) {
         // Prevent focus steal (keyboard close) on mobile
@@ -1560,10 +1583,10 @@ function setupEventListeners() {
     }
     const avatarScanBtn = document.getElementById('avatar-scan-btn');
     if (avatarScanBtn) {
-        avatarScanBtn.addEventListener('click', triggerFaceReScan);
+        addFastClickListener(avatarScanBtn, triggerFaceReScan);
     }
     if (avatarPreviewContainer) {
-        avatarPreviewContainer.addEventListener('click', triggerFaceReScan);
+        addFastClickListener(avatarPreviewContainer, triggerFaceReScan);
     }
 
     if (profilePicInput) profilePicInput.addEventListener('change', (e) => {
@@ -1838,11 +1861,11 @@ function setupEventListeners() {
         if (imgInput) imgInput.value = '';
     };
 
-    if (editorCloseBtn) editorCloseBtn.addEventListener('click', closeEditor);
-    if (editorCancelBtn) editorCancelBtn.addEventListener('click', closeEditor);
+    if (editorCloseBtn) addFastClickListener(editorCloseBtn, closeEditor);
+    if (editorCancelBtn) addFastClickListener(editorCancelBtn, closeEditor);
 
     if (editorRotateBtn && editorPreviewImg) {
-        editorRotateBtn.addEventListener('click', () => {
+        addFastClickListener(editorRotateBtn, () => {
             editorRotationAngle = (editorRotationAngle + 90) % 360;
             editorPreviewImg.style.transform = `rotate(${editorRotationAngle}deg)`;
         });
@@ -1860,7 +1883,7 @@ function setupEventListeners() {
     }
 
     if (editorSendBtn) {
-        editorSendBtn.addEventListener('click', () => {
+        addFastClickListener(editorSendBtn, () => {
             if (!editorSelectedFile) return;
 
             const oldHtml = editorSendBtn.innerHTML;
@@ -3755,8 +3778,8 @@ function initCropModal() {
     if (!wrap) return;
 
     // Confirm / Cancel
-    if (useBtn)    useBtn.addEventListener('click', applyCrop);
-    if (cancelBtn) cancelBtn.addEventListener('click', closeCropModal);
+    if (useBtn)    addFastClickListener(useBtn, applyCrop);
+    if (cancelBtn) addFastClickListener(cancelBtn, closeCropModal);
 
     // Zoom slider
     if (zoomSlider) {
@@ -3874,7 +3897,7 @@ function initMembersModal() {
     const closeBtn = document.getElementById('members-close-btn');
 
     if (btn && modal) {
-        btn.addEventListener('click', () => {
+        addFastClickListener(btn, () => {
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             updateThemeColor();
@@ -3882,7 +3905,7 @@ function initMembersModal() {
     }
 
     if (closeBtn && modal) {
-        closeBtn.addEventListener('click', () => {
+        addFastClickListener(closeBtn, () => {
             modal.classList.remove('open');
             document.body.style.overflow = '';
             updateThemeColor();
@@ -6130,7 +6153,7 @@ function _initSettingsEnhancements() {
     // Clear all history button
     const clearAllBtn = document.getElementById('settings-clear-all-history-btn');
     if (clearAllBtn) {
-        clearAllBtn.addEventListener('click', () => {
+        addFastClickListener(clearAllBtn, () => {
             if (confirm('Clear all chat history for this Face ID?')) {
                 clearAllHistory();
                 renderChatHistoryInSettings();

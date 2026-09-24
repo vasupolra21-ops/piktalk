@@ -431,13 +431,21 @@ body.light-mode .bg-moon {
 }
 
 /* Buttons */
+.btn, .btn-icon, button, .editor-tool-btn, .btn-text-danger, .avatar-scan-btn, .history-room-clear {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    will-change: transform;
+}
+
 .btn {
     padding: 12px 24px;
     border-radius: 12px;
     border: none;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), background-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -454,10 +462,10 @@ body.light-mode .bg-moon {
     box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
 }
 
-.btn:active, .btn-icon:active, button:active {
-    transform: scale(0.96) translateY(0) !important;
+.btn:active, .btn-icon:active, button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active, .editor-tool-btn:active, .btn-text-danger:active, .history-room-clear:active, .avatar-scan-btn:active {
+    transform: scale(0.94) translateY(0) !important;
     filter: brightness(0.92);
-    transition: transform 0.05s ease !important;
+    transition: transform 0.04s cubic-bezier(0.2, 0, 0, 1) !important;
 }
 
 .btn-large {
