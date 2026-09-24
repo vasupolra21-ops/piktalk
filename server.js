@@ -340,6 +340,13 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('request-room-users', ({ roomID }) => {
+        const targetRoomID = String(roomID || (users[socket.id] && users[socket.id].roomID) || '').trim();
+        if (targetRoomID) {
+            sendRoomUsers(targetRoomID);
+        }
+    });
+
     socket.on('check-room-id-available', ({ roomID }) => {
         const cleanRoomID = String(roomID).trim();
         const exists = rooms[cleanRoomID] !== undefined;

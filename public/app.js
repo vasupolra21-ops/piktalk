@@ -2737,11 +2737,26 @@ function showChat() {
     }
     if (roomLinkInput) roomLinkInput.value = shareUrl;
     if (onlineStatus) {
-        onlineStatus.textContent = 'Online';
+        onlineStatus.textContent = '1 online';
         onlineStatus.style.color = 'var(--accent)';
     }
     // Show invite button by default — visible to all members
     if (inviteBtn) inviteBtn.style.display = '';
+
+    // Instant members render before server roundtrip
+    if (!_cachedRoomUsers || _cachedRoomUsers.length === 0) {
+        _cachedRoomUsers = [{
+            id: (socket && socket.id) || 'me',
+            nickname: myNickname || 'You',
+            profilePic: myProfilePic || null,
+            isAdmin: amIAdmin
+        }];
+    }
+    updateMembersList(_cachedRoomUsers);
+    if (socket && currentRoomID) {
+        socket.emit('request-room-users', { roomID: currentRoomID });
+    }
+
     updateInputsState();
     updateThemeColor();
     // Load chat history for this room
@@ -4453,6 +4468,8 @@ function clampCrop() {
 /* ══════════════════════════════════════
    Chat Members Modal Logic
    ══════════════════════════════════════ */
+let _cachedRoomUsers = [];
+
 function initMembersModal() {
     const btn = document.getElementById('members-btn');
     const modal = document.getElementById('members-modal');
@@ -4460,6 +4477,14 @@ function initMembersModal() {
 
     if (btn && modal) {
         addFastClickListener(btn, () => {
+            // Render immediately with cached users or self
+            updateMembersList(_cachedRoomUsers);
+            
+            // Request fresh room users from server
+            if (socket && currentRoomID) {
+                socket.emit('request-room-users', { roomID: currentRoomID });
+            }
+            
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             updateThemeColor();
@@ -4487,10 +4512,32 @@ function updateMembersList(usersList) {
     const badge = document.getElementById('members-badge');
     if (!listWrap) return;
 
+    if (Array.isArray(usersList) && usersList.length > 0) {
+        _cachedRoomUsers = usersList;
+    } else if (!usersList || usersList.length === 0) {
+        if (_cachedRoomUsers && _cachedRoomUsers.length > 0) {
+            usersList = _cachedRoomUsers;
+        } else {
+            usersList = [{
+                id: (socket && socket.id) || 'me',
+                nickname: myNickname || 'You',
+                profilePic: myProfilePic || null,
+                isAdmin: amIAdmin
+            }];
+            _cachedRoomUsers = usersList;
+        }
+    }
+
     // Update badge count
     if (badge) {
         badge.textContent = usersList.length;
         badge.style.display = usersList.length > 0 ? 'flex' : 'none';
+    }
+
+    // Update header online status text
+    if (onlineStatus) {
+        onlineStatus.textContent = usersList.length > 0 ? `${usersList.length} online` : 'Online';
+        onlineStatus.style.color = 'var(--accent)';
     }
 
     listWrap.innerHTML = '';
@@ -4502,13 +4549,13 @@ function updateMembersList(usersList) {
     updateAdminUI(); // show/hide invite btn + share section
 
     usersList.forEach(u => {
-        const isMe = (socket && u.id === socket.id);
+        const isMe = (socket && u.id === socket.id) || (u.nickname === myNickname);
         const item = document.createElement('div');
         item.className = 'member-item';
 
         let avatarHtml = '';
         if (u.profilePic) {
-            avatarHtml = `<div class="member-avatar-wrap"><img src="${u.profilePic}"></div>`;
+            avatarHtml = `<div class="member-avatar-wrap"><img src="${u.profilePic}" alt="${escapeHtml(u.nickname)}"></div>`;
         } else {
             const initial = u.nickname ? u.nickname.charAt(0).toUpperCase() : '?';
             avatarHtml = `<div class="member-avatar-wrap" style="background: ${getNicknameColor(u.nickname)}">${initial}</div>`;
@@ -4533,7 +4580,7 @@ function updateMembersList(usersList) {
 
         item.innerHTML = `
             ${avatarHtml}
-            <span class="member-name">${u.nickname || 'Anonymous'}</span>
+            <span class="member-name">${escapeHtml(u.nickname || 'Anonymous')}</span>
             ${badgesHtml}
             ${kickBtnHtml}
         `;
@@ -4541,8 +4588,8 @@ function updateMembersList(usersList) {
         // Wire up kick button click
         const kickBtn = item.querySelector('.member-remove-btn');
         if (kickBtn) {
-            kickBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
+            addFastClickListener(kickBtn, (e) => {
+                if (e && e.stopPropagation) e.stopPropagation();
                 const targetId = kickBtn.dataset.socketId;
                 if (confirm(`Are you sure you want to remove ${u.nickname} from the chat?`)) {
                     if (socket) {

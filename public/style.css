@@ -3159,12 +3159,13 @@ body.light-mode .waveform-bar {
 .members-cancel-btn:hover { background: rgba(255,255,255,0.2); }
 
 .members-list-wrap {
-    max-height: min(360px, 50vh);
+    max-height: min(380px, 60vh);
+    min-height: 90px;
     overflow-y: auto;
-    padding: 16px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 .members-list-wrap::-webkit-scrollbar {
     width: 6px;
@@ -3181,23 +3182,40 @@ body.light-mode .waveform-bar {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     transition: transform 0.2s, background 0.2s;
 }
 .member-item:hover {
-    transform: translateX(4px);
-    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(2px);
+    background: rgba(255, 255, 255, 0.08);
 }
 
-body.light-mode .member-item {
-    background: rgba(0, 0, 0, 0.02);
-    border: 1px solid rgba(0, 0, 0, 0.04);
+body.light-mode .members-modal-box,
+html.light-mode-active .members-modal-box {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.16) !important;
 }
-body.light-mode .member-item:hover {
-    background: rgba(0, 0, 0, 0.04);
+body.light-mode .members-modal-title,
+html.light-mode-active .members-modal-title {
+    color: #0f172a !important;
+}
+body.light-mode .members-cancel-btn,
+html.light-mode-active .members-cancel-btn {
+    background: rgba(0, 0, 0, 0.06) !important;
+    color: #0f172a !important;
+}
+body.light-mode .member-item,
+html.light-mode-active .member-item {
+    background: #f8fafc !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+body.light-mode .member-item:hover,
+html.light-mode-active .member-item:hover {
+    background: #f1f5f9 !important;
 }
 
 .member-avatar-wrap {
@@ -3211,8 +3229,8 @@ body.light-mode .member-item:hover {
     justify-content: center;
     color: #fff;
     font-weight: 600;
-    font-size: 0.9rem;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.95rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .member-avatar-wrap img {
     width: 100%;
@@ -3229,6 +3247,10 @@ body.light-mode .member-item:hover {
     overflow: hidden;
     text-overflow: ellipsis;
 }
+body.light-mode .member-name,
+html.light-mode-active .member-name {
+    color: #0f172a !important;
+}
 .member-you-badge {
     font-size: 0.75rem;
     font-weight: 600;
@@ -3238,8 +3260,9 @@ body.light-mode .member-item:hover {
     border-radius: 20px;
     flex-shrink: 0;
 }
-body.light-mode .member-you-badge {
-    background: rgba(99, 102, 241, 0.1);
+body.light-mode .member-you-badge,
+html.light-mode-active .member-you-badge {
+    background: rgba(99, 102, 241, 0.12);
 }
 .member-admin-badge {
     font-size: 0.75rem;
@@ -3250,8 +3273,9 @@ body.light-mode .member-you-badge {
     border-radius: 20px;
     flex-shrink: 0;
 }
-body.light-mode .member-admin-badge {
-    background: rgba(245, 158, 11, 0.1);
+body.light-mode .member-admin-badge,
+html.light-mode-active .member-admin-badge {
+    background: rgba(245, 158, 11, 0.12);
 }
 .member-remove-btn {
     background: rgba(239, 68, 68, 0.1);
