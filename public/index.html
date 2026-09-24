@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=286" as="style">
+    <link rel="preload" href="/style.css?v=284" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=286" as="script">
+    <link rel="preload" href="/app.js?v=284" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=286">
+    <link rel="stylesheet" href="/style.css?v=284">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -122,9 +122,6 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button id="video-call-btn" class="btn-icon btn-video-call" title="Video Call">
-                        <i class="fas fa-video"></i>
-                    </button>
                     <button id="settings-btn" class="btn-icon" title="Settings">
                         <i class="fas fa-cog"></i>
                     </button>
@@ -389,7 +386,7 @@
                             <i class="fas fa-user-plus"></i>
                         </div>
                         <button type="button" id="avatar-scan-btn" class="avatar-scan-btn" title="Tap to re-scan face" aria-label="Scan face">
-                            <img src="/face-scan-icon.png?v=286" alt="Scan Face" class="avatar-scan-icon-img">
+                            <img src="/face-scan-icon.png?v=284" alt="Scan Face" class="avatar-scan-icon-img">
                         </button>
                     </div>
                 </div>
@@ -670,140 +667,7 @@
         </div>
     </div>
 
-    <!-- ═══════════════════ VIDEO CALL SCREEN ═══════════════════ -->
-    <div id="video-call-screen" class="vc-screen hidden" role="dialog" aria-modal="true" aria-label="Video Call">
-        <!-- Background blur -->
-        <div class="vc-bg"></div>
-
-        <!-- Top bar -->
-        <div class="vc-topbar">
-            <div class="vc-topbar-left">
-                <div class="vc-room-pill">
-                    <i class="fas fa-lock"></i>
-                    <span id="vc-room-label">Room</span>
-                </div>
-            </div>
-            <div class="vc-topbar-center">
-                <span id="vc-timer" class="vc-timer">00:00</span>
-            </div>
-            <div class="vc-topbar-right">
-                <button class="vc-top-btn" id="vc-grid-btn" title="Toggle layout">
-                    <i class="fas fa-table-cells"></i>
-                </button>
-                <button class="vc-top-btn" id="vc-pip-btn" title="Picture in picture">
-                    <i class="fas fa-external-link-alt"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Main video grid -->
-        <div class="vc-grid" id="vc-grid">
-            <!-- Remote / main video -->
-            <div class="vc-tile vc-tile-main" id="vc-remote-tile">
-                <video id="vc-remote-video" autoplay playsinline></video>
-                <div class="vc-tile-overlay">
-                    <div class="vc-tile-name" id="vc-remote-name">
-                        <i class="fas fa-user-circle"></i>
-                        <span>Waiting for others...</span>
-                    </div>
-                    <div class="vc-tile-mic-off hidden" id="vc-remote-mic-indicator">
-                        <i class="fas fa-microphone-slash"></i>
-                    </div>
-                </div>
-                <div class="vc-avatar-fallback" id="vc-remote-avatar">
-                    <div class="vc-avatar-circle">
-                        <i class="fas fa-user"></i>
-                    </div>
-                    <div class="vc-waiting-ring"></div>
-                    <p class="vc-waiting-text">Waiting for participants to join...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Local video (self view - floating) -->
-        <div class="vc-self-view" id="vc-self-view">
-            <video id="vc-local-video" autoplay playsinline muted></video>
-            <div class="vc-self-label">You</div>
-            <div class="vc-self-no-cam hidden" id="vc-self-no-cam">
-                <i class="fas fa-video-slash"></i>
-            </div>
-        </div>
-
-        <!-- Participants sidebar -->
-        <div class="vc-participants-panel hidden" id="vc-participants-panel">
-            <div class="vc-panel-header">
-                <span>People</span>
-                <button class="vc-panel-close" id="vc-close-panel-btn"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="vc-participants-list" id="vc-participants-list"></div>
-        </div>
-
-        <!-- Bottom controls bar -->
-        <div class="vc-controls">
-            <div class="vc-controls-left">
-                <div class="vc-info-chip">
-                    <i class="fas fa-shield-halved"></i>
-                    <span>End-to-End Encrypted</span>
-                </div>
-            </div>
-            <div class="vc-controls-center">
-                <!-- Mic -->
-                <button class="vc-ctrl-btn" id="vc-mic-btn" title="Mute/Unmute">
-                    <i class="fas fa-microphone"></i>
-                    <span>Mic</span>
-                </button>
-                <!-- Camera -->
-                <button class="vc-ctrl-btn" id="vc-cam-btn" title="Camera On/Off">
-                    <i class="fas fa-video"></i>
-                    <span>Camera</span>
-                </button>
-                <!-- End call (red) -->
-                <button class="vc-ctrl-btn vc-btn-end" id="vc-end-btn" title="Leave call">
-                    <i class="fas fa-phone-slash"></i>
-                    <span>Leave</span>
-                </button>
-                <!-- Share screen -->
-                <button class="vc-ctrl-btn" id="vc-share-btn" title="Share screen">
-                    <i class="fas fa-display"></i>
-                    <span>Share</span>
-                </button>
-                <!-- Chat -->
-                <button class="vc-ctrl-btn" id="vc-chat-btn" title="Chat">
-                    <i class="fas fa-message"></i>
-                    <span>Chat</span>
-                </button>
-            </div>
-            <div class="vc-controls-right">
-                <button class="vc-ctrl-btn vc-ctrl-sm" id="vc-participants-btn" title="Participants">
-                    <i class="fas fa-people-group"></i>
-                    <span id="vc-people-count">1</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Incoming call overlay (shown to other users) -->
-        <div class="vc-incoming-overlay hidden" id="vc-incoming-overlay">
-            <div class="vc-incoming-card glass-card">
-                <div class="vc-incoming-avatar">
-                    <i class="fas fa-user-circle"></i>
-                    <div class="vc-ring-anim"></div>
-                </div>
-                <p class="vc-incoming-caller" id="vc-incoming-caller-name">Someone</p>
-                <p class="vc-incoming-sub">Incoming video call</p>
-                <div class="vc-incoming-actions">
-                    <button class="vc-incoming-btn vc-btn-decline" id="vc-decline-btn">
-                        <i class="fas fa-phone-slash"></i>
-                    </button>
-                    <button class="vc-incoming-btn vc-btn-accept" id="vc-accept-btn">
-                        <i class="fas fa-video"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- ═══════════════════ END VIDEO CALL SCREEN ═══════════════════ -->
-
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=286" defer></script>
+    <script src="/app.js?v=284" defer></script>
 </body>
 </html>
