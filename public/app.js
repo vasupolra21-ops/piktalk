@@ -5127,20 +5127,15 @@ function enforceCameraZoom(stream) {
             if (track && track.readyState === 'live' && track.getCapabilities && track.applyConstraints) {
                 const caps = track.getCapabilities();
                 if (caps && caps.zoom) {
-                    // Force absolute minimum zoom = widest angle possible
                     const minZoom = (typeof caps.zoom.min === 'number') ? caps.zoom.min : 1;
                     track.applyConstraints({ advanced: [{ zoom: minZoom }] }).catch(() => {});
-                }
-                // Reset focus to continuous auto for widest, sharpest wide-angle shot
-                if (caps && caps.focusMode && caps.focusMode.includes('continuous')) {
-                    track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
                 }
             }
         } catch(e) {}
     };
 
     applyZoomConstraint();
-    [50, 150, 300, 600, 1000, 1500, 2000, 2500].forEach(delay => setTimeout(applyZoomConstraint, delay));
+    [50, 150, 300, 600, 1000, 1500, 2500].forEach(delay => setTimeout(applyZoomConstraint, delay));
 
     if (_zoomLockInterval) clearInterval(_zoomLockInterval);
     _zoomLockInterval = setInterval(() => {
@@ -5209,38 +5204,18 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    // Wide-angle front camera constraints — request minimum zoom for widest FOV
     const videoConstraints = {
         facingMode: 'user',
-        width:  { ideal: 1920, min: 640 },
-        height: { ideal: 1080, min: 480 },
-        zoom: { ideal: 1 },          // request widest angle (zoom = 1 = no zoom)
-        advanced: [{ zoom: 1 }]      // Chrome/Android: force min zoom
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        aspectRatio: { ideal: 1.7777777778 }
     };
 
-    const getCamStream = () =>
-        // 1st try: wide-angle with zoom:1 constraint
-        navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        // 2nd try: wide-angle without zoom hint (iOS Safari compatible)
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: {
-            facingMode: 'user',
-            width:  { ideal: 1920, min: 640 },
-            height: { ideal: 1080, min: 480 }
-        }}))
-        // 3rd try: standard 720p front
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: {
-            facingMode: 'user',
-            width: { ideal: 1280 }, height: { ideal: 720 },
-            aspectRatio: { ideal: 1.7777777778 }
-        }}))
-        // 4th try: 540p front
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: {
-            facingMode: 'user',
-            width: { ideal: 960 }, height: { ideal: 540 }
-        }}))
-        // 5th try: any front camera
+    const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', aspectRatio: { ideal: 1.7777777778 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
-        // Last resort: any camera
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     getCamStream()
