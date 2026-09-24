@@ -4476,18 +4476,27 @@ function initMembersModal() {
     const closeBtn = document.getElementById('members-close-btn');
 
     if (btn && modal) {
-        addFastClickListener(btn, () => {
-            // Render immediately with cached users or self
-            updateMembersList(_cachedRoomUsers);
-            
-            // Request fresh room users from server
+        // Use direct touch + click listeners for guaranteed first-tap on iOS/Android
+        // (addFastClickListener has a 350ms debounce that blocks the very first tap)
+        const openMembersModal = () => {
+            try { updateMembersList(_cachedRoomUsers); } catch(e) {}
             if (socket && currentRoomID) {
                 socket.emit('request-room-users', { roomID: currentRoomID });
             }
-            
             modal.classList.add('open');
             document.body.style.overflow = 'hidden';
             updateThemeColor();
+        };
+        let _membersTouchHandled = false;
+        btn.addEventListener('touchstart', () => {}, { passive: true }); // enable :active on iOS
+        btn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            _membersTouchHandled = true;
+            openMembersModal();
+            setTimeout(() => { _membersTouchHandled = false; }, 500);
+        }, { passive: false });
+        btn.addEventListener('click', () => {
+            if (!_membersTouchHandled) openMembersModal();
         });
     }
 
