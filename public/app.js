@@ -2613,14 +2613,13 @@ function showTyping(name, profilePic, mode) {
         bubbleEl.innerHTML = `
             <div class="wa-typing-label">
                 <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
-                <span class="wa-typing-sub">typing...</span>
             </div>
             <div class="wa-typing-dots">
                 <span></span><span></span><span></span>
             </div>
         `;
         if (onlineStatus) {
-            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)} typing...</span>`;
+            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)}</span>`;
         }
     }
 
