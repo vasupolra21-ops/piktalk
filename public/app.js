@@ -603,6 +603,52 @@ function initViewportHandler() {
             setTimeout(clearKeyboardHeight, 600);
         });
     }
+
+    // ── Home View Keyboard Handler ──
+    const homeViewEl = document.getElementById('home-view');
+    let homeVpResizeHandler = null;
+
+    function applyHomeKeyboardHeight() {
+        if (!homeViewEl) return;
+        const vh = window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight;
+        document.documentElement.style.setProperty('--viewport-height', vh + 'px');
+        homeViewEl.style.setProperty('height', vh + 'px', 'important');
+        if (joinRoomInput) {
+            joinRoomInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function clearHomeKeyboardHeight() {
+        document.documentElement.style.removeProperty('--viewport-height');
+        if (homeViewEl) {
+            homeViewEl.style.removeProperty('height');
+        }
+    }
+
+    if (joinRoomInput) {
+        joinRoomInput.addEventListener('focus', () => {
+            document.body.classList.add('home-keyboard-active');
+            if (window.visualViewport && !homeVpResizeHandler) {
+                homeVpResizeHandler = applyHomeKeyboardHeight;
+                window.visualViewport.addEventListener('resize', homeVpResizeHandler);
+            }
+            applyHomeKeyboardHeight();
+            setTimeout(applyHomeKeyboardHeight, 50);
+            setTimeout(applyHomeKeyboardHeight, 150);
+            setTimeout(applyHomeKeyboardHeight, 300);
+            setTimeout(applyHomeKeyboardHeight, 500);
+        });
+
+        joinRoomInput.addEventListener('blur', () => {
+            document.body.classList.remove('home-keyboard-active');
+            if (window.visualViewport && homeVpResizeHandler) {
+                window.visualViewport.removeEventListener('resize', homeVpResizeHandler);
+                homeVpResizeHandler = null;
+            }
+            setTimeout(clearHomeKeyboardHeight, 100);
+            setTimeout(clearHomeKeyboardHeight, 300);
+        });
+    }
 }
 
 
@@ -1353,16 +1399,6 @@ function setupEventListeners() {
             joinRoomBtn.click();
         }
     });
-
-    // Mobile keyboard fix: scroll input into view when keyboard opens
-    if (joinRoomInput) {
-        joinRoomInput.addEventListener('focus', () => {
-            // Small delay so the keyboard has time to open and shrink the viewport
-            setTimeout(() => {
-                joinRoomInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 300);
-        });
-    }
 
     // Password modal cancel/submit
     if (cancelPasswordBtn) {
@@ -2173,6 +2209,8 @@ function toggleTheme() {
 }
 
 function showHome() {
+    document.body.classList.remove('home-keyboard-active');
+    document.body.classList.remove('keyboard-active');
     [homeView, chatView, nicknameModal, createRoomModal, passwordModal, roomNotFoundModal].forEach(v => { if (v) v.classList.remove('active'); });
     // Remove connecting overlay if present
     const existingOverlay = document.getElementById('connecting-overlay');

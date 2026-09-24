@@ -2379,6 +2379,28 @@ body.light-mode .waveform-bar {
         width: 100vw;
         align-items: stretch;
         justify-content: flex-start;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Home View Container on mobile */
+    #home-view.active {
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    body.home-keyboard-active #home-view.active {
+        height: var(--viewport-height, 100dvh) !important;
     }
 
     /* Chat View: height-based (100dvh), JS overrides height only when keyboard is open */
@@ -2406,22 +2428,71 @@ body.light-mode .waveform-bar {
     }
 
     .main-hero {
-        padding: 2rem 1.25rem 2rem;
-        padding-top: calc(4rem + env(safe-area-inset-top));
-        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
-        margin: 0 !important;
-        width: 100vw !important;
-        height: 100% !important;
-        min-height: var(--viewport-height, 100dvh) !important;
-        max-width: 100% !important;
+        padding: 1.75rem 1.25rem 2rem;
+        padding-top: calc(3rem + env(safe-area-inset-top, 0px));
+        padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+        margin: 0 auto !important;
+        width: 100% !important;
+        max-width: 440px !important;
+        height: auto !important;
+        min-height: 100% !important;
         border-radius: 0 !important;
         border: none !important;
         box-shadow: none !important;
         display: flex;
         flex-direction: column;
-        justify-content: space-evenly;
+        justify-content: center;
         align-items: center;
-        overflow-y: auto;
+        gap: 16px;
+        transition: padding 0.25s cubic-bezier(0.16, 1, 0.3, 1), gap 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* When typing Room ID on mobile, smoothly compact the header so the input is 100% visible */
+    body.home-keyboard-active .main-hero {
+        padding-top: calc(0.75rem + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px)) !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+    }
+
+    body.home-keyboard-active .logo {
+        margin-bottom: 0.2rem !important;
+        transform: scale(0.8);
+        transform-origin: center;
+        transition: transform 0.2s ease, margin 0.2s ease;
+    }
+
+    body.home-keyboard-active .main-hero h2 {
+        font-size: 1.15rem !important;
+        margin: 0 !important;
+    }
+
+    body.home-keyboard-active .main-hero p {
+        display: none !important;
+    }
+
+    body.home-keyboard-active .features-grid {
+        display: none !important;
+    }
+
+    body.home-keyboard-active .btn-large {
+        padding: 10px 16px !important;
+        font-size: 0.9rem !important;
+    }
+
+    body.home-keyboard-active .divider {
+        margin: 4px 0 !important;
+    }
+
+    body.home-keyboard-active .join-existing {
+        transform: scale(1.02);
+        transition: transform 0.2s ease;
+    }
+
+    body.home-keyboard-active .join-existing input {
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35) !important;
+        background: var(--card-bg) !important;
     }
     
     .btn-large {
