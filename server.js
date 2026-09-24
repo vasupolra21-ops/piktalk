@@ -28,7 +28,14 @@ const app = express();
 app.use(express.json());
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 1e8 // 100 MB limit for large photos
+    maxHttpBufferSize: 1e8, // 100 MB limit for large photos
+    transports: ['websocket', 'polling'],
+    allowUpgrades: true,
+    perMessageDeflate: false, // Disables deflate buffer lag for instant sub-10ms delivery
+    httpCompression: false,
+    pingTimeout: 10000,
+    pingInterval: 5000,
+    cors: { origin: '*' }
 });
 
 const PORT = process.env.PORT || 3000;
@@ -380,19 +387,21 @@ io.on('connection', (socket) => {
 
     socket.on('send-message', (data) => {
         const user = users[socket.id];
-        if (user) {
+        const roomID = (user && user.roomID) || data.roomID;
+        if (roomID) {
             const messageData = {
                 msgId: uuidv4(),
                 id: socket.id,
-                nickname: data.nickname || user.nickname,
+                nickname: data.nickname || (user && user.nickname) || 'Anonymous',
                 message: data.message,
                 image: data.image,
                 audio: data.audio,
                 audioDuration: data.audioDuration,
-                profilePic: data.profilePic || user.profilePic,
-                replyTo: data.replyTo || null
+                profilePic: data.profilePic || (user && user.profilePic) || null,
+                replyTo: data.replyTo || null,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
-            io.to(user.roomID).emit('receive-message', messageData);
+            io.to(roomID).emit('receive-message', messageData);
         }
     });
 

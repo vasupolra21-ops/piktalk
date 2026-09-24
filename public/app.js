@@ -2288,7 +2288,7 @@ function sendMessage() {
             // Stop typing indicator instantly upon sending
             clearTimeout(typingTimeout);
             isCurrentlyTyping = false;
-            socket.emit('stop-typing');
+            socket.emit('stop-typing', { roomID: currentRoomID });
 
             // Optimistic UI: render message instantly without waiting for server echo
             const optimisticData = {
@@ -2300,11 +2300,13 @@ function sendMessage() {
                 replyTo: replyingTo || null
             };
             appendMessage(optimisticData, true);
-            saveMsgToHistory(optimisticData);
+            setTimeout(() => saveMsgToHistory(optimisticData), 0);
             _lastOptimisticMsgText = text;
 
             socket.emit('send-message', {
                 roomID: currentRoomID,
+                nickname: myNickname || 'Anonymous',
+                profilePic: myProfilePic || null,
                 message: text,
                 replyTo: replyingTo || null
             });
@@ -2346,7 +2348,7 @@ if (socket) {
             return;
         }
         appendMessage(data, data.id === socket.id);
-        saveMsgToHistory(data);
+        setTimeout(() => saveMsgToHistory(data), 0);
         if (msgSound) SoundManager.play(msgSound);
 
         // Auto-refresh smart replies in real time if suggestions bar is currently open
