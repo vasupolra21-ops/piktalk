@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=266" as="style">
+    <link rel="preload" href="/style.css?v=267" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=266" as="script">
+    <link rel="preload" href="/app.js?v=267" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=266">
+    <link rel="stylesheet" href="/style.css?v=267">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -157,14 +157,14 @@
 
             <div id="messages-container" class="messages-container">
                 <div class="system-message">Welcome to your private chat room!</div>
-            </div>
-
-            <div id="typing-indicator" class="typing-indicator">
-                <div id="typing-avatar" class="typing-avatar"></div>
-                <div class="typing-bubble">
-                    <span class="typing-name" id="typing-text"></span>
-                    <div class="typing-dots">
-                        <span></span><span></span><span></span>
+                <!-- WhatsApp-style In-stream Typing Indicator -->
+                <div id="typing-indicator" class="typing-indicator">
+                    <div id="typing-avatar" class="typing-avatar"></div>
+                    <div class="typing-bubble wa-typing-bubble">
+                        <span class="typing-name" id="typing-text"></span>
+                        <div class="typing-dots">
+                            <span></span><span></span><span></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -336,7 +336,7 @@
                             <i class="fas fa-user-plus"></i>
                         </div>
                         <button type="button" id="avatar-scan-btn" class="avatar-scan-btn" title="Tap to re-scan face" aria-label="Scan face">
-                            <img src="/face-scan-icon.png?v=266" alt="Scan Face" class="avatar-scan-icon-img">
+                            <img src="/face-scan-icon.png?v=267" alt="Scan Face" class="avatar-scan-icon-img">
                         </button>
                     </div>
                 </div>
@@ -568,6 +568,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=266" defer></script>
+    <script src="/app.js?v=267" defer></script>
 </body>
 </html>

@@ -2551,8 +2551,14 @@ function showTyping(name, profilePic, mode) {
         }
     }
 
-    indicator.classList.add('visible');
     const container = document.getElementById('messages-container');
+    if (container && indicator) {
+        if (indicator.parentNode !== container || indicator.nextSibling) {
+            container.appendChild(indicator);
+        }
+    }
+
+    indicator.classList.add('visible');
     if (container) container.scrollTop = container.scrollHeight;
 
     // Auto-hide safety timeout
@@ -2882,7 +2888,12 @@ function appendMessage(data, isSentByMe) {
     // Add msg-new class: triggers opacity fade + will-change only on this new bubble
     msgDiv.classList.add('msg-new');
 
-    messagesContainer.appendChild(msgDiv);
+    const typingIndicatorEl = document.getElementById('typing-indicator');
+    if (typingIndicatorEl && typingIndicatorEl.parentNode === messagesContainer) {
+        messagesContainer.insertBefore(msgDiv, typingIndicatorEl);
+    } else {
+        messagesContainer.appendChild(msgDiv);
+    }
 
     // Scroll to bottom immediately — opacity-only animation has no layout impact
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -3504,7 +3515,12 @@ function appendSystemMessage(text) {
     const msgDiv = document.createElement('div');
     msgDiv.classList.add('system-message');
     msgDiv.textContent = text;
-    messagesContainer.appendChild(msgDiv);
+    const typingIndicatorEl = document.getElementById('typing-indicator');
+    if (typingIndicatorEl && typingIndicatorEl.parentNode === messagesContainer) {
+        messagesContainer.insertBefore(msgDiv, typingIndicatorEl);
+    } else {
+        messagesContainer.appendChild(msgDiv);
+    }
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
