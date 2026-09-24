@@ -540,22 +540,60 @@ function updateActiveModalViewport() {
     }
 }
 
-// Global scroll helper to scroll and focus latest messages smoothly
+// Global scroll helper to scroll and focus latest messages smoothly and accurately
 function scrollToBottom(smooth = false) {
     if (!messagesContainer) return;
+    const target = messagesContainer.scrollHeight - messagesContainer.clientHeight;
+    if (target <= 0) {
+        messagesContainer.scrollTop = 0;
+        return;
+    }
     if (smooth && typeof messagesContainer.scrollTo === 'function') {
         messagesContainer.scrollTo({
-            top: messagesContainer.scrollHeight,
+            top: target + 100,
             behavior: 'smooth'
         });
     } else {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        messagesContainer.scrollTop = target + 100;
     }
     requestAnimationFrame(() => {
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     });
+}
+
+function focusNewMessage(msgEl, isSentByMe = false) {
+    if (!messagesContainer) return;
+
+    // Immediate scroll
+    scrollToBottom(false);
+
+    // If message element is provided, monitor dynamic content expansion (images, audio waveform, polls)
+    if (msgEl && typeof ResizeObserver !== 'undefined') {
+        let resizePasses = 0;
+        const ro = new ResizeObserver(() => {
+            scrollToBottom(false);
+            resizePasses++;
+            if (resizePasses >= 8) ro.disconnect();
+        });
+        ro.observe(msgEl);
+        setTimeout(() => ro.disconnect(), 2500);
+    }
+
+    // Follow-up frames to guarantee newest message is fully locked in view above input bar
+    requestAnimationFrame(() => {
+        scrollToBottom(false);
+    });
+    setTimeout(() => {
+        scrollToBottom(true);
+    }, 40);
+    setTimeout(() => {
+        scrollToBottom(false);
+    }, 120);
+    setTimeout(() => {
+        scrollToBottom(false);
+    }, 280);
 }
 
 // Mobile keyboard handler for iOS/Android:
@@ -586,6 +624,8 @@ function initViewportHandler() {
 
         // Scroll to bottom so latest message stays visible above keyboard
         scrollToBottom();
+        requestAnimationFrame(() => scrollToBottom(false));
+        setTimeout(() => scrollToBottom(true), 60);
         updateActiveModalViewport();
     }
 
@@ -598,6 +638,7 @@ function initViewportHandler() {
         chatView.style.removeProperty('left');
         // Scroll to bottom after keyboard dismisses too
         setTimeout(scrollToBottom, 50);
+        setTimeout(scrollToBottom, 150);
     }
 
     // Prevent iOS page scroll (it creates white gaps)
@@ -3474,10 +3515,7 @@ function appendMessage(data, isSentByMe) {
 
         // Auto-focus and scroll to new image as soon as image loads/renders
         const onImageReady = () => {
-            scrollToBottom();
-            try {
-                msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            } catch(e) {}
+            focusNewMessage(msgDiv, isSentByMe);
         };
         img.addEventListener('load', onImageReady);
         if (img.complete) {
@@ -3790,36 +3828,7 @@ function appendMessage(data, isSentByMe) {
     }
 
     // Scroll to bottom immediately & focus new message
-    scrollToBottom();
-    try {
-        msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    } catch(e) {}
-
-    // Follow-up scroll passes to handle image rendering, font loading, poll/audio heights
-    requestAnimationFrame(() => {
-        scrollToBottom();
-        try {
-            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } catch(e) {}
-    });
-
-    setTimeout(() => {
-        scrollToBottom();
-        try {
-            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } catch(e) {}
-    }, 60);
-
-    setTimeout(() => {
-        scrollToBottom();
-        try {
-            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        } catch(e) {}
-    }, 180);
-
-    setTimeout(() => {
-        scrollToBottom();
-    }, 400);
+    focusNewMessage(msgDiv, isSentByMe);
 
     // Clean up will-change after animation ends to free GPU layers
     msgDiv.addEventListener('animationend', () => {
@@ -4444,7 +4453,7 @@ function appendSystemMessage(text) {
     } else {
         messagesContainer.appendChild(msgDiv);
     }
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    scrollToBottom(true);
 }
 
 function getNicknameColor(name) {
@@ -6797,7 +6806,8 @@ function loadAndRenderHistory(roomID) {
         sep2.style.cssText = 'text-align:center;color:var(--text-muted);font-size:0.75rem;padding:8px 0;opacity:0.6;';
         sep2.textContent = '— Live messages —';
         messagesContainer.appendChild(sep2);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        scrollToBottom(false);
+        setTimeout(() => scrollToBottom(false), 50);
     } catch(e) { /* ignore */ }
 }
 

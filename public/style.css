@@ -750,19 +750,18 @@ body.light-mode .btn-icon {
     background: rgba(148, 163, 184, 0.7);
 }
 
-/* Base message: GPU optimized with layout containment & content-visibility for ultra-smooth 60/120fps scrolling */
+/* Base message: GPU optimized with layout containment for rock-solid scroll height calculation */
 .message {
     max-width: 65%;
     display: flex;
     flex-direction: column;
     contain: layout style;
-    content-visibility: auto;
-    contain-intrinsic-size: 0 45px;
+    scroll-margin-bottom: 24px;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
 
-/* â”€â”€ Smooth, Fast & Attractive Message Entrance Animations (Mobile & PC) â”€â”€ */
+/* Entrance Animations */
 .message.msg-new.sent {
     animation: msgSentFluidIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: bottom right;
@@ -777,6 +776,25 @@ body.light-mode .btn-icon {
     animation: msgReceivedFluidIn 0.20s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: bottom left;
     will-change: opacity, transform;
+}
+
+.message.msg-new.received .bubble {
+    animation: receivedBubblePopGlow 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes receivedBubblePopGlow {
+    0% {
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4), 0 0 12px rgba(16, 185, 129, 0.3);
+        transform: scale(0.96);
+    }
+    60% {
+        box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
+        transform: scale(1.01);
+    }
+    100% {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        transform: scale(1);
+    }
 }
 
 @keyframes msgSentFluidIn {
