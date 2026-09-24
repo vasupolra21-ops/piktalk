@@ -58,6 +58,11 @@ body.light-mode .btn-icon .theme-icon-light {
     font-family: 'Outfit', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body, button, .btn, .btn-icon, a, input, select, textarea {
+    touch-action: manipulation;
 }
 
 /* Performance: promote image/video elements to their own layer */
@@ -447,6 +452,12 @@ body.light-mode .bg-moon {
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
+}
+
+.btn:active, .btn-icon:active, button:active {
+    transform: scale(0.96) translateY(0) !important;
+    filter: brightness(0.92);
+    transition: transform 0.05s ease !important;
 }
 
 .btn-large {

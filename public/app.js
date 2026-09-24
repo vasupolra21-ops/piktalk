@@ -121,17 +121,55 @@ const SoundManager = (() => {
 
 
 
-// Initialize Socket.io – websocket-first for fastest connection
+// Initialize Socket.io – websocket-first with permanent auto-reconnect and zero-latency recovery
 let socket;
 try {
     socket = io({
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 5,
-        timeout: 8000,
-        reconnectionDelay: 300
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 400,
+        reconnectionDelayMax: 2000,
+        timeout: 10000
     });
 } catch (e) {
     console.error("Socket.io initialization failed:", e);
+}
+
+// Proactive instant reconnection on mobile tab wake / user interaction
+function ensureSocketLive() {
+    if (!socket) return;
+    if (!socket.connected) {
+        try {
+            socket.connect();
+        } catch(e) {}
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') ensureSocketLive();
+});
+window.addEventListener('focus', ensureSocketLive);
+window.addEventListener('pageshow', ensureSocketLive);
+window.addEventListener('online', ensureSocketLive);
+document.addEventListener('touchstart', ensureSocketLive, { passive: true });
+
+// Zero-delay fast click handler for mobile and desktop (eliminates 300ms tap delay)
+function addFastClickListener(element, handler) {
+    if (!element) return;
+    let touchHandled = false;
+    element.addEventListener('touchstart', (e) => {
+        touchHandled = true;
+        handler(e);
+        setTimeout(() => { touchHandled = false; }, 350);
+    }, { passive: true });
+    element.addEventListener('click', (e) => {
+        if (touchHandled) {
+            e.preventDefault();
+            return;
+        }
+        handler(e);
+    });
 }
 
 // DOM Elements
@@ -1227,49 +1265,88 @@ function setupEventListeners() {
     initPasswordToggle(createRoomPasswordInput, toggleCreatePasswordBtn);
     initPasswordToggle(joinRoomPasswordInput, toggleJoinPasswordBtn);
 
-    // Host room creation modal triggers
-    if (createRoomBtn) createRoomBtn.addEventListener('click', () => {
-        const randomID = Math.random().toString(36).substring(2, 9);
-        if (createRoomIdInput) createRoomIdInput.value = randomID;
-        if (createRoomPasswordInput) createRoomPasswordInput.value = '';
-        if (createRoomError) createRoomError.style.display = 'none';
-        if (createRoomModal) createRoomModal.classList.add('active');
-        updateInputsState();
-        updateThemeColor();
-    });
+    // Host room creation modal triggers with 0ms fast tap
+    if (createRoomBtn) {
+        addFastClickListener(createRoomBtn, () => {
+            const randomID = Math.random().toString(36).substring(2, 9);
+            if (createRoomIdInput) createRoomIdInput.value = randomID;
+            if (createRoomPasswordInput) createRoomPasswordInput.value = '';
+            if (createRoomError) createRoomError.style.display = 'none';
+            if (createRoomModal) createRoomModal.classList.add('active');
+            updateInputsState();
+            updateThemeColor();
+        });
+    }
 
-    if (cancelCreateRoomBtn) cancelCreateRoomBtn.addEventListener('click', () => {
-        if (createRoomModal) createRoomModal.classList.remove('active');
-        updateInputsState();
-        updateThemeColor();
-    });
+    if (cancelCreateRoomBtn) {
+        addFastClickListener(cancelCreateRoomBtn, () => {
+            if (createRoomModal) createRoomModal.classList.remove('active');
+            updateInputsState();
+            updateThemeColor();
+        });
+    }
 
-    if (confirmCreateRoomBtn) confirmCreateRoomBtn.addEventListener('click', () => {
-        let roomID = createRoomIdInput.value.trim();
-        if (!roomID) {
-            roomID = Math.random().toString(36).substring(2, 9);
-        }
-        if (!/^[a-zA-Z0-9-_]+$/.test(roomID)) {
-            if (createRoomError) {
-                createRoomError.textContent = 'Room ID can only contain letters, numbers, hyphens, and underscores.';
-                createRoomError.style.display = 'block';
+    if (confirmCreateRoomBtn) {
+        addFastClickListener(confirmCreateRoomBtn, () => {
+            let roomID = createRoomIdInput.value.trim();
+            if (!roomID) {
+                roomID = Math.random().toString(36).substring(2, 9);
             }
-            return;
-        }
-        if (socket) {
-            socket.emit('check-room-id-available', { roomID });
-        }
-    });
-
-    // Enter Room ID on home screen
-    if (joinRoomBtn) joinRoomBtn.addEventListener('click', () => {
-        const roomID = joinRoomInput.value.trim();
-        if (roomID) {
-            if (socket) {
-                socket.emit('check-room', { roomID });
+            if (!/^[a-zA-Z0-9-_]+$/.test(roomID)) {
+                if (createRoomError) {
+                    createRoomError.textContent = 'Room ID can only contain letters, numbers, hyphens, and underscores.';
+                    createRoomError.style.display = 'block';
+                }
+                return;
             }
-        }
-    });
+
+            ensureSocketLive();
+
+            if (socket && socket.connected) {
+                socket.emit('check-room-id-available', { roomID });
+                // Safety optimistic fallback: if server takes > 500ms, proceed immediately
+                setTimeout(() => {
+                    if (createRoomModal && createRoomModal.classList.contains('active')) {
+                        currentRoomID = roomID;
+                        currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
+                        createRoomModal.classList.remove('active');
+                        window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                        showPhoneModal(showNicknameModal);
+                    }
+                }, 500);
+            } else {
+                currentRoomID = roomID;
+                currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
+                if (createRoomModal) createRoomModal.classList.remove('active');
+                window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                showPhoneModal(showNicknameModal);
+            }
+        });
+    }
+
+    // Enter Room ID on home screen with fast tap
+    if (joinRoomBtn) {
+        addFastClickListener(joinRoomBtn, () => {
+            const roomID = joinRoomInput.value.trim();
+            if (roomID) {
+                ensureSocketLive();
+                if (socket && socket.connected) {
+                    socket.emit('check-room', { roomID });
+                    setTimeout(() => {
+                        if (homeView && homeView.classList.contains('active') && !document.querySelector('.modal.active')) {
+                            currentRoomID = roomID;
+                            window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                            showPhoneModal(showNicknameModal);
+                        }
+                    }, 600);
+                } else {
+                    currentRoomID = roomID;
+                    window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                    showPhoneModal(showNicknameModal);
+                }
+            }
+        });
+    }
 
     if (joinRoomInput) joinRoomInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1278,17 +1355,22 @@ function setupEventListeners() {
     });
 
     // Password modal cancel/submit
-    if (cancelPasswordBtn) cancelPasswordBtn.addEventListener('click', () => {
-        if (passwordModal) passwordModal.classList.remove('active');
-        window.location.href = '/';
-    });
+    if (cancelPasswordBtn) {
+        addFastClickListener(cancelPasswordBtn, () => {
+            if (passwordModal) passwordModal.classList.remove('active');
+            window.location.href = '/';
+        });
+    }
 
-    if (submitPasswordBtn) submitPasswordBtn.addEventListener('click', () => {
-        const password = joinRoomPasswordInput.value.trim();
-        if (socket && currentRoomID) {
-            socket.emit('verify-password', { roomID: currentRoomID, password });
-        }
-    });
+    if (submitPasswordBtn) {
+        addFastClickListener(submitPasswordBtn, () => {
+            const password = joinRoomPasswordInput.value.trim();
+            ensureSocketLive();
+            if (socket && currentRoomID) {
+                socket.emit('verify-password', { roomID: currentRoomID, password });
+            }
+        });
+    }
 
     if (joinRoomPasswordInput) joinRoomPasswordInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1297,9 +1379,11 @@ function setupEventListeners() {
     });
 
     // Room not found modal triggers
-    if (roomNotFoundHomeBtn) roomNotFoundHomeBtn.addEventListener('click', () => {
-        window.location.href = '/';
-    });
+    if (roomNotFoundHomeBtn) {
+        addFastClickListener(roomNotFoundHomeBtn, () => {
+            window.location.href = '/';
+        });
+    }
 
     if (joinChatBtn) joinChatBtn.addEventListener('click', () => {
         const nick = nicknameInput.value.trim();
@@ -1419,8 +1503,8 @@ function setupEventListeners() {
         }
     });
 
-    if (themeToggle) themeToggle.addEventListener('click', toggleTheme);
-    if (homeThemeToggle) homeThemeToggle.addEventListener('click', toggleTheme);
+    if (themeToggle) addFastClickListener(themeToggle, toggleTheme);
+    if (homeThemeToggle) addFastClickListener(homeThemeToggle, toggleTheme);
     
     // ── Scan button: navigate back to biometric face scan ──
     function triggerFaceReScan() {
