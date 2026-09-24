@@ -1781,10 +1781,9 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionend', emitMyTyping);
     }
 
-    // WhatsApp Attachment Menu Toggle (Fast Touch Response for iOS & Android & Desktop)
+    // WhatsApp Attachment Menu Toggle — direct touchstart/touchend/click for guaranteed response
     if (attachBtn && attachMenu) {
-        addFastClickListener(attachBtn, (e) => {
-            if (e && e.stopPropagation) e.stopPropagation();
+        const toggleAttachMenu = () => {
             const isOpen = !attachMenu.classList.contains('hidden');
             if (isOpen) {
                 attachMenu.classList.add('hidden');
@@ -1795,25 +1794,47 @@ function setupEventListeners() {
                 // Close emoji picker if open
                 if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
                     emojiPicker.classList.add('hidden');
+                    _isMessageInputFocused = false;
                 }
             }
+        };
+
+        let _attachBtnTouchHandled = false;
+
+        // touchstart: make the button feel instantly responsive (enables :active CSS)
+        attachBtn.addEventListener('touchstart', () => {}, { passive: true });
+
+        // touchend: fire immediately, prevent the 300ms synthetic click
+        attachBtn.addEventListener('touchend', (e) => {
+            e.preventDefault(); // stop synthetic click
+            e.stopPropagation();
+            _attachBtnTouchHandled = true;
+            toggleAttachMenu();
+            setTimeout(() => { _attachBtnTouchHandled = false; }, 600);
+        }, { passive: false });
+
+        // click: desktop fallback (also fires on mobile if touchend didn't preventDefault)
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (_attachBtnTouchHandled) return; // already handled by touchend
+            toggleAttachMenu();
         });
 
-        // Close attachment menu when tapping anywhere outside
-        const closeAttachMenuOutside = (e) => {
+        // Close when tapping anywhere outside the menu or the + button
+        document.addEventListener('click', (e) => {
             if (attachMenu && !attachMenu.classList.contains('hidden')) {
-                const target = e.target;
-                if (target && !attachMenu.contains(target) && !attachBtn.contains(target)) {
+                if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
                     attachMenu.classList.add('hidden');
                     attachBtn.classList.remove('menu-open');
                 }
             }
-        };
-        document.addEventListener('click', closeAttachMenuOutside);
+        });
         document.addEventListener('touchend', (e) => {
-            if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
-                attachMenu.classList.add('hidden');
-                attachBtn.classList.remove('menu-open');
+            if (attachMenu && !attachMenu.classList.contains('hidden')) {
+                if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
+                    attachMenu.classList.add('hidden');
+                    attachBtn.classList.remove('menu-open');
+                }
             }
         }, { passive: true });
     }
