@@ -127,11 +127,26 @@ try {
     socket = io({
         transports: ['websocket', 'polling'],
         upgrade: true,
+        rememberUpgrade: true,
+        autoConnect: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 200,
-        reconnectionDelayMax: 1000,
-        timeout: 10000
+        reconnectionDelay: 100,
+        reconnectionDelayMax: 500,
+        randomizationFactor: 0.1,
+        timeout: 8000
+    });
+
+    socket.on('connect', () => {
+        if (currentRoomID && myNickname) {
+            socket.emit('join-room', {
+                roomID: currentRoomID,
+                nickname: myNickname,
+                profilePic: myProfilePic || null,
+                userId: getFaceUserId() || null,
+                password: currentRoomPassword || null
+            });
+        }
     });
 } catch (e) {
     console.error("Socket.io initialization failed:", e);
@@ -1774,8 +1789,8 @@ function setupEventListeners() {
     function emitMyTyping() {
         if (socket && currentRoomID) {
             const now = Date.now();
-            // Emit immediately on first keystroke or every 1000ms while user is actively composing
-            if (now - _lastTypingEmitTime > 1000) {
+            // Emit immediately on first keystroke or every 400ms while user is actively composing
+            if (now - _lastTypingEmitTime > 400) {
                 _lastTypingEmitTime = now;
                 const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
                 socket.emit('typing', {
@@ -1785,11 +1800,11 @@ function setupEventListeners() {
                 });
             }
 
-            // Reliable 2500ms debounce so the indicator remains visible steadily while composing
+            // Reliable 1800ms debounce so the indicator remains visible steadily while composing
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
                 emitMyStopTyping();
-            }, 2500);
+            }, 1800);
         }
     }
 
@@ -3035,9 +3050,12 @@ function sendMessage() {
             isCurrentlyTyping = false;
             socket.emit('stop-typing', { roomID: currentRoomID });
 
+            // Generate deterministic unique clientMsgId for 0ms latency
+            const clientMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
             // Optimistic UI: render message instantly without waiting for server echo
             const optimisticData = {
-                msgId: '_opt_' + Date.now(),
+                msgId: clientMsgId,
                 id: socket.id,
                 nickname: myNickname || 'Me',
                 message: text,
@@ -3046,9 +3064,11 @@ function sendMessage() {
             };
             appendMessage(optimisticData, true);
             setTimeout(() => saveMsgToHistory(optimisticData), 0);
+            _lastOptimisticMsgId = clientMsgId;
             _lastOptimisticMsgText = text;
 
             socket.emit('send-message', {
+                msgId: clientMsgId,
                 roomID: currentRoomID,
                 nickname: myNickname || 'Anonymous',
                 profilePic: myProfilePic || null,

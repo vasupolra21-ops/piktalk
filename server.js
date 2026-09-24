@@ -394,8 +394,10 @@ io.on('connection', (socket) => {
 
     socket.on('send-message', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || (data && data.roomID);
+        const roomID = (data && data.roomID) || (user && user.roomID);
         if (roomID) {
+            const cleanRoomID = String(roomID).trim();
+            socket.join(cleanRoomID);
             const messageData = {
                 msgId: (data && data.msgId) ? data.msgId : uuidv4(),
                 id: socket.id,
@@ -411,7 +413,7 @@ io.on('connection', (socket) => {
                 replyTo: data.replyTo || null,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
-            io.to(roomID).emit('receive-message', messageData);
+            io.to(cleanRoomID).emit('receive-message', messageData);
         }
     });
 
@@ -420,7 +422,8 @@ io.on('connection', (socket) => {
         const user = users[socket.id];
         const rID = (user && user.roomID) || roomID;
         if (rID && msgId && optionIndex !== undefined) {
-            io.to(rID).emit('poll-voted', {
+            const cleanRoomID = String(rID).trim();
+            io.to(cleanRoomID).emit('poll-voted', {
                 msgId,
                 optionIndex,
                 userId: socket.id,
@@ -432,8 +435,9 @@ io.on('connection', (socket) => {
     // Real-time emoji reactions — relay to whole room
     socket.on('toggle-reaction', ({ msgId, emoji, previousEmoji }) => {
         const user = users[socket.id];
-        if (user && msgId && emoji) {
-            io.to(user.roomID).emit('reaction-toggled', {
+        if (user && msgId && emoji && user.roomID) {
+            const cleanRoomID = String(user.roomID).trim();
+            io.to(cleanRoomID).emit('reaction-toggled', {
                 msgId,
                 emoji,
                 socketId: socket.id,
@@ -446,37 +450,41 @@ io.on('connection', (socket) => {
 
     socket.on('typing', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || (data && data.roomID);
+        const roomID = (data && data.roomID) || (user && user.roomID);
         const nickname = (user && user.nickname) || (data && data.nickname) || 'Someone';
         const profilePic = (user && user.profilePic) || (data && data.profilePic) || null;
         if (roomID) {
-            socket.to(roomID).emit('user-typing', { nickname, profilePic });
+            const cleanRoomID = String(roomID).trim();
+            socket.to(cleanRoomID).emit('user-typing', { nickname, profilePic });
         }
     });
 
     socket.on('stop-typing', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || (data && data.roomID);
+        const roomID = (data && data.roomID) || (user && user.roomID);
         if (roomID) {
-            socket.to(roomID).emit('user-stop-typing');
+            const cleanRoomID = String(roomID).trim();
+            socket.to(cleanRoomID).emit('user-stop-typing');
         }
     });
 
     socket.on('voice-recording-start', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || (data && data.roomID);
-        const nickname = (user && user.nickname) || (data && data.nickname) || 'Someone';
+        const roomID = (data && data.roomID) || (user && user.roomID);
+        const nickname = (data && data.nickname) || (user && user.nickname) || 'Someone';
         const profilePic = (user && user.profilePic) || (data && data.profilePic) || null;
         if (roomID) {
-            socket.to(roomID).emit('user-voice-recording', { nickname, profilePic });
+            const cleanRoomID = String(roomID).trim();
+            socket.to(cleanRoomID).emit('user-voice-recording', { nickname, profilePic });
         }
     });
 
     socket.on('voice-recording-stop', (data) => {
         const user = users[socket.id];
-        const roomID = (user && user.roomID) || (data && data.roomID);
+        const roomID = (data && data.roomID) || (user && user.roomID);
         if (roomID) {
-            socket.to(roomID).emit('user-voice-stop-recording');
+            const cleanRoomID = String(roomID).trim();
+            socket.to(cleanRoomID).emit('user-voice-stop-recording');
         }
     });
 
