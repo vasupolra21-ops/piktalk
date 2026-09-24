@@ -777,9 +777,6 @@ function updateInputsState() {
     if (imgInput) {
         imgInput.disabled = !isChatActive;
     }
-    [attachDocInput, attachCameraInput, attachGalleryInput, attachAudioInput].forEach(inp => {
-        if (inp) inp.disabled = !isChatActive;
-    });
 }
 
 // ── Manage Theme Color & Elastic Scroll Background ──
@@ -1708,10 +1705,10 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionend', emitMyTyping);
     }
 
-    // WhatsApp Attachment Menu Toggle (Fast Touch Response for iOS & Android)
+    // WhatsApp Attachment Menu Toggle
     if (attachBtn && attachMenu) {
-        addFastClickListener(attachBtn, (e) => {
-            if (e && e.stopPropagation) e.stopPropagation();
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
             const isOpen = !attachMenu.classList.contains('hidden');
             if (isOpen) {
                 attachMenu.classList.add('hidden');
@@ -1726,23 +1723,15 @@ function setupEventListeners() {
             }
         });
 
-        // Close attachment menu when tapping anywhere outside
-        const closeAttachMenuOutside = (e) => {
+        // Close attachment menu when tapping anywhere else
+        document.addEventListener('click', (e) => {
             if (attachMenu && !attachMenu.classList.contains('hidden')) {
-                const target = e.target;
-                if (target && !attachMenu.contains(target) && !attachBtn.contains(target)) {
+                if (!attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
                     attachMenu.classList.add('hidden');
                     attachBtn.classList.remove('menu-open');
                 }
             }
-        };
-        document.addEventListener('click', closeAttachMenuOutside);
-        document.addEventListener('touchend', (e) => {
-            if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
-                attachMenu.classList.add('hidden');
-                attachBtn.classList.remove('menu-open');
-            }
-        }, { passive: true });
+        });
     }
     
     // AI smart replies trigger
@@ -1906,15 +1895,10 @@ function setupEventListeners() {
     const editorPreviewImg = document.getElementById('image-editor-preview');
 
     function openImageEditor(file) {
-        if (!file) return;
         editorSelectedFile = file;
         editorRotationAngle = 0;
         
-        if (!editorModal || !editorPreviewImg) {
-            // If modal elements missing, send directly
-            sendDirectImage(file);
-            return;
-        }
+        if (!editorModal || !editorPreviewImg) return;
         
         if (editorFilterSelect) editorFilterSelect.value = 'none';
         editorPreviewImg.style.transform = 'rotate(0deg)';
@@ -1924,43 +1908,15 @@ function setupEventListeners() {
         reader.onload = (e) => {
             editorPreviewImg.src = e.target.result;
             editorModal.style.display = 'flex';
-            editorModal.classList.add('open');
-            document.body.classList.add('modal-open');
-        };
-        reader.onerror = () => {
-            sendDirectImage(file);
         };
         reader.readAsDataURL(file);
     }
 
     const closeEditor = () => {
-        if (editorModal) {
-            editorModal.style.display = 'none';
-            editorModal.classList.remove('open');
-        }
-        document.body.classList.remove('modal-open');
+        if (editorModal) editorModal.style.display = 'none';
         editorSelectedFile = null;
-        [imgInput, attachGalleryInput, attachCameraInput, attachDocInput, attachAudioInput].forEach(inp => {
-            if (inp) { try { inp.value = ''; } catch(e) {} }
-        });
+        if (imgInput) imgInput.value = '';
     };
-
-    function sendDirectImage(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (socket && currentRoomID) {
-                socket.emit('send-message', {
-                    roomID: currentRoomID,
-                    message: '',
-                    image: e.target.result,
-                    replyTo: replyingTo || null
-                });
-                clearReply();
-            }
-        };
-        reader.readAsDataURL(file);
-    }
 
     if (editorCloseBtn) addFastClickListener(editorCloseBtn, closeEditor);
     if (editorCancelBtn) addFastClickListener(editorCancelBtn, closeEditor);
@@ -1991,42 +1947,36 @@ function setupEventListeners() {
             editorSendBtn.disabled = true;
             editorSendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
 
-            const sendPayload = (base64Data) => {
-                if (socket && currentRoomID) {
-                    socket.emit('send-message', {
-                        roomID: currentRoomID,
-                        message: '',
-                        image: base64Data,
-                        replyTo: replyingTo || null
-                    });
-                    clearReply();
-                    if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-                    setTimeout(() => {
-                        if (messageInput && !messageInput.disabled) messageInput.focus();
-                    }, 50);
-                }
-                editorSendBtn.disabled = false;
-                editorSendBtn.innerHTML = oldHtml;
-                closeEditor();
-            };
-
             const reader = new FileReader();
             reader.onload = (e) => {
-                const rawBase64 = e.target.result;
                 if (editorSelectedFile.type === 'image/gif' && editorRotationAngle === 0 && (!editorFilterSelect || editorFilterSelect.value === 'none')) {
-                    sendPayload(rawBase64);
-                    return;
-                }
-
-                const img = new Image();
-                img.onload = () => {
-                    try {
+                    // Send raw GIF directly if not rotated or filtered to preserve animation
+                    if (socket) {
+                        socket.emit('send-message', {
+                            roomID: currentRoomID,
+                            message: '',
+                            image: e.target.result,
+                            replyTo: replyingTo || null
+                        });
+                        clearReply();
+                        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                        setTimeout(() => {
+                            if (messageInput && !messageInput.disabled) messageInput.focus();
+                        }, 50);
+                    }
+                    editorSendBtn.disabled = false;
+                    editorSendBtn.innerHTML = oldHtml;
+                    closeEditor();
+                } else {
+                    // Render rotation + filters to canvas
+                    const img = new Image();
+                    img.onload = () => {
                         const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
                         const isRotated90or270 = (editorRotationAngle === 90 || editorRotationAngle === 270);
-                        const natW = img.naturalWidth || img.width || 800;
-                        const natH = img.naturalHeight || img.height || 600;
-                        const destW = isRotated90or270 ? natH : natW;
-                        const destH = isRotated90or270 ? natW : natH;
+                        const destW = isRotated90or270 ? img.naturalHeight : img.naturalWidth;
+                        const destH = isRotated90or270 ? img.naturalWidth : img.naturalHeight;
 
                         const maxW = 1920;
                         const maxH = 1920;
@@ -2044,51 +1994,57 @@ function setupEventListeners() {
 
                         canvas.width = width;
                         canvas.height = height;
-                        const ctx = canvas.getContext('2d');
 
-                        if (editorRotationAngle !== 0) {
-                            ctx.translate(canvas.width / 2, canvas.height / 2);
-                            ctx.rotate((editorRotationAngle * Math.PI) / 180);
-                            const drawW = isRotated90or270 ? height : width;
-                            const drawH = isRotated90or270 ? width : height;
-                            ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-                        } else {
-                            ctx.drawImage(img, 0, 0, width, height);
+                        ctx.translate(canvas.width / 2, canvas.height / 2);
+                        ctx.rotate((editorRotationAngle * Math.PI) / 180);
+
+                        const val = editorFilterSelect ? editorFilterSelect.value : 'none';
+                        if (val === 'grayscale') ctx.filter = 'grayscale(100%)';
+                        else if (val === 'sepia') ctx.filter = 'sepia(100%)';
+                        else if (val === 'invert') ctx.filter = 'invert(100%)';
+                        else if (val === 'brightness') ctx.filter = 'brightness(1.3)';
+                        else ctx.filter = 'none';
+
+                        const drawW = isRotated90or270 ? height : width;
+                        const drawH = isRotated90or270 ? width : height;
+                        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.97);
+
+                        if (socket) {
+                            socket.emit('send-message', {
+                                roomID: currentRoomID,
+                                message: '',
+                                image: compressedBase64,
+                                replyTo: replyingTo || null
+                            });
+                            clearReply();
+                            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+                            setTimeout(() => {
+                                if (messageInput && !messageInput.disabled) messageInput.focus();
+                            }, 50);
                         }
 
-                        const filterVal = editorFilterSelect ? editorFilterSelect.value : 'none';
-                        if (filterVal && filterVal !== 'none' && ctx.filter !== undefined) {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            if (filterVal === 'grayscale') ctx.filter = 'grayscale(100%)';
-                            else if (filterVal === 'sepia') ctx.filter = 'sepia(100%)';
-                            else if (filterVal === 'invert') ctx.filter = 'invert(100%)';
-                            else if (filterVal === 'brightness') ctx.filter = 'brightness(1.3)';
-                            
-                            if (editorRotationAngle !== 0) {
-                                const drawW = isRotated90or270 ? height : width;
-                                const drawH = isRotated90or270 ? width : height;
-                                ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-                            } else {
-                                ctx.drawImage(img, 0, 0, width, height);
-                            }
+                        editorSendBtn.disabled = false;
+                        editorSendBtn.innerHTML = oldHtml;
+                        closeEditor();
+                    };
+                    img.onerror = () => {
+                        if (socket) {
+                            socket.emit('send-message', {
+                                roomID: currentRoomID,
+                                message: '',
+                                image: e.target.result,
+                                replyTo: replyingTo || null
+                            });
+                            clearReply();
                         }
-
-                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.95);
-                        sendPayload(compressedBase64);
-                    } catch (err) {
-                        console.warn('Canvas rendering failed, falling back to raw image:', err);
-                        sendPayload(rawBase64);
-                    }
-                };
-                img.onerror = () => {
-                    sendPayload(rawBase64);
-                };
-                img.src = rawBase64;
-            };
-            reader.onerror = () => {
-                editorSendBtn.disabled = false;
-                editorSendBtn.innerHTML = oldHtml;
-                closeEditor();
+                        editorSendBtn.disabled = false;
+                        editorSendBtn.innerHTML = oldHtml;
+                        closeEditor();
+                    };
+                    img.src = e.target.result;
+                }
             };
             reader.readAsDataURL(editorSelectedFile);
         });
@@ -2104,10 +2060,7 @@ function setupEventListeners() {
         if (!file) return;
         closeAttachMenu();
 
-        const isImage = (file.type && file.type.startsWith('image/')) || 
-                        /\.(jpe?g|png|gif|webp|bmp|heic|heif|svg)$/i.test(file.name || '');
-
-        if (isImage) {
+        if (file.type && file.type.startsWith('image/')) {
             if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
             openImageEditor(file);
         } else {

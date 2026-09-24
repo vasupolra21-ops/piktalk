@@ -44,13 +44,13 @@
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js" as="script">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=285" as="style">
+    <link rel="preload" href="/style.css?v=284" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=285" as="script">
+    <link rel="preload" href="/app.js?v=284" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=285">
+    <link rel="stylesheet" href="/style.css?v=284">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (neural-network based) -->
@@ -215,28 +215,28 @@
                 <!-- WhatsApp Style Attachment Menu -->
                 <div id="attach-menu" class="attach-menu glass-card hidden" role="menu" aria-label="Attachment options">
                     <div class="attach-menu-grid">
-                        <label class="attach-item">
+                        <label class="attach-item" for="attach-doc-input">
                             <div class="attach-icon-circle attach-doc-bg">
                                 <i class="fas fa-file-lines"></i>
                             </div>
                             <span>Document</span>
-                            <input type="file" id="attach-doc-input" accept="application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:10;-webkit-tap-highlight-color:transparent;">
+                            <input type="file" id="attach-doc-input" accept="application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
                         </label>
                         
-                        <label class="attach-item">
+                        <label class="attach-item" for="attach-camera-input">
                             <div class="attach-icon-circle attach-cam-bg">
                                 <i class="fas fa-camera"></i>
                             </div>
                             <span>Camera</span>
-                            <input type="file" id="attach-camera-input" accept="image/*" capture="environment" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:10;-webkit-tap-highlight-color:transparent;">
+                            <input type="file" id="attach-camera-input" accept="image/*" capture="environment" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
                         </label>
                         
-                        <label class="attach-item">
+                        <label class="attach-item" for="attach-gallery-input">
                             <div class="attach-icon-circle attach-gallery-bg">
                                 <i class="fas fa-images"></i>
                             </div>
                             <span>Photos</span>
-                            <input type="file" id="attach-gallery-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:10;-webkit-tap-highlight-color:transparent;">
+                            <input type="file" id="attach-gallery-input" accept="image/*,video/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
                         </label>
                         
                         <button type="button" class="attach-item" id="attach-poll-btn">
@@ -253,12 +253,12 @@
                             <span>Location</span>
                         </button>
 
-                        <label class="attach-item">
+                        <label class="attach-item" for="attach-audio-input">
                             <div class="attach-icon-circle attach-audio-bg">
                                 <i class="fas fa-headphones"></i>
                             </div>
                             <span>Audio</span>
-                            <input type="file" id="attach-audio-input" accept="audio/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:10;-webkit-tap-highlight-color:transparent;">
+                            <input type="file" id="attach-audio-input" accept="audio/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;">
                         </label>
                     </div>
                 </div>
@@ -386,7 +386,7 @@
                             <i class="fas fa-user-plus"></i>
                         </div>
                         <button type="button" id="avatar-scan-btn" class="avatar-scan-btn" title="Tap to re-scan face" aria-label="Scan face">
-                            <img src="/face-scan-icon.png?v=285" alt="Scan Face" class="avatar-scan-icon-img">
+                            <img src="/face-scan-icon.png?v=284" alt="Scan Face" class="avatar-scan-icon-img">
                         </button>
                     </div>
                 </div>
@@ -668,6 +668,6 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=285" defer></script>
+    <script src="/app.js?v=284" defer></script>
 </body>
 </html>
