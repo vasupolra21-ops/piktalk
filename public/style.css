@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     --primary: #6366f1; /* Indigo */
     --primary-alt: #4f46e5;
     --brand-purple: #5b4b8a; /* Deep purple from PikTalk logo */
@@ -757,7 +757,7 @@ body.light-mode .btn-icon {
     flex-direction: column;
 }
 
-/* ── Smooth, Fast & Attractive Message Entrance Animations (Mobile & PC) ── */
+/* â”€â”€ Smooth, Fast & Attractive Message Entrance Animations (Mobile & PC) â”€â”€ */
 .message.msg-new.sent {
     animation: msgSentFluidIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     transform-origin: bottom right;
@@ -998,7 +998,7 @@ body.light-mode .bubble-timestamp {
     flex-direction: row-reverse;
 }
 
-/* ── WhatsApp-style image bubble ── */
+/* â”€â”€ WhatsApp-style image bubble â”€â”€ */
 .bubble-image {
     padding: 3px !important;
     padding-bottom: 3px !important;
@@ -1165,7 +1165,7 @@ body.light-mode .bubble-timestamp {
     filter: brightness(0.88);
 }
 
-/* ── Fullscreen lightbox ── */
+/* â”€â”€ Fullscreen lightbox â”€â”€ */
 .img-lightbox {
     display: none;
     position: fixed;
@@ -1307,9 +1307,9 @@ body.light-mode .bubble-timestamp {
     font-weight: 600;
 }
 
-/* ═══════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    WHATSAPP-STYLE IN-STREAM TYPING & VOICE EFFECT
-═══════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .typing-indicator {
     align-self: flex-start;
     display: none;
@@ -1606,7 +1606,7 @@ body.light-mode .chat-input-area::before {
 .btn-icon-small.left { left: 8px; }
 .btn-icon-small.right { right: 8px; }
 
-/* Attach label — no tap animation, no highlight */
+/* Attach label â€” no tap animation, no highlight */
 label#attach-btn {
     display: flex;
     -webkit-tap-highlight-color: transparent;
@@ -1618,7 +1618,7 @@ label#attach-btn:active {
     opacity: 0.6;
 }
 
-/* ── Send Button Interactive Animations & Physics ── */
+/* â”€â”€ Send Button Interactive Animations & Physics â”€â”€ */
 .btn-send {
     background: linear-gradient(135deg, var(--primary), #818cf8);
     color: white;
@@ -1953,7 +1953,7 @@ body:not(.light-mode) .image-editor-modal-overlay {
     pointer-events: none;
 }
 
-/* ── Scan badge — positioned at bottom-right corner of avatar, replacing pencil badge ── */
+/* â”€â”€ Scan badge â€” positioned at bottom-right corner of avatar, replacing pencil badge â”€â”€ */
 .avatar-scan-btn {
     position: absolute;
     bottom: 4px;
@@ -2052,7 +2052,7 @@ body:not(.light-mode) .image-editor-modal-overlay {
 /* Utilities */
 .hidden { display: none !important; }
 
-/* ── Voice Message Styles ── */
+/* â”€â”€ Voice Message Styles â”€â”€ */
 
 /* Mic button */
 .btn-mic {
@@ -2417,10 +2417,10 @@ body.light-mode .waveform-bar {
     body {
         height: 100dvh !important;
         overflow: hidden !important;
-        /* Do NOT use position:fixed — it collapses the height on iOS when keyboard opens */
+        /* Do NOT use position:fixed â€” it collapses the height on iOS when keyboard opens */
     }
 
-    /* Full-screen container — no centering padding on mobile */
+    /* Full-screen container â€” no centering padding on mobile */
     .container {
         padding: 0;
         height: 100dvh;
@@ -2456,7 +2456,7 @@ body.light-mode .waveform-bar {
         padding: 0 !important;
         margin: 0 !important;
         width: 100vw !important;
-        /* 100dvh = dynamic viewport height — updates when Safari URL bar shows/hides */
+        /* 100dvh = dynamic viewport height â€” updates when Safari URL bar shows/hides */
         height: 100dvh !important;
         display: flex !important;
         flex-direction: column !important;
@@ -2467,7 +2467,7 @@ body.light-mode .waveform-bar {
         top: 0 !important;
         left: 0 !important;
         right: 0 !important;
-        /* No bottom:0 — height:100dvh handles sizing without the iOS layout-viewport conflict */
+        /* No bottom:0 â€” height:100dvh handles sizing without the iOS layout-viewport conflict */
         z-index: 1000 !important;
     }
 
@@ -2641,7 +2641,7 @@ body.light-mode .waveform-bar {
     }
 
     .chat-input-area {
-        /* Never shrink — always visible at the bottom */
+        /* Never shrink â€” always visible at the bottom */
         flex: 0 0 auto !important;
         flex-shrink: 0 !important;
         width: 100% !important;
@@ -2899,7 +2899,7 @@ body.light-mode .waveform-bar {
         margin-bottom: 0.5rem !important;
     }
 }
-/* ── Profile Picture Crop Modal ── */
+/* â”€â”€ Profile Picture Crop Modal â”€â”€ */
 .crop-modal-overlay {
     display: none;
     position: fixed;
@@ -2971,7 +2971,7 @@ body.light-mode .waveform-bar {
     top: 0; left: 0;
     display: block;
 }
-/* Circular cutout overlay — darkens outside the circle */
+/* Circular cutout overlay â€” darkens outside the circle */
 .crop-circle-overlay {
     position: absolute;
     pointer-events: none;
@@ -3054,7 +3054,7 @@ body.light-mode .waveform-bar {
     .crop-modal-box { border-radius: 16px; }
 }
 
-/* ── Chat Members Button Badge ── */
+/* â”€â”€ Chat Members Button Badge â”€â”€ */
 .btn-icon {
     position: relative;
 }
@@ -3077,7 +3077,7 @@ body.light-mode .waveform-bar {
     line-height: 1;
 }
 
-/* ── Chat Members Modal ── */
+/* â”€â”€ Chat Members Modal â”€â”€ */
 .members-modal-overlay {
     display: none;
     position: fixed;
@@ -3247,7 +3247,7 @@ body.light-mode .member-admin-badge {
     transform: translateY(-0.5px);
 }
 
-/* ── WhatsApp-style Message Action Bar ── */
+/* â”€â”€ WhatsApp-style Message Action Bar â”€â”€ */
 .message {
     position: relative;
 }
@@ -3317,8 +3317,8 @@ body.light-mode .member-admin-badge {
     border-color: rgba(99, 102, 241, 0.4);
 }
 
-/* ── Quick Emoji Picker ── */
-/* ── Quick Emoji Picker (WhatsApp-style flex row) ── */
+/* â”€â”€ Quick Emoji Picker â”€â”€ */
+/* â”€â”€ Quick Emoji Picker (WhatsApp-style flex row) â”€â”€ */
 .quick-react-menu {
     position: absolute;
     bottom: calc(100% + 8px);
@@ -3381,7 +3381,7 @@ body.light-mode .member-admin-badge {
     transform: scale(1.2) translateY(0);
 }
 
-/* ── WhatsApp-Style Bottom Sheet Emoji Keyboard ── */
+/* â”€â”€ WhatsApp-Style Bottom Sheet Emoji Keyboard â”€â”€ */
 .emoji-bottom-sheet-overlay {
     position: fixed;
     top: 0;
@@ -3571,7 +3571,7 @@ body.light-mode .member-admin-badge {
     padding: 24px 0;
 }
 
-/* ── Reaction Pills below bubble ── */
+/* â”€â”€ Reaction Pills below bubble â”€â”€ */
 .reaction-row {
     display: flex;
     flex-wrap: wrap;
@@ -3699,7 +3699,7 @@ body.light-mode .member-admin-badge {
     background: rgba(239,68,68,0.1);
 }
 
-/* ── Quoted reply block inside a bubble ── */
+/* â”€â”€ Quoted reply block inside a bubble â”€â”€ */
 .reply-quote {
     display: flex;
     flex-direction: column;
@@ -3751,7 +3751,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     color: rgba(255, 255, 255, 0.88) !important;
 }
 
-/* ── Highlight flash when jumping to quoted message ── */
+/* â”€â”€ Highlight flash when jumping to quoted message â”€â”€ */
 @keyframes msgFlash {
     0%   { outline: 2px solid var(--primary); background: rgba(99,102,241,0.18); }
     70%  { outline: 2px solid var(--primary); background: rgba(99,102,241,0.18); }
@@ -3763,7 +3763,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     border-radius: 12px;
 }
 
-/* ── Bubble Wrapper for action positioning ── */
+/* â”€â”€ Bubble Wrapper for action positioning â”€â”€ */
 .bubble-wrapper {
     position: relative;
     display: inline-flex;
@@ -3780,7 +3780,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     align-items: flex-start;
 }
 
-/* ── Bubble Container: wraps bubble + action bar so action bar centers on bubble only ── */
+/* â”€â”€ Bubble Container: wraps bubble + action bar so action bar centers on bubble only â”€â”€ */
 .bubble-container {
     position: relative;
     display: inline-flex;
@@ -3796,7 +3796,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     align-items: flex-start;
 }
 
-/* ── Premium Connecting Overlay & Reaction Tooltip Avatar Styles ── */
+/* â”€â”€ Premium Connecting Overlay & Reaction Tooltip Avatar Styles â”€â”€ */
 #connecting-overlay {
     position: fixed;
     top: 0;
@@ -3914,7 +3914,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     color: var(--primary);
 }
 
-/* ── Instagram-style Reactions Bottom Sheet ── */
+/* â”€â”€ Instagram-style Reactions Bottom Sheet â”€â”€ */
 .reactions-sheet-overlay {
     position: fixed;
     inset: 0;
@@ -4047,7 +4047,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
 }
 .quick-react-btn:hover { transform: scale(1.45) translateY(-2px); background: rgba(99,102,241,0.1); }
 
-/* ── AI Smart Reply Styles ── */
+/* â”€â”€ AI Smart Reply Styles â”€â”€ */
 .btn-ai {
     background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%);
     border: 1px solid rgba(139, 92, 246, 0.3);
@@ -4238,7 +4238,7 @@ body.light-mode .reply-quote:hover { background: rgba(0, 0, 0, 0.08); }
     }
 }
 
-/* ── Biometric Face ID Auth Styling ── */
+/* â”€â”€ Biometric Face ID Auth Styling â”€â”€ */
 
 .face-logo-wrap {
     display: flex;
@@ -4450,7 +4450,7 @@ video::-picture-in-picture-button,
     background: linear-gradient(90deg, var(--primary), #10b981);
     border-radius: 10px;
     box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
-    /* No CSS transition — JS rAF interpolation already smooths animation;
+    /* No CSS transition â€” JS rAF interpolation already smooths animation;
        a CSS transition causes visible lag when the bar snaps to 100% */
 }
 
@@ -4538,7 +4538,7 @@ video::-picture-in-picture-button,
     border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* ── Face Not Found overlay ── */
+/* â”€â”€ Face Not Found overlay â”€â”€ */
 .face-not-found {
     display: flex;
     flex-direction: column;
@@ -4581,7 +4581,7 @@ video::-picture-in-picture-button,
 }
 
 
-/* ── Settings Modal ── */
+/* â”€â”€ Settings Modal â”€â”€ */
 .settings-modal-overlay {
     display: none;
     position: fixed;
@@ -4812,9 +4812,9 @@ video::-picture-in-picture-button,
 }
 
 
-/* ═══════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    PHONE + OTP MODAL
-═══════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 #phone-modal {
     position: fixed;
     inset: 0;
@@ -5058,9 +5058,9 @@ video::-picture-in-picture-button,
     color: var(--accent);
 }
 
-/* ═══════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SETTINGS ENHANCEMENTS
-═══════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .settings-section-card {
     background: var(--input-bg);
     border: 1px solid var(--glass-border);
@@ -5257,7 +5257,7 @@ video::-picture-in-picture-button,
     background: rgba(255, 255, 255, 0.04);
 }
 
-/* ── Settings Conversation Detail View ── */
+/* â”€â”€ Settings Conversation Detail View â”€â”€ */
 .settings-conversation-detail {
     display: flex;
     flex-direction: column;
@@ -5276,7 +5276,7 @@ video::-picture-in-picture-button,
 }
 
 
-/* ── Conversation Panel Header (matches main chat header style) ── */
+/* â”€â”€ Conversation Panel Header (matches main chat header style) â”€â”€ */
 .conversation-header {
     display: flex;
     align-items: center;
@@ -5353,7 +5353,7 @@ body.light-mode .btn-icon-back:hover {
     transform: scale(1.03);
 }
 
-/* ── Message scroll area — matches main chat background ── */
+/* â”€â”€ Message scroll area â€” matches main chat background â”€â”€ */
 .settings-conv-messages {
     flex: 1;
     overflow-y: auto;
@@ -5372,7 +5372,7 @@ body.light-mode .settings-conv-messages {
 
 
 
-/* ── Image Editor Modal ── */
+/* â”€â”€ Image Editor Modal â”€â”€ */
 .image-editor-modal-overlay {
     display: none;
     position: fixed;

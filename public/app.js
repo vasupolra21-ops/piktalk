@@ -1990,11 +1990,10 @@ function setupEventListeners() {
     }
 
     if (imgInput) imgInput.addEventListener('change', () => {
-        const file = imgInput.files[0];
+        const file = imgInput.files && imgInput.files[0];
         if (!file) return;
-        imgInput.value = ''; // reset so same file can be re-selected
 
-        if (file.type.startsWith('image/')) {
+        if (file.type && file.type.startsWith('image/')) {
             // Images → open editor as before
             if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
             openImageEditor(file);
@@ -2003,6 +2002,11 @@ function setupEventListeners() {
             if (file.size > 25000000) { alert('File too large (Max 25MB)'); return; }
             sendFileAttachment(file);
         }
+
+        // Reset value after a short delay so same file can be re-selected without breaking iOS read
+        setTimeout(() => {
+            try { if (imgInput) imgInput.value = ''; } catch(e) {}
+        }, 300);
     });
 
     // ── Voice message listeners ──
