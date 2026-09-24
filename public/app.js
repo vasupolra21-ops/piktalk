@@ -1921,8 +1921,8 @@ function setupEventListeners() {
                         const destW = isRotated90or270 ? img.naturalHeight : img.naturalWidth;
                         const destH = isRotated90or270 ? img.naturalWidth : img.naturalHeight;
 
-                        const maxW = 1200;
-                        const maxH = 1200;
+                        const maxW = 900;
+                        const maxH = 900;
                         let width = destW;
                         let height = destH;
                         if (width > maxW || height > maxH) {
@@ -1952,7 +1952,7 @@ function setupEventListeners() {
                         const drawH = isRotated90or270 ? width : height;
                         ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
 
-                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.72);
 
                         if (socket) {
                             socket.emit('send-message', {
@@ -2194,14 +2194,24 @@ function discardPreview() {
 
 function sendVoiceMessage() {
     if (!recordedAudioBlob) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    // Use arrayBuffer for much faster blob→base64 than FileReader
+    recordedAudioBlob.arrayBuffer().then(buffer => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        const base64 = btoa(binary);
+        const mimeType = recordedAudioBlob.type || 'audio/webm';
+        const dataUrl = `data:${mimeType};base64,${base64}`;
+
         if (socket) {
             socket.emit('voice-recording-stop');
             socket.emit('send-message', {
                 roomID: currentRoomID,
                 message: '',
-                audio: e.target.result,
+                audio: dataUrl,
                 audioDuration: recordingSeconds,
                 replyTo: replyingTo || null
             });
@@ -2214,8 +2224,25 @@ function sendVoiceMessage() {
         } else {
             alert("Not connected to server. Voice message could not be sent.");
         }
-    };
-    reader.readAsDataURL(recordedAudioBlob);
+    }).catch(() => {
+        // Fallback to FileReader if arrayBuffer not supported
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (socket) {
+                socket.emit('voice-recording-stop');
+                socket.emit('send-message', {
+                    roomID: currentRoomID,
+                    message: '',
+                    audio: e.target.result,
+                    audioDuration: recordingSeconds,
+                    replyTo: replyingTo || null
+                });
+                clearReply();
+                discardPreview();
+            }
+        };
+        reader.readAsDataURL(recordedAudioBlob);
+    });
 }
 
 function applyTheme(theme) {
@@ -2577,6 +2604,7 @@ if (socket) {
 }
 
 let _typingHideTimer = null;
+let _currentTypingMode = null; // track mode to avoid re-rendering and animation reset
 
 function showTyping(name, profilePic, mode) {
     const indicator = document.getElementById('typing-indicator');
@@ -2585,49 +2613,55 @@ function showTyping(name, profilePic, mode) {
     if (!indicator || !bubbleEl) return;
 
     const cleanName = name || 'Someone';
+    const currentMode = mode || 'text';
 
-    // Render avatar
-    if (avatarEl) {
-        avatarEl.innerHTML = '';
-        if (profilePic) {
-            const img = document.createElement('img');
-            img.src = profilePic;
-            img.alt = cleanName;
-            avatarEl.appendChild(img);
-            avatarEl.style.background = 'transparent';
+    // Only re-render bubble HTML if mode changed — preserves continuous dot animation
+    if (_currentTypingMode !== currentMode) {
+        _currentTypingMode = currentMode;
+
+        // Render avatar
+        if (avatarEl) {
+            avatarEl.innerHTML = '';
+            if (profilePic) {
+                const img = document.createElement('img');
+                img.src = profilePic;
+                img.alt = cleanName;
+                avatarEl.appendChild(img);
+                avatarEl.style.background = 'transparent';
+            } else {
+                const initial = cleanName ? cleanName.charAt(0).toUpperCase() : '?';
+                avatarEl.textContent = initial;
+                avatarEl.style.background = getNicknameColor(cleanName);
+            }
+        }
+
+        if (currentMode === 'voice') {
+            bubbleEl.className = 'typing-bubble wa-typing-bubble wa-voice-mode';
+            bubbleEl.innerHTML = `
+                <i class="fas fa-microphone wa-mic-icon"></i>
+                <div class="wa-typing-label">
+                    <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
+                </div>
+                <div class="wa-audio-bars">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            `;
+            if (onlineStatus) {
+                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)}</span>`;
+            }
         } else {
-            const initial = cleanName ? cleanName.charAt(0).toUpperCase() : '?';
-            avatarEl.textContent = initial;
-            avatarEl.style.background = getNicknameColor(cleanName);
-        }
-    }
-
-    if (mode === 'voice') {
-        bubbleEl.className = 'typing-bubble wa-typing-bubble wa-voice-mode';
-        bubbleEl.innerHTML = `
-            <i class="fas fa-microphone wa-mic-icon"></i>
-            <div class="wa-typing-label">
-                <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
-            </div>
-            <div class="wa-audio-bars">
-                <span></span><span></span><span></span><span></span>
-            </div>
-        `;
-        if (onlineStatus) {
-            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)}</span>`;
-        }
-    } else {
-        bubbleEl.className = 'typing-bubble wa-typing-bubble';
-        bubbleEl.innerHTML = `
-            <div class="wa-typing-label">
-                <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
-            </div>
-            <div class="wa-typing-dots">
-                <span></span><span></span><span></span>
-            </div>
-        `;
-        if (onlineStatus) {
-            onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)}</span>`;
+            bubbleEl.className = 'typing-bubble wa-typing-bubble';
+            bubbleEl.innerHTML = `
+                <div class="wa-typing-label">
+                    <span class="wa-typing-name">${escapeHtml(cleanName)}</span>
+                </div>
+                <div class="wa-typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            `;
+            if (onlineStatus) {
+                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)}</span>`;
+            }
         }
     }
 
@@ -2643,13 +2677,14 @@ function showTyping(name, profilePic, mode) {
 
     // Auto-hide safety timeout — skip for voice mode (heartbeat keeps it alive)
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
-    if (mode !== 'voice') {
+    if (currentMode !== 'voice') {
         _typingHideTimer = setTimeout(hideTyping, 2000);
     }
 }
 
 function hideTyping() {
     if (_typingHideTimer) { clearTimeout(_typingHideTimer); _typingHideTimer = null; }
+    _currentTypingMode = null; // reset so next show always renders fresh
     const indicator = document.getElementById('typing-indicator');
     if (indicator) indicator.classList.remove('visible');
     if (onlineStatus) {
