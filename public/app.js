@@ -214,6 +214,7 @@ let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
 let _lastOptimisticMsgText = null; // tracks optimistically-rendered sent message text
+let _lastOptimisticMsgId = null;   // tracks optimistically-rendered message ID
 let _isMessageInputFocused = false; // tracks if messageInput / mobile keyboard is currently active
 
 // AI Smart Reply variables
@@ -1731,8 +1732,8 @@ function setupEventListeners() {
     function emitMyTyping() {
         if (socket && currentRoomID) {
             const now = Date.now();
-            // Emit immediately on first keystroke or if 1.2s has passed
-            if (now - _lastTypingEmitTime > 1200) {
+            // Emit immediately on first keystroke or if 500ms has passed
+            if (now - _lastTypingEmitTime > 500) {
                 _lastTypingEmitTime = now;
                 const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
                 socket.emit('typing', {
@@ -1742,11 +1743,11 @@ function setupEventListeners() {
                 });
             }
 
-            // Fast stop-typing debounce: fires 400ms after user pauses typing
+            // Snappy stop-typing debounce: fires 600ms after user pauses typing
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
                 emitMyStopTyping();
-            }, 400);
+            }, 600);
         }
     }
 
@@ -2059,11 +2060,28 @@ function setupEventListeners() {
         const reader = new FileReader();
         reader.onload = (e) => {
             if (socket && currentRoomID) {
-                socket.emit('send-message', {
-                    roomID: currentRoomID,
+                const optMsgId = '_opt_img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+                const optimisticData = {
+                    msgId: optMsgId,
+                    id: socket.id,
+                    nickname: myNickname || 'Me',
                     message: '',
                     image: e.target.result,
+                    profilePic: myProfilePic || null,
                     replyTo: replyingTo || null
+                };
+                appendMessage(optimisticData, true);
+                _lastOptimisticMsgId = optMsgId;
+                emitMyStopTyping();
+
+                socket.emit('send-message', {
+                    roomID: currentRoomID,
+                    nickname: myNickname || 'Anonymous',
+                    profilePic: myProfilePic || null,
+                    message: '',
+                    image: e.target.result,
+                    replyTo: replyingTo || null,
+                    msgId: optMsgId
                 });
                 clearReply();
             }
@@ -2102,11 +2120,28 @@ function setupEventListeners() {
 
             const sendPayload = (base64Data) => {
                 if (socket && currentRoomID) {
-                    socket.emit('send-message', {
-                        roomID: currentRoomID,
+                    const optMsgId = '_opt_img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+                    const optimisticData = {
+                        msgId: optMsgId,
+                        id: socket.id,
+                        nickname: myNickname || 'Me',
                         message: '',
                         image: base64Data,
+                        profilePic: myProfilePic || null,
                         replyTo: replyingTo || null
+                    };
+                    appendMessage(optimisticData, true);
+                    _lastOptimisticMsgId = optMsgId;
+                    emitMyStopTyping();
+
+                    socket.emit('send-message', {
+                        roomID: currentRoomID,
+                        nickname: myNickname || 'Anonymous',
+                        profilePic: myProfilePic || null,
+                        message: '',
+                        image: base64Data,
+                        replyTo: replyingTo || null,
+                        msgId: optMsgId
                     });
                     clearReply();
                     if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
@@ -2538,6 +2573,25 @@ function sendFileAttachment(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
         const dataUrl = e.target.result;
+        const optMsgId = '_opt_file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        const optimisticData = {
+            msgId: optMsgId,
+            id: socket.id,
+            nickname: myNickname || 'Me',
+            message: '',
+            file: {
+                name: file.name,
+                size: file.size,
+                type: file.type || 'application/octet-stream',
+                data: dataUrl
+            },
+            profilePic: myProfilePic || null,
+            replyTo: replyingTo || null
+        };
+        appendMessage(optimisticData, true);
+        _lastOptimisticMsgId = optMsgId;
+        emitMyStopTyping();
+
         socket.emit('send-message', {
             roomID: currentRoomID,
             nickname: currentName,
@@ -2549,7 +2603,8 @@ function sendFileAttachment(file) {
                 type: file.type || 'application/octet-stream',
                 data: dataUrl
             },
-            replyTo: replyingTo || null
+            replyTo: replyingTo || null,
+            msgId: optMsgId
         });
         clearReply();
         if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
@@ -2727,13 +2782,31 @@ function sendVoiceMessage() {
 
     const doSend = (dataUrl) => {
         if (socket) {
-            socket.emit('voice-recording-stop');
-            socket.emit('send-message', {
-                roomID: currentRoomID,
+            const optMsgId = '_opt_voice_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+            const optimisticData = {
+                msgId: optMsgId,
+                id: socket.id,
+                nickname: myNickname || 'Me',
                 message: '',
                 audio: dataUrl,
                 audioDuration: recordingSeconds,
+                profilePic: myProfilePic || null,
                 replyTo: replyingTo || null
+            };
+            appendMessage(optimisticData, true);
+            _lastOptimisticMsgId = optMsgId;
+            emitMyStopTyping();
+
+            socket.emit('voice-recording-stop');
+            socket.emit('send-message', {
+                roomID: currentRoomID,
+                nickname: myNickname || 'Anonymous',
+                profilePic: myProfilePic || null,
+                message: '',
+                audio: dataUrl,
+                audioDuration: recordingSeconds,
+                replyTo: replyingTo || null,
+                msgId: optMsgId
             });
             clearReply();
             discardPreview();
@@ -2988,11 +3061,18 @@ function sendMessage() {
 if (socket) {
     socket.on('receive-message', (data) => {
         hideTyping();
-        // Skip own messages — already rendered optimistically in sendMessage()
-        if (data.id === socket.id && _lastOptimisticMsgText !== null && data.message === _lastOptimisticMsgText) {
-            _lastOptimisticMsgText = null;
-            if (msgSound) SoundManager.play(msgSound);
-            return;
+        // Skip own messages if already rendered optimistically
+        if (data.id === socket.id) {
+            if (data.msgId && _lastOptimisticMsgId === data.msgId) {
+                _lastOptimisticMsgId = null;
+                if (msgSound) SoundManager.play(msgSound);
+                return;
+            }
+            if (_lastOptimisticMsgText !== null && data.message === _lastOptimisticMsgText) {
+                _lastOptimisticMsgText = null;
+                if (msgSound) SoundManager.play(msgSound);
+                return;
+            }
         }
         appendMessage(data, data.id === socket.id);
         setTimeout(() => saveMsgToHistory(data), 0);
@@ -3198,6 +3278,8 @@ if (socket) {
 let _typingHideTimer = null;
 let _currentTypingMode = null; // track mode to avoid re-rendering and animation reset
 
+let _currentTypingUser = null;
+
 function showTyping(name, profilePic, mode) {
     const indicator = document.getElementById('typing-indicator');
     const avatarEl   = document.getElementById('typing-avatar');
@@ -3207,9 +3289,10 @@ function showTyping(name, profilePic, mode) {
     const cleanName = name || 'Someone';
     const currentMode = mode || 'text';
 
-    // Only re-render bubble HTML if mode changed — preserves continuous dot animation
-    if (_currentTypingMode !== currentMode) {
+    // Only re-render bubble HTML if mode or user changed — preserves smooth continuous dot animation
+    if (_currentTypingMode !== currentMode || _currentTypingUser !== cleanName) {
         _currentTypingMode = currentMode;
+        _currentTypingUser = cleanName;
 
         // Render avatar
         if (avatarEl) {
@@ -3218,6 +3301,8 @@ function showTyping(name, profilePic, mode) {
                 const img = document.createElement('img');
                 img.src = profilePic;
                 img.alt = cleanName;
+                img.loading = 'lazy';
+                img.decoding = 'async';
                 avatarEl.appendChild(img);
                 avatarEl.style.background = 'transparent';
             } else {
@@ -3239,7 +3324,7 @@ function showTyping(name, profilePic, mode) {
                 </div>
             `;
             if (onlineStatus) {
-                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)}</span>`;
+                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-voice"><i class="fas fa-microphone"></i> ${escapeHtml(cleanName)} is recording...</span>`;
             }
         } else {
             bubbleEl.className = 'typing-bubble wa-typing-bubble';
@@ -3252,7 +3337,7 @@ function showTyping(name, profilePic, mode) {
                 </div>
             `;
             if (onlineStatus) {
-                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)}</span>`;
+                onlineStatus.innerHTML = `<span class="wa-header-status wa-header-typing">${escapeHtml(cleanName)} is typing...</span>`;
             }
         }
     }
@@ -3265,18 +3350,19 @@ function showTyping(name, profilePic, mode) {
     }
 
     indicator.classList.add('visible');
-    if (container) container.scrollTop = container.scrollHeight;
+    if (container) scrollToBottom();
 
-    // Auto-hide safety timeout — skip for voice mode (heartbeat keeps it alive)
+    // Auto-hide safety timeout — 1500ms ensures continuous typing never flickers
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
     if (currentMode !== 'voice') {
-        _typingHideTimer = setTimeout(hideTyping, 900);
+        _typingHideTimer = setTimeout(hideTyping, 1500);
     }
 }
 
 function hideTyping() {
     if (_typingHideTimer) { clearTimeout(_typingHideTimer); _typingHideTimer = null; }
-    _currentTypingMode = null; // reset so next show always renders fresh
+    _currentTypingMode = null;
+    _currentTypingUser = null;
     const indicator = document.getElementById('typing-indicator');
     if (indicator) indicator.classList.remove('visible');
     if (onlineStatus) {
