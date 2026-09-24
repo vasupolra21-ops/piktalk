@@ -1733,8 +1733,8 @@ function setupEventListeners() {
     function emitMyTyping() {
         if (socket && currentRoomID) {
             const now = Date.now();
-            // Emit immediately on first keystroke or if 500ms has passed
-            if (now - _lastTypingEmitTime > 500) {
+            // Emit immediately on first keystroke or every 1000ms while user is actively composing
+            if (now - _lastTypingEmitTime > 1000) {
                 _lastTypingEmitTime = now;
                 const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
                 socket.emit('typing', {
@@ -1744,11 +1744,11 @@ function setupEventListeners() {
                 });
             }
 
-            // Snappy stop-typing debounce: fires 600ms after user pauses typing
+            // Reliable 2500ms debounce so the indicator remains visible steadily while composing
             clearTimeout(typingTimeout);
             typingTimeout = setTimeout(() => {
                 emitMyStopTyping();
-            }, 600);
+            }, 2500);
         }
     }
 
@@ -3336,10 +3336,10 @@ function showTyping(name, profilePic, mode) {
     indicator.classList.add('visible');
     if (container) scrollToBottom();
 
-    // Auto-hide safety timeout — 1500ms ensures continuous typing never flickers
+    // Auto-hide safety timeout — 3000ms ensures continuous typing remains steady and never flickers
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
     if (currentMode !== 'voice') {
-        _typingHideTimer = setTimeout(hideTyping, 1500);
+        _typingHideTimer = setTimeout(hideTyping, 3000);
     }
 }
 

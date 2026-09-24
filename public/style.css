@@ -1396,32 +1396,38 @@ body.light-mode .wa-typing-bubble {
     font-size: 0.8rem;
 }
 
-/* WhatsApp-style 3 big animated bouncing purple dots — snappy 0.9s loop */
 .wa-typing-dots {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     margin-left: 6px;
+    height: 14px;
+    vertical-align: middle;
 }
 
 .wa-typing-dots span {
-    width: 10px;
-    height: 10px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: #6366f1;
+    background: var(--primary);
     display: inline-block;
     animation: waDotBounce 0.9s infinite ease-in-out;
     will-change: transform, opacity;
 }
 
 .wa-typing-dots span:nth-child(1) { animation-delay: 0s; }
-.wa-typing-dots span:nth-child(2) { animation-delay: 0.15s; }
-.wa-typing-dots span:nth-child(3) { animation-delay: 0.30s; }
+.wa-typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+.wa-typing-dots span:nth-child(3) { animation-delay: 0.32s; }
 
 @keyframes waDotBounce {
-    0%,  80%, 100% { transform: translateY(0)    scale(1);    opacity: 0.45; }
-    40%            { transform: translateY(-8px)  scale(1.22); opacity: 1;    }
-    60%            { transform: translateY(-2px)  scale(1.05); opacity: 0.8;  }
+    0%, 80%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    40% {
+        transform: translateY(-4px);
+        opacity: 1;
+    }
 }
 
 /* WhatsApp Voice Recording Mode */
