@@ -214,6 +214,7 @@ let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
 let _lastOptimisticMsgText = null; // tracks optimistically-rendered sent message text
+let _isMessageInputFocused = false; // tracks if messageInput / mobile keyboard is currently active
 
 // AI Smart Reply variables
 let aiBtn, aiRepliesBar, aiRepliesList, closeAiBtn;
@@ -1177,19 +1178,31 @@ function renderEmojiPicker() {
         return;
     }
 
-    // Track user cursor position so clicking an emoji inserts at exact cursor location
+    // Track user cursor position & focus state
     let savedCursorPos = null;
     if (messageInput) {
         const updateCursor = () => {
             if (document.activeElement === messageInput) {
                 savedCursorPos = messageInput.selectionStart;
+                _isMessageInputFocused = true;
             }
         };
+        messageInput.addEventListener('focus', () => {
+            _isMessageInputFocused = true;
+            savedCursorPos = messageInput.selectionStart;
+        });
+        messageInput.addEventListener('blur', () => {
+            try {
+                savedCursorPos = messageInput.selectionStart;
+            } catch(e) {}
+            _isMessageInputFocused = false;
+        });
         messageInput.addEventListener('keyup', updateCursor);
         messageInput.addEventListener('mouseup', updateCursor);
         messageInput.addEventListener('touchend', updateCursor);
         messageInput.addEventListener('click', updateCursor);
         messageInput.addEventListener('select', updateCursor);
+        messageInput.addEventListener('input', updateCursor);
     }
 
     function loadCategory(catName) {
@@ -1198,30 +1211,27 @@ function renderEmojiPicker() {
             const span = document.createElement('span');
             span.textContent = emoji;
             
-            // Prevent focus steal and maintain keyboard on touch/click
-            span.addEventListener('mousedown', (e) => e.preventDefault());
+            let _spanTouchHandled = false;
+            const insertThisEmoji = (keepKeyboard) => {
+                if (!messageInput) return;
+                let start = savedCursorPos;
+                if (start === null || start === undefined || start < 0) {
+                    start = (messageInput.selectionStart != null && keepKeyboard) ? messageInput.selectionStart : messageInput.value.length;
+                }
+                const end = (messageInput.selectionEnd != null && messageInput.selectionEnd >= start && keepKeyboard) ? messageInput.selectionEnd : start;
+                const val = messageInput.value;
+                
+                messageInput.value = val.slice(0, start) + emoji + val.slice(end);
+                const newCursor = start + emoji.length;
+                savedCursorPos = newCursor;
 
-            span.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (messageInput) {
-                    let start = savedCursorPos;
-                    if (start === null || start === undefined || start < 0) {
-                        start = messageInput.selectionStart != null ? messageInput.selectionStart : messageInput.value.length;
-                    }
-                    const end = (messageInput.selectionEnd != null && messageInput.selectionEnd >= start) ? messageInput.selectionEnd : start;
-                    const val = messageInput.value;
-                    
-                    messageInput.value = val.slice(0, start) + emoji + val.slice(end);
-                    const newCursor = start + emoji.length;
-                    savedCursorPos = newCursor;
+                messageInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                    messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-
+                if (keepKeyboard) {
                     messageInput.focus();
                     try {
                         messageInput.setSelectionRange(newCursor, newCursor);
                     } catch(err) {}
-
                     setTimeout(() => {
                         if (messageInput && !messageInput.disabled) {
                             messageInput.focus();
@@ -1229,25 +1239,67 @@ function renderEmojiPicker() {
                                 messageInput.setSelectionRange(newCursor, newCursor);
                             } catch(err) {}
                         }
-                    }, 50);
+                    }, 30);
                 }
+            };
+
+            span.addEventListener('mousedown', (e) => {
+                e.preventDefault();
             });
+
+            span.addEventListener('touchstart', (e) => {
+                const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+                if (wasActive) {
+                    e.preventDefault();
+                    _spanTouchHandled = true;
+                    insertThisEmoji(true);
+                    setTimeout(() => { _spanTouchHandled = false; }, 350);
+                }
+            }, { passive: false });
+
+            span.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (_spanTouchHandled) return;
+                const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+                insertThisEmoji(wasActive);
+            });
+
             container.appendChild(span);
         });
     }
 
     tabs.forEach(tab => {
-        // Prevent focus steal and maintain keyboard on tab switches
-        tab.addEventListener('mousedown', (e) => e.preventDefault());
-
-        tab.addEventListener('click', (e) => {
-            e.stopPropagation();
+        let _tabTouchHandled = false;
+        const switchTab = (keepKeyboard) => {
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
             loadCategory(tab.dataset.cat);
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) messageInput.focus();
-            }, 50);
+            if (keepKeyboard) {
+                setTimeout(() => {
+                    if (messageInput && !messageInput.disabled) messageInput.focus();
+                }, 30);
+            }
+        };
+
+        tab.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+
+        tab.addEventListener('touchstart', (e) => {
+            const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+            if (wasActive) {
+                e.preventDefault();
+                _tabTouchHandled = true;
+                switchTab(true);
+                setTimeout(() => { _tabTouchHandled = false; }, 350);
+            }
+        }, { passive: false });
+
+        tab.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (_tabTouchHandled) return;
+            const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+            switchTab(wasActive);
         });
     });
 
@@ -1580,14 +1632,35 @@ function setupEventListeners() {
     }
 
     if (emojiBtn) {
-        // Prevent focus steal (keyboard close) on mobile
-        emojiBtn.addEventListener('mousedown', (e) => e.preventDefault());
+        let _emojiBtnTouchHandled = false;
+        const toggleEmojiPicker = (keepKeyboard) => {
+            emojiPicker.classList.toggle('hidden');
+            if (keepKeyboard) {
+                setTimeout(() => {
+                    if (messageInput && !messageInput.disabled) messageInput.focus();
+                }, 30);
+            }
+        };
+
+        emojiBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+
+        emojiBtn.addEventListener('touchstart', (e) => {
+            const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+            if (wasActive) {
+                e.preventDefault();
+                _emojiBtnTouchHandled = true;
+                toggleEmojiPicker(true);
+                setTimeout(() => { _emojiBtnTouchHandled = false; }, 350);
+            }
+        }, { passive: false });
+
         emojiBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            emojiPicker.classList.toggle('hidden');
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) messageInput.focus();
-            }, 50);
+            if (_emojiBtnTouchHandled) return;
+            const wasActive = (document.activeElement === messageInput || _isMessageInputFocused);
+            toggleEmojiPicker(wasActive);
         });
     }
 
