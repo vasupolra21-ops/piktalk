@@ -1634,7 +1634,7 @@ function setupEventListeners() {
                 if (socket && currentRoomID) {
                     socket.emit('stop-typing', { roomID: currentRoomID });
                 }
-            }, 2500);
+            }, 800);
         }
     }
 
@@ -2636,7 +2636,7 @@ function showTyping(name, profilePic, mode) {
 
     // Auto-hide safety timeout
     if (_typingHideTimer) clearTimeout(_typingHideTimer);
-    _typingHideTimer = setTimeout(hideTyping, 3500);
+    _typingHideTimer = setTimeout(hideTyping, 2000);
 }
 
 function hideTyping() {
