@@ -538,6 +538,24 @@ function updateActiveModalViewport() {
     }
 }
 
+// Global scroll helper to scroll and focus latest messages smoothly
+function scrollToBottom(smooth = false) {
+    if (!messagesContainer) return;
+    if (smooth && typeof messagesContainer.scrollTo === 'function') {
+        messagesContainer.scrollTo({
+            top: messagesContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    } else {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    requestAnimationFrame(() => {
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    });
+}
+
 // Mobile keyboard handler for iOS/Android:
 // - CSS baseline: #chat-view has height:100dvh (correct when no keyboard)
 // - When keyboard opens: JS sets chatView.style.height = visualViewport.height
@@ -547,17 +565,6 @@ function updateActiveModalViewport() {
 function initViewportHandler() {
     const chatView = document.getElementById('chat-view');
     let vpResizeHandler = null;
-
-    function scrollToBottom() {
-        if (messagesContainer) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            requestAnimationFrame(() => {
-                if (messagesContainer) {
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                }
-            });
-        }
-    }
 
     function applyKeyboardHeight() {
         if (!window.visualViewport || !chatView) return;
@@ -3383,6 +3390,21 @@ function appendMessage(data, isSentByMe) {
         img.alt = 'Sent image';
         img.className = 'message-image';
         img.addEventListener('click', () => openLightbox(data.image));
+
+        // Auto-focus and scroll to new image as soon as image loads/renders
+        const onImageReady = () => {
+            scrollToBottom();
+            try {
+                msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            } catch(e) {}
+        };
+        img.addEventListener('load', onImageReady);
+        if (img.complete) {
+            onImageReady();
+        } else if (img.decode) {
+            img.decode().then(onImageReady).catch(() => {});
+        }
+
         bubble.appendChild(img);
 
         const timeSpan = document.createElement('span');
@@ -3686,8 +3708,37 @@ function appendMessage(data, isSentByMe) {
         messagesContainer.appendChild(msgDiv);
     }
 
-    // Scroll to bottom immediately — opacity-only animation has no layout impact
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    // Scroll to bottom immediately & focus new message
+    scrollToBottom();
+    try {
+        msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    } catch(e) {}
+
+    // Follow-up scroll passes to handle image rendering, font loading, poll/audio heights
+    requestAnimationFrame(() => {
+        scrollToBottom();
+        try {
+            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } catch(e) {}
+    });
+
+    setTimeout(() => {
+        scrollToBottom();
+        try {
+            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } catch(e) {}
+    }, 60);
+
+    setTimeout(() => {
+        scrollToBottom();
+        try {
+            msgDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        } catch(e) {}
+    }, 180);
+
+    setTimeout(() => {
+        scrollToBottom();
+    }, 400);
 
     // Clean up will-change after animation ends to free GPU layers
     msgDiv.addEventListener('animationend', () => {
