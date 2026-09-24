@@ -1788,62 +1788,71 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionend', emitMyTyping);
     }
 
-    // WhatsApp Attachment Menu Toggle — direct touchstart/touchend/click for guaranteed response
+    // WhatsApp Attachment Menu Toggle — guaranteed 1-click / 1-tap open
     if (attachBtn && attachMenu) {
-        const toggleAttachMenu = () => {
+        let _lastToggleTime = 0;
+
+        const openMenu = () => {
+            attachMenu.classList.remove('hidden');
+            attachBtn.classList.add('menu-open');
+            if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
+                emojiPicker.classList.add('hidden');
+                _isMessageInputFocused = false;
+            }
+        };
+
+        const closeMenu = () => {
+            attachMenu.classList.add('hidden');
+            attachBtn.classList.remove('menu-open');
+        };
+
+        const toggleMenu = (e) => {
+            if (e) {
+                if (e.stopPropagation) e.stopPropagation();
+            }
+            const now = Date.now();
+            if (now - _lastToggleTime < 280) return; // ignore duplicate ghost events within 280ms
+            _lastToggleTime = now;
+
             const isOpen = !attachMenu.classList.contains('hidden');
             if (isOpen) {
-                attachMenu.classList.add('hidden');
-                attachBtn.classList.remove('menu-open');
+                closeMenu();
             } else {
-                attachMenu.classList.remove('hidden');
-                attachBtn.classList.add('menu-open');
-                // Close emoji picker if open
-                if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
-                    emojiPicker.classList.add('hidden');
-                    _isMessageInputFocused = false;
+                openMenu();
+            }
+        };
+
+        // Prevent blur / focus stealing on mousedown
+        attachBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+
+        // Fast touch response on mobile (fires immediately on touchend without 300ms delay)
+        attachBtn.addEventListener('touchend', (e) => {
+            e.preventDefault(); // stop synthetic delayed click
+            e.stopPropagation();
+            toggleMenu(e);
+        }, { passive: false });
+
+        // Direct click handler (works flawlessly on PC & fallback for mobile)
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMenu(e);
+        });
+
+        // Close when tapping anywhere outside (strictly ignore if clicked within 280ms of toggle)
+        const handleOutsideClose = (e) => {
+            if (Date.now() - _lastToggleTime < 280) return;
+            if (attachMenu && !attachMenu.classList.contains('hidden')) {
+                const target = e.target;
+                if (target && !attachMenu.contains(target) && !attachBtn.contains(target)) {
+                    closeMenu();
                 }
             }
         };
 
-        let _attachBtnTouchHandled = false;
-
-        // touchstart: make the button feel instantly responsive (enables :active CSS)
-        attachBtn.addEventListener('touchstart', () => {}, { passive: true });
-
-        // touchend: fire immediately, prevent the 300ms synthetic click
-        attachBtn.addEventListener('touchend', (e) => {
-            e.preventDefault(); // stop synthetic click
-            e.stopPropagation();
-            _attachBtnTouchHandled = true;
-            toggleAttachMenu();
-            setTimeout(() => { _attachBtnTouchHandled = false; }, 600);
-        }, { passive: false });
-
-        // click: desktop fallback (also fires on mobile if touchend didn't preventDefault)
-        attachBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (_attachBtnTouchHandled) return; // already handled by touchend
-            toggleAttachMenu();
-        });
-
-        // Close when tapping anywhere outside the menu or the + button
-        document.addEventListener('click', (e) => {
-            if (attachMenu && !attachMenu.classList.contains('hidden')) {
-                if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
-                    attachMenu.classList.add('hidden');
-                    attachBtn.classList.remove('menu-open');
-                }
-            }
-        });
-        document.addEventListener('touchend', (e) => {
-            if (attachMenu && !attachMenu.classList.contains('hidden')) {
-                if (e.target && !attachMenu.contains(e.target) && !attachBtn.contains(e.target)) {
-                    attachMenu.classList.add('hidden');
-                    attachBtn.classList.remove('menu-open');
-                }
-            }
-        }, { passive: true });
+        document.addEventListener('click', handleOutsideClose);
+        document.addEventListener('touchend', handleOutsideClose, { passive: true });
     }
     
     // AI smart replies trigger
