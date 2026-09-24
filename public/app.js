@@ -1354,6 +1354,16 @@ function setupEventListeners() {
         }
     });
 
+    // Mobile keyboard fix: scroll input into view when keyboard opens
+    if (joinRoomInput) {
+        joinRoomInput.addEventListener('focus', () => {
+            // Small delay so the keyboard has time to open and shrink the viewport
+            setTimeout(() => {
+                joinRoomInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        });
+    }
+
     // Password modal cancel/submit
     if (cancelPasswordBtn) {
         addFastClickListener(cancelPasswordBtn, () => {

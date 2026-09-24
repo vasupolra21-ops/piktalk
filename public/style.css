@@ -516,7 +516,9 @@ body.light-mode .bg-moon {
     border-radius: 12px;
     color: var(--text-main);
     outline: none;
+    scroll-margin-bottom: 24px;
 }
+
 
 .btn-send {
     background: var(--primary);
