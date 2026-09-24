@@ -243,7 +243,7 @@ function initDOMElements() {
     themeToggle = document.getElementById('theme-toggle');
     homeThemeToggle = document.getElementById('home-theme-toggle');
     attachBtn = document.getElementById('attach-btn');
-    imgInput = document.getElementById('image-input');
+    imgInput = document.getElementById('file-input');
     joinRoomInput = document.getElementById('join-room-input');
     joinRoomBtn = document.getElementById('join-room-btn');
     emojiPicker = document.getElementById('emoji-picker');
@@ -1671,12 +1671,7 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionupdate', emitMyTyping);
     }
 
-    if (attachBtn) {
-        // Standard click event listener works reliably across all mobile and desktop browsers
-        attachBtn.addEventListener('click', () => {
-            if (imgInput) imgInput.click();
-        });
-    }
+    // attachBtn is now a <label for="file-input"> — no JS click handler needed (works natively on mobile)
     
     // AI smart replies trigger
     if (aiBtn) {
@@ -1997,8 +1992,17 @@ function setupEventListeners() {
     if (imgInput) imgInput.addEventListener('change', () => {
         const file = imgInput.files[0];
         if (!file) return;
-        if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
-        openImageEditor(file);
+        imgInput.value = ''; // reset so same file can be re-selected
+
+        if (file.type.startsWith('image/')) {
+            // Images → open editor as before
+            if (file.size > 50000000) { alert('Image too large (Max 50MB)'); return; }
+            openImageEditor(file);
+        } else {
+            // Documents, PDFs, ZIPs, etc. → send directly as file attachment
+            if (file.size > 25000000) { alert('File too large (Max 25MB)'); return; }
+            sendFileAttachment(file);
+        }
     });
 
     // ── Voice message listeners ──
@@ -2208,6 +2212,61 @@ function discardPreview() {
     setTimeout(() => {
         if (messageInput && !messageInput.disabled) messageInput.focus();
     }, 50);
+}
+
+// ── File Attachment Send ──
+function _getFileIcon(mimeType, name) {
+    if (mimeType === 'application/pdf' || name.endsWith('.pdf')) return 'fa-file-pdf';
+    if (mimeType.includes('word') || name.match(/\.docx?$/)) return 'fa-file-word';
+    if (mimeType.includes('excel') || name.match(/\.xlsx?$/)) return 'fa-file-excel';
+    if (mimeType.includes('powerpoint') || name.match(/\.pptx?$/)) return 'fa-file-powerpoint';
+    if (mimeType.includes('zip') || name.match(/\.(zip|rar|7z)$/)) return 'fa-file-zipper';
+    if (mimeType.includes('text') || name.endsWith('.txt')) return 'fa-file-lines';
+    if (mimeType.includes('video')) return 'fa-file-video';
+    return 'fa-file';
+}
+
+function _formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function sendFileAttachment(file) {
+    if (!socket || !currentRoomID) { alert('Not connected.'); return; }
+    const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+
+    file.arrayBuffer().then(buffer => {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunk = 8192;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        }
+        const base64 = btoa(binary);
+        const dataUrl = `data:${file.type || 'application/octet-stream'};base64,${base64}`;
+
+        socket.emit('send-message', {
+            roomID: currentRoomID,
+            message: '',
+            file: { name: file.name, size: file.size, type: file.type, data: dataUrl },
+            replyTo: replyingTo || null
+        });
+        clearReply();
+        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+    }).catch(() => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            socket.emit('send-message', {
+                roomID: currentRoomID,
+                message: '',
+                file: { name: file.name, size: file.size, type: file.type, data: e.target.result },
+                replyTo: replyingTo || null
+            });
+            clearReply();
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function sendVoiceMessage() {
@@ -2822,6 +2881,28 @@ function appendMessage(data, isSentByMe) {
         img.addEventListener('click', () => openLightbox(data.image));
         bubble.appendChild(img);
 
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'bubble-timestamp';
+        timeSpan.appendChild(document.createTextNode(timeStr));
+        bubble.appendChild(timeSpan);
+        contentEl = bubble;
+
+    } else if (data.file) {
+        const f = data.file;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble bubble-file';
+        const icon = _getFileIcon(f.type || '', f.name || '');
+        bubble.innerHTML = `
+            <div class="file-attach-card">
+                <div class="file-attach-icon"><i class="fas ${icon}"></i></div>
+                <div class="file-attach-info">
+                    <div class="file-attach-name">${escapeHtml(f.name || 'file')}</div>
+                    <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
+                </div>
+                <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'file')}" title="Download">
+                    <i class="fas fa-arrow-down"></i>
+                </a>
+            </div>`;
         const timeSpan = document.createElement('span');
         timeSpan.className = 'bubble-timestamp';
         timeSpan.appendChild(document.createTextNode(timeStr));

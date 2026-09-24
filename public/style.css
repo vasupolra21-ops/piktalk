@@ -1606,6 +1606,18 @@ body.light-mode .chat-input-area::before {
 .btn-icon-small.left { left: 8px; }
 .btn-icon-small.right { right: 8px; }
 
+/* Attach label — no tap animation, no highlight */
+label#attach-btn {
+    display: flex;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+label#attach-btn:active {
+    transform: translateY(-50%); /* no scale on tap */
+    opacity: 0.6;
+}
+
 /* ── Send Button Interactive Animations & Physics ── */
 .btn-send {
     background: linear-gradient(135deg, var(--primary), #818cf8);
@@ -5519,3 +5531,37 @@ body.light-mode .editor-select {
     background: rgba(0, 0, 0, 0.15);
     width: 100%;
 }
+
+/* -----------------------------------------------
+   FILE ATTACHMENT BUBBLE
+----------------------------------------------- */
+.file-attach-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    min-width: 200px;
+    max-width: 280px;
+}
+.file-attach-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1.1rem; flex-shrink: 0;
+}
+.file-attach-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.file-attach-name { font-size: 0.82rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-attach-size { font-size: 0.72rem; color: var(--text-muted); }
+.file-attach-dl {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #6366f1; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; flex-shrink: 0;
+    text-decoration: none;
+    transition: transform 0.15s, opacity 0.15s;
+}
+.file-attach-dl:active { transform: scale(0.92); opacity: 0.85; }
