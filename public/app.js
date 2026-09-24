@@ -3389,6 +3389,8 @@ function appendMessage(data, isSentByMe) {
         img.src = data.image;
         img.alt = 'Sent image';
         img.className = 'message-image';
+        img.loading = 'lazy';
+        img.decoding = 'async';
         img.addEventListener('click', () => openLightbox(data.image));
 
         // Auto-focus and scroll to new image as soon as image loads/renders
@@ -4374,7 +4376,7 @@ function getNicknameColor(name) {
 }
 
 function getAvatar(name, profilePic) {
-    if (profilePic) return `<div class="avatar"><img src="${profilePic}"></div>`;
+    if (profilePic) return `<div class="avatar"><img src="${profilePic}" loading="lazy" decoding="async" alt="Avatar"></div>`;
     const initial = name ? name.charAt(0).toUpperCase() : '?';
     return `<div class="avatar" style="background: ${getNicknameColor(name)}">${initial}</div>`;
 }
