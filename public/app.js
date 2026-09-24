@@ -1922,8 +1922,8 @@ function setupEventListeners() {
                         const destW = isRotated90or270 ? img.naturalHeight : img.naturalWidth;
                         const destH = isRotated90or270 ? img.naturalWidth : img.naturalHeight;
 
-                        const maxW = 900;
-                        const maxH = 900;
+                        const maxW = 1920;
+                        const maxH = 1920;
                         let width = destW;
                         let height = destH;
                         if (width > maxW || height > maxH) {
@@ -1953,7 +1953,7 @@ function setupEventListeners() {
                         const drawH = isRotated90or270 ? width : height;
                         ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
 
-                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.72);
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.97);
 
                         if (socket) {
                             socket.emit('send-message', {
@@ -3794,7 +3794,7 @@ function applyCrop() {
     if (!_cropImg) return;
     const cx = _cropCanvasW / 2, cy = _cropCanvasH / 2;
     const r  = _cropCircleR;
-    const out = 800; // Increased output resolution to 800x800 for Ultra HD avatars!
+    const out = 1200; // Ultra HD avatar — 1200×1200
 
     // Map crop circle center back to image coordinates
     const srcX = (cx - r - _cropX) / _cropScale;
@@ -3815,7 +3815,7 @@ function applyCrop() {
     ctx.drawImage(_cropImg, srcX, srcY, srcS, srcS, 0, 0, out, out);
 
     // Export with high-quality JPEG compression (0.95 quality for ultra HD rendering)
-    const result = offscreen.toDataURL('image/jpeg', 0.95);
+    const result = offscreen.toDataURL('image/jpeg', 1.0);
     myProfilePic = result;
     if (avatarPreviewImg) {
         avatarPreviewImg.src = result;
@@ -5131,8 +5131,8 @@ function saveBiometrics(signature, video) {
         localStorage.setItem('piktalk_face_signature', JSON.stringify(signature));
         
         const thumbCanvas = document.createElement('canvas');
-        thumbCanvas.width = 150;
-        thumbCanvas.height = 150;
+        thumbCanvas.width = 400;
+        thumbCanvas.height = 400;
         const thumbCtx = thumbCanvas.getContext('2d');
         
         const size = Math.min(video.videoWidth || 300, video.videoHeight || 300) || 300;
@@ -5140,19 +5140,17 @@ function saveBiometrics(signature, video) {
         const sy = ((video.videoHeight || 300) - size) / 2;
         
         try {
-            // Translate and scale to mirror the image horizontally, matching the mirrored preview
-            thumbCtx.translate(150, 0);
+            // Mirror horizontally to match mirrored preview
+            thumbCtx.translate(400, 0);
             thumbCtx.scale(-1, 1);
-            thumbCtx.drawImage(video, sx, sy, size, size, 0, 0, 150, 150);
-            // Reset transform matrix
+            thumbCtx.drawImage(video, sx, sy, size, size, 0, 0, 400, 400);
             thumbCtx.setTransform(1, 0, 0, 1, 0, 0);
         } catch(e) {
-            // Mock if drawImage fails
             thumbCtx.fillStyle = '#10b981';
-            thumbCtx.fillRect(0, 0, 150, 150);
+            thumbCtx.fillRect(0, 0, 400, 400);
         }
         
-        const avatarDataURL = thumbCanvas.toDataURL('image/jpeg', 0.85);
+        const avatarDataURL = thumbCanvas.toDataURL('image/jpeg', 1.0);
         myProfilePic = avatarDataURL;
         
         // Update nickname modal avatar preview
