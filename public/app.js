@@ -3134,18 +3134,7 @@ if (socket) {
 
     // Real-time reaction update
     socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic, previousEmoji }) => {
-        if (!msgReactions[msgId]) msgReactions[msgId] = {};
-        // Remove previous reaction if the user switched emojis (1 reaction per person)
-        if (previousEmoji && previousEmoji !== emoji && msgReactions[msgId][previousEmoji]) {
-            msgReactions[msgId][previousEmoji].delete(socketId);
-            if (msgReactions[msgId][previousEmoji].size === 0) delete msgReactions[msgId][previousEmoji];
-        }
-        if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
-        const map = msgReactions[msgId][emoji];
-        if (map.has(socketId)) map.delete(socketId);
-        else map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
-        if (map.size === 0) delete msgReactions[msgId][emoji];
-        renderReactions(msgId);
+        applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji);
     });
 
     socket.on('system-message', (data) => {
@@ -3454,8 +3443,11 @@ function appendMessage(data, isSentByMe) {
     if (!messagesContainer) return;
 
     // Strict DOM deduplication: Never append the same message ID twice
-    const effectiveMsgId = data.msgId || data.messageId;
-    if (effectiveMsgId && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(effectiveMsgId)}"]`)) {
+    const effectiveMsgId = data.msgId || data.messageId || ('msg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7));
+    data.msgId = effectiveMsgId;
+    data.messageId = effectiveMsgId;
+
+    if (messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(effectiveMsgId)}"]`)) {
         return;
     }
 
@@ -3471,7 +3463,7 @@ function appendMessage(data, isSentByMe) {
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
     else msgDiv.classList.add('received');
-    if (effectiveMsgId) msgDiv.dataset.msgId = effectiveMsgId;
+    msgDiv.dataset.msgId = effectiveMsgId;
 
     const color = isSentByMe ? 'var(--text-muted)' : getNicknameColor(data.nickname);
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);
@@ -3730,80 +3722,76 @@ function appendMessage(data, isSentByMe) {
     msgDiv.appendChild(contentDiv);
 
     // ── Reaction row (populated later) ──
-    if (data.msgId) {
-        const reactionRow = document.createElement('div');
-        reactionRow.className = 'reaction-row';
-        reactionRow.id = 'reactions-' + data.msgId;
-        bubbleWrapper.appendChild(reactionRow);
-    }
+    const reactionRow = document.createElement('div');
+    reactionRow.className = 'reaction-row';
+    reactionRow.id = 'reactions-' + effectiveMsgId;
+    bubbleWrapper.appendChild(reactionRow);
 
     // ── Action bar (react + reply) ──
-    if (data.msgId) {
-        const actionBar = document.createElement('div');
-        actionBar.className = 'msg-action-bar';
+    const actionBar = document.createElement('div');
+    actionBar.className = 'msg-action-bar';
 
-        // Quick react popup (WhatsApp-style: 6 emojis + plus icon)
-        const quickMenu = document.createElement('div');
-        quickMenu.className = 'quick-react-menu';
-        const QUICK_EMOJIS = ['👍','❤️','😂','😮','😢','🙏'];
-        QUICK_EMOJIS.forEach(em => {
-            const btn = document.createElement('button');
-            btn.className = 'quick-react-btn';
-            btn.textContent = em;
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                quickMenu.classList.remove('visible');
-                msgDiv.classList.remove('action-visible');
-                const previousEmoji = getMyReactionOnMsg(data.msgId);
-                if (socket) socket.emit('toggle-reaction', { msgId: data.msgId, emoji: em, previousEmoji });
-            });
-            quickMenu.appendChild(btn);
-        });
-        
-        // Plus button to open full emoji panel
-        const plusBtn = document.createElement('button');
-        plusBtn.className = 'quick-react-btn plus-btn';
-        plusBtn.textContent = '+';
-        plusBtn.addEventListener('click', (e) => {
+    // Quick react popup (WhatsApp-style: 6 emojis + plus icon)
+    const quickMenu = document.createElement('div');
+    quickMenu.className = 'quick-react-menu';
+    const QUICK_EMOJIS = ['👍','❤️','😂','😮','😢','🙏'];
+    QUICK_EMOJIS.forEach(em => {
+        const btn = document.createElement('button');
+        btn.className = 'quick-react-btn';
+        btn.textContent = em;
+        btn.addEventListener('click', (e) => {
             e.stopPropagation();
             quickMenu.classList.remove('visible');
             msgDiv.classList.remove('action-visible');
-            showEmojiBottomSheet(data.msgId);
+            triggerReactionOnMsg(effectiveMsgId, em);
         });
-        quickMenu.appendChild(plusBtn);
-        
-        bubbleContainer.appendChild(quickMenu);
+        quickMenu.appendChild(btn);
+    });
+    
+    // Plus button to open full emoji panel
+    const plusBtn = document.createElement('button');
+    plusBtn.className = 'quick-react-btn plus-btn';
+    plusBtn.textContent = '+';
+    plusBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickMenu.classList.remove('visible');
+        msgDiv.classList.remove('action-visible');
+        showEmojiBottomSheet(effectiveMsgId);
+    });
+    quickMenu.appendChild(plusBtn);
+    
+    bubbleContainer.appendChild(quickMenu);
 
-        // React button
-        const reactBtn = document.createElement('button');
-        reactBtn.className = 'msg-action-btn';
-        reactBtn.title = 'React';
-        reactBtn.innerHTML = '<i class="far fa-smile"></i>';
-        reactBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isOpen = quickMenu.classList.contains('visible');
-            // Close any open quick menus and bottom sheets first
-            document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
-            document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
-            if (!isOpen) quickMenu.classList.add('visible');
-        });
+    // React button
+    const reactBtn = document.createElement('button');
+    reactBtn.className = 'msg-action-btn';
+    reactBtn.title = 'React';
+    reactBtn.innerHTML = '<i class="far fa-smile"></i>';
+    reactBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = quickMenu.classList.contains('visible');
+        // Close any open quick menus and bottom sheets first
+        document.querySelectorAll('.quick-react-menu.visible').forEach(m => m.classList.remove('visible'));
+        document.querySelectorAll('.emoji-bottom-sheet-overlay').forEach(m => m.remove());
+        if (!isOpen) quickMenu.classList.add('visible');
+    });
 
-        // Reply button
-        const replyBtn = document.createElement('button');
-        replyBtn.className = 'msg-action-btn';
-        replyBtn.title = 'Reply';
-        replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
-        replyBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            msgDiv.classList.remove('action-visible');
-            const preview = data.audio ? '🎤 Voice message'
-                          : data.image ? '🖼️ Image'
-                          : data.file ? `📁 ${(data.file.name || 'File')}`
-                          : data.poll ? `📊 Poll: ${(data.poll.question || '')}`
-                          : data.location ? '📍 Live Location'
-                          : (data.message || '').slice(0, 80);
-            setReply({ msgId: data.msgId, nickname: data.nickname || 'You', preview });
-        });
+    // Reply button
+    const replyBtn = document.createElement('button');
+    replyBtn.className = 'msg-action-btn';
+    replyBtn.title = 'Reply';
+    replyBtn.innerHTML = '<i class="fas fa-reply"></i>';
+    replyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        msgDiv.classList.remove('action-visible');
+        const preview = data.audio ? '🎤 Voice message'
+                      : data.image ? '🖼️ Image'
+                      : data.file ? `📁 ${(data.file.name || 'File')}`
+                      : data.poll ? `📊 Poll: ${(data.poll.question || '')}`
+                      : data.location ? '📍 Live Location'
+                      : (data.message || '').slice(0, 80);
+        setReply({ msgId: effectiveMsgId, nickname: data.nickname || 'You', preview });
+    });
 
         // Download button next to photo in action bar
         if (data.image) {
@@ -3827,7 +3815,6 @@ function appendMessage(data, isSentByMe) {
         actionBar.appendChild(replyBtn);
         actionBar.appendChild(reactBtn);
         bubbleContainer.appendChild(actionBar);
-    }
 
     // ── Long-press for mobile ──
     if (data.msgId) {
@@ -4049,8 +4036,7 @@ function showEmojiBottomSheet(msgId) {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (currentReactionMsgId) {
-                    const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
-                    if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
+                    triggerReactionOnMsg(currentReactionMsgId, em);
                 }
                 closeSheet();
             });
@@ -4162,8 +4148,7 @@ function showEmojiBottomSheet(msgId) {
                     btn.addEventListener('click', (e) => {
                         e.stopPropagation();
                         if (currentReactionMsgId) {
-                            const previousEmoji = getMyReactionOnMsg(currentReactionMsgId);
-                            if (socket) socket.emit('toggle-reaction', { msgId: currentReactionMsgId, emoji: em, previousEmoji });
+                            triggerReactionOnMsg(currentReactionMsgId, em);
                         }
                         closeSheet();
                     });
@@ -4199,6 +4184,49 @@ function getMyReactionOnMsg(msgId) {
         if (map.has(socket.id)) return emoji;
     }
     return null;
+}
+
+// ── Apply reaction locally in memory + update DOM (instant 0ms) ──
+function applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji) {
+    if (!msgId || !emoji) return;
+    if (!msgReactions[msgId]) msgReactions[msgId] = {};
+
+    // Remove previous reaction if user switched emoji
+    if (previousEmoji && previousEmoji !== emoji && msgReactions[msgId][previousEmoji]) {
+        msgReactions[msgId][previousEmoji].delete(socketId);
+        if (msgReactions[msgId][previousEmoji].size === 0) delete msgReactions[msgId][previousEmoji];
+    }
+
+    if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
+    const map = msgReactions[msgId][emoji];
+    if (map.has(socketId)) {
+        map.delete(socketId);
+    } else {
+        map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
+    }
+    if (map.size === 0) delete msgReactions[msgId][emoji];
+
+    renderReactions(msgId);
+}
+
+// ── Trigger reaction on specific message: instant optimistic UI + server sync + smooth scroll focus ──
+function triggerReactionOnMsg(targetMsgId, emoji) {
+    if (!targetMsgId || !emoji || !socket) return;
+    const previousEmoji = getMyReactionOnMsg(targetMsgId);
+
+    // 1. Instant 0ms local optimistic UI
+    applyReactionLocally(targetMsgId, emoji, socket.id, myNickname || 'Me', myProfilePic || null, previousEmoji);
+
+    // 2. Real-time broadcast to room members
+    socket.emit('toggle-reaction', { msgId: targetMsgId, emoji, previousEmoji });
+
+    // 3. Smooth focus & auto-scroll to ensure reacted message stays nicely in view
+    if (messagesContainer) {
+        const msgEl = messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(targetMsgId)}"]`);
+        if (msgEl) {
+            msgEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
 }
 
 // ── Show Instagram-style reaction sheet ──
@@ -4266,7 +4294,7 @@ function showReactionSheet(msgId) {
             removeBtn.textContent = 'Remove';
             removeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (socket) socket.emit('toggle-reaction', { msgId, emoji, previousEmoji: null });
+                triggerReactionOnMsg(msgId, emoji);
                 overlay.remove();
                 if (messageInput) messageInput.focus();
             });
@@ -4288,14 +4316,16 @@ function showReactionSheet(msgId) {
     });
 }
 
-// ── Render reaction pills for a msgId ──
+// ── Render reaction pills for a specific msgId ──
 function renderReactions(msgId) {
-    const row = document.getElementById('reactions-' + msgId);
+    if (!msgId || !messagesContainer) return;
+    const msgEl = messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(msgId)}"]`);
+    const row = msgEl ? msgEl.querySelector('.reaction-row') : document.getElementById('reactions-' + msgId);
     if (!row) return;
     row.innerHTML = '';
     const reactions = msgReactions[msgId] || {};
     Object.entries(reactions).forEach(([emoji, map]) => {
-        if (map.size === 0) return;
+        if (!map || map.size === 0) return;
         const pill = document.createElement('button');
         const isMine = socket && map.has(socket.id);
         pill.className = 'reaction-pill' + (isMine ? ' mine' : '');
@@ -6790,6 +6820,7 @@ function saveMsgToHistory(data) {
         const key = _historyKey(faceUserId, currentRoomID);
         const existing = JSON.parse(localStorage.getItem(key) || '[]');
         const entry = {
+            msgId: data.msgId || data.messageId || ('hist_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)),
             nickname: data.nickname || 'Anonymous',
             text: data.message || '',
             time: data.time || new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
