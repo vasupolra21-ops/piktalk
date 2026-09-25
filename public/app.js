@@ -229,8 +229,25 @@ let replyBarEl = null;     // the reply preview bar DOM element
 let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
-let _lastOptimisticMsgText = null; // tracks optimistically-rendered sent message text
-let _lastOptimisticMsgId = null;   // tracks optimistically-rendered message ID
+// Multi-message optimistic deduplication tracking Set
+const _sentOptimisticMsgIds = new Set();
+function markOptimisticMsg(msgId) {
+    if (!msgId) return;
+    _sentOptimisticMsgIds.add(String(msgId));
+    if (_sentOptimisticMsgIds.size > 300) {
+        const first = _sentOptimisticMsgIds.values().next().value;
+        _sentOptimisticMsgIds.delete(first);
+    }
+}
+function isOptimisticMsg(msgId) {
+    if (!msgId) return false;
+    const strId = String(msgId);
+    if (_sentOptimisticMsgIds.has(strId)) {
+        _sentOptimisticMsgIds.delete(strId);
+        return true;
+    }
+    return false;
+}
 let _isMessageInputFocused = false; // tracks if messageInput / mobile keyboard is currently active
 
 // AI Smart Reply variables
@@ -1764,15 +1781,12 @@ function setupEventListeners() {
 
     if (sendBtn) {
         // Prevent send button from stealing focus from the textarea on mobile
-        // Using mousedown preventDefault stops iOS Safari from dismissing the keyboard
         sendBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
         });
-        sendBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
+        addFastClickListener(sendBtn, () => {
             sendMessage();
-        }, { passive: false });
-        sendBtn.addEventListener('click', sendMessage);
+        });
     }
     function resizeMessageInput() {
         if (!messageInput) return;
@@ -2130,7 +2144,7 @@ function setupEventListeners() {
                     replyTo: replyingTo || null
                 };
                 appendMessage(optimisticData, true);
-                _lastOptimisticMsgId = optMsgId;
+                markOptimisticMsg(optMsgId);
                 emitMyStopTyping();
 
                 socket.emit('send-message', {
@@ -2190,7 +2204,7 @@ function setupEventListeners() {
                         replyTo: replyingTo || null
                     };
                     appendMessage(optimisticData, true);
-                    _lastOptimisticMsgId = optMsgId;
+                    markOptimisticMsg(optMsgId);
                     emitMyStopTyping();
 
                     socket.emit('send-message', {
@@ -2642,7 +2656,7 @@ function sendFileAttachment(file) {
             replyTo: replyingTo || null
         };
         appendMessage(optimisticData, true);
-        _lastOptimisticMsgId = optMsgId;
+        markOptimisticMsg(optMsgId);
         emitMyStopTyping();
 
         socket.emit('send-message', {
@@ -2847,7 +2861,7 @@ function sendVoiceMessage() {
                 replyTo: replyingTo || null
             };
             appendMessage(optimisticData, true);
-            _lastOptimisticMsgId = optMsgId;
+            markOptimisticMsg(optMsgId);
             emitMyStopTyping();
 
             socket.emit('voice-recording-stop');
@@ -3044,63 +3058,64 @@ function showNicknameModal() {
 }
 
 function sendMessage() {
+    if (!messageInput || !currentRoomID || !socket) return;
     const text = messageInput.value.trim();
-    if (text && currentRoomID) {
-        if (socket) {
-            // Stop typing indicator instantly upon sending
-            clearTimeout(typingTimeout);
-            isCurrentlyTyping = false;
-            socket.emit('stop-typing', { roomID: currentRoomID });
+    if (!text) return;
 
-            // Generate deterministic unique clientMsgId for 0ms latency
-            const clientMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    // Clear input field immediately to prevent rapid double-sending
+    messageInput.value = '';
+    messageInput.style.height = '38px';
+    messageInput.style.overflowY = 'hidden';
 
-            // Optimistic UI: render message instantly without waiting for server echo
-            const optimisticData = {
-                msgId: clientMsgId,
-                id: socket.id,
-                nickname: myNickname || 'Me',
-                message: text,
-                profilePic: myProfilePic || null,
-                replyTo: replyingTo || null
-            };
-            appendMessage(optimisticData, true);
-            setTimeout(() => saveMsgToHistory(optimisticData), 0);
-            _lastOptimisticMsgId = clientMsgId;
-            _lastOptimisticMsgText = text;
+    // Stop typing indicator instantly upon sending
+    clearTimeout(typingTimeout);
+    isCurrentlyTyping = false;
+    socket.emit('stop-typing', { roomID: currentRoomID });
 
-            socket.emit('send-message', {
-                msgId: clientMsgId,
-                roomID: currentRoomID,
-                nickname: myNickname || 'Anonymous',
-                profilePic: myProfilePic || null,
-                message: text,
-                replyTo: replyingTo || null
-            });
-            if (sendBtn) {
-                sendBtn.classList.remove('btn-send-pop');
-                void sendBtn.offsetWidth; // Force reflow
-                sendBtn.classList.add('btn-send-pop');
-                sendBtn.addEventListener('animationend', () => sendBtn.classList.remove('btn-send-pop'), { once: true });
-            }
+    // Generate deterministic unique clientMsgId for 0ms latency
+    const clientMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
 
-            messageInput.value = '';
-            messageInput.style.height = '38px';
-            messageInput.style.overflowY = 'hidden';
-            if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            clearReply();
+    // Optimistic UI: render message instantly without waiting for server echo
+    const optimisticData = {
+        msgId: clientMsgId,
+        messageId: clientMsgId,
+        id: socket.id,
+        nickname: myNickname || 'Me',
+        message: text,
+        profilePic: myProfilePic || null,
+        replyTo: replyingTo || null
+    };
+    appendMessage(optimisticData, true);
+    setTimeout(() => saveMsgToHistory(optimisticData), 0);
+    markOptimisticMsg(clientMsgId);
 
-            const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
-            if (emojiPicker) emojiPicker.classList.add('hidden');
-            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-            if (!isEmojiOpen) {
-                setTimeout(() => {
-                    if (messageInput && !messageInput.disabled) messageInput.focus();
-                }, 0);
-            }
-        } else {
-            alert("Not connected to server. Message could not be sent.");
-        }
+    socket.emit('send-message', {
+        msgId: clientMsgId,
+        messageId: clientMsgId,
+        roomID: currentRoomID,
+        nickname: myNickname || 'Anonymous',
+        profilePic: myProfilePic || null,
+        message: text,
+        replyTo: replyingTo || null
+    });
+
+    if (sendBtn) {
+        sendBtn.classList.remove('btn-send-pop');
+        void sendBtn.offsetWidth; // Force reflow
+        sendBtn.classList.add('btn-send-pop');
+        sendBtn.addEventListener('animationend', () => sendBtn.classList.remove('btn-send-pop'), { once: true });
+    }
+
+    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    clearReply();
+
+    const isEmojiOpen = emojiPicker && !emojiPicker.classList.contains('hidden');
+    if (emojiPicker) emojiPicker.classList.add('hidden');
+    if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+    if (!isEmojiOpen) {
+        setTimeout(() => {
+            if (messageInput && !messageInput.disabled) messageInput.focus();
+        }, 0);
     }
 }
 
@@ -3108,19 +3123,14 @@ function sendMessage() {
 if (socket) {
     socket.on('receive-message', (data) => {
         hideTyping();
+        const mId = data.msgId || data.messageId;
+
         // Skip own messages if already rendered optimistically
-        if (data.id === socket.id) {
-            if (data.msgId && _lastOptimisticMsgId === data.msgId) {
-                _lastOptimisticMsgId = null;
-                if (msgSound) SoundManager.play(msgSound);
-                return;
-            }
-            if (_lastOptimisticMsgText !== null && data.message === _lastOptimisticMsgText) {
-                _lastOptimisticMsgText = null;
-                if (msgSound) SoundManager.play(msgSound);
-                return;
-            }
+        if ((mId && isOptimisticMsg(mId)) || (data.id === socket.id && mId && messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(mId)}"]`))) {
+            if (msgSound) SoundManager.play(msgSound);
+            return;
         }
+
         appendMessage(data, data.id === socket.id);
         setTimeout(() => saveMsgToHistory(data), 0);
         if (msgSound) SoundManager.play(msgSound);
@@ -3129,6 +3139,17 @@ if (socket) {
         if (aiRepliesBar && !aiRepliesBar.classList.contains('hidden') && typeof refreshAISuggestions === 'function') {
             refreshAISuggestions();
         }
+    });
+
+    // Room history — restore messages on join / reconnect with deduplication
+    socket.on('room-history', (data) => {
+        if (!data || !Array.isArray(data.messages) || !messagesContainer) return;
+        data.messages.forEach(msg => {
+            const isMine = msg.senderId === socket.id || msg.id === socket.id ||
+                (msg.nickname && myNickname && msg.nickname.trim().toLowerCase() === myNickname.trim().toLowerCase());
+            appendMessage(msg, isMine);
+        });
+        scrollToBottom(false);
     });
 
     // Real-time reaction update
@@ -3452,6 +3473,12 @@ function isSingleEmoji(str) {
 function appendMessage(data, isSentByMe) {
     if (!messagesContainer) return;
 
+    // Strict DOM deduplication: Never append the same message ID twice
+    const effectiveMsgId = data.msgId || data.messageId;
+    if (effectiveMsgId && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(effectiveMsgId)}"]`)) {
+        return;
+    }
+
     // Log chat history for AI Smart Reply context
     chatHistory.push({
         nickname: data.nickname || 'Anonymous',
@@ -3464,7 +3491,7 @@ function appendMessage(data, isSentByMe) {
     msgDiv.classList.add('message');
     if (isSentByMe) msgDiv.classList.add('sent');
     else msgDiv.classList.add('received');
-    if (data.msgId) msgDiv.dataset.msgId = data.msgId;
+    if (effectiveMsgId) msgDiv.dataset.msgId = effectiveMsgId;
 
     const color = isSentByMe ? 'var(--text-muted)' : getNicknameColor(data.nickname);
     const avatar = isSentByMe ? '' : getAvatar(data.nickname, data.profilePic);

@@ -398,9 +398,12 @@ io.on('connection', (socket) => {
         if (roomID) {
             const cleanRoomID = String(roomID).trim();
             socket.join(cleanRoomID);
+            const effectiveMsgId = (data && (data.msgId || data.messageId)) ? (data.msgId || data.messageId) : uuidv4();
             const messageData = {
-                msgId: (data && data.msgId) ? data.msgId : uuidv4(),
+                msgId: effectiveMsgId,
+                messageId: effectiveMsgId,
                 id: socket.id,
+                senderId: socket.id,
                 nickname: (data && data.nickname) || (user && user.nickname) || 'Anonymous',
                 message: data.message || '',
                 image: data.image || null,
@@ -411,7 +414,8 @@ io.on('connection', (socket) => {
                 audioDuration: data.audioDuration || null,
                 profilePic: (data && data.profilePic) || (user && user.profilePic) || null,
                 replyTo: data.replyTo || null,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: (data && data.timestamp) || Date.now()
             };
             io.to(cleanRoomID).emit('receive-message', messageData);
         }
