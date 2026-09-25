@@ -1846,11 +1846,14 @@ function setupEventListeners() {
         messageInput.addEventListener('compositionend', emitMyTyping);
     }
 
-    // WhatsApp Attachment Menu Toggle — guaranteed 1-click / 1-tap open
+    // Attachment Menu Toggle — guaranteed instant 1-click / 1-tap open
     if (attachBtn && attachMenu) {
-        let _lastToggleTime = 0;
+        let _menuOpen = false;
+        let _lastToggle = 0;
 
         const openMenu = () => {
+            _menuOpen = true;
+            _lastToggle = Date.now();
             attachMenu.classList.remove('hidden');
             attachBtn.classList.add('menu-open');
             if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
@@ -1860,48 +1863,47 @@ function setupEventListeners() {
         };
 
         const closeMenu = () => {
+            _menuOpen = false;
+            _lastToggle = Date.now();
             attachMenu.classList.add('hidden');
             attachBtn.classList.remove('menu-open');
         };
 
         const toggleMenu = (e) => {
             if (e) {
-                if (e.stopPropagation) e.stopPropagation();
+                if (typeof e.preventDefault === 'function') e.preventDefault();
+                if (typeof e.stopPropagation === 'function') e.stopPropagation();
             }
-            const now = Date.now();
-            if (now - _lastToggleTime < 280) return; // ignore duplicate ghost events within 280ms
-            _lastToggleTime = now;
-
-            const isOpen = !attachMenu.classList.contains('hidden');
-            if (isOpen) {
+            if (Date.now() - _lastToggle < 120) return; // ignore rapid double-fire from touch+click
+            if (!attachMenu.classList.contains('hidden')) {
                 closeMenu();
             } else {
                 openMenu();
             }
         };
 
-        // Prevent blur / focus stealing on mousedown
+        // Prevent textarea blur or accidental form submission
         attachBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
         });
 
-        // Fast touch response on mobile (fires immediately on touchend without 300ms delay)
+        // Fast tap response on mobile
         attachBtn.addEventListener('touchend', (e) => {
-            e.preventDefault(); // stop synthetic delayed click
+            e.preventDefault();
             e.stopPropagation();
             toggleMenu(e);
         }, { passive: false });
 
-        // Direct click handler (works flawlessly on PC & fallback for mobile)
+        // Direct click response for desktop
         attachBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleMenu(e);
         });
 
-        // Close when tapping anywhere outside (strictly ignore if clicked within 280ms of toggle)
+        // Close when clicking / tapping anywhere outside
         const handleOutsideClose = (e) => {
-            if (Date.now() - _lastToggleTime < 280) return;
-            if (attachMenu && !attachMenu.classList.contains('hidden')) {
+            if (Date.now() - _lastToggle < 180) return;
+            if (!attachMenu.classList.contains('hidden')) {
                 const target = e.target;
                 if (target && !attachMenu.contains(target) && !attachBtn.contains(target)) {
                     closeMenu();
