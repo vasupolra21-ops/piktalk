@@ -1862,12 +1862,7 @@ function setupEventListeners() {
 
     // Attachment Menu Toggle — guaranteed instant 1-click / 1-tap open
     if (attachBtn && attachMenu) {
-        let _menuOpen = false;
-        let _lastToggle = 0;
-
         const openMenu = () => {
-            _menuOpen = true;
-            _lastToggle = Date.now();
             attachMenu.classList.remove('hidden');
             attachBtn.classList.add('menu-open');
             if (emojiPicker && !emojiPicker.classList.contains('hidden')) {
@@ -1877,18 +1872,11 @@ function setupEventListeners() {
         };
 
         const closeMenu = () => {
-            _menuOpen = false;
-            _lastToggle = Date.now();
             attachMenu.classList.add('hidden');
             attachBtn.classList.remove('menu-open');
         };
 
-        const toggleMenu = (e) => {
-            if (e) {
-                if (typeof e.preventDefault === 'function') e.preventDefault();
-                if (typeof e.stopPropagation === 'function') e.stopPropagation();
-            }
-            if (Date.now() - _lastToggle < 120) return; // ignore rapid double-fire from touch+click
+        const toggleMenu = () => {
             if (!attachMenu.classList.contains('hidden')) {
                 closeMenu();
             } else {
@@ -1896,27 +1884,19 @@ function setupEventListeners() {
             }
         };
 
-        // Prevent textarea blur or accidental form submission
+        // Prevent textarea blur or accidental deselect
         attachBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
         });
 
-        // Fast tap response on mobile
-        attachBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleMenu(e);
-        }, { passive: false });
-
-        // Direct click response for desktop
-        attachBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleMenu(e);
+        // Fast & reliable 1-click/1-tap listener for mobile and desktop
+        addFastClickListener(attachBtn, (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            toggleMenu();
         });
 
         // Close when clicking / tapping anywhere outside
         const handleOutsideClose = (e) => {
-            if (Date.now() - _lastToggle < 180) return;
             if (!attachMenu.classList.contains('hidden')) {
                 const target = e.target;
                 if (target && !attachMenu.contains(target) && !attachBtn.contains(target)) {
