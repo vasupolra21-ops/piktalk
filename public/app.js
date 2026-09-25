@@ -2534,9 +2534,9 @@ function cancelRecording() {
         if (mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
     }
     clearInterval(recordingTimerInterval);
-    micBtn.classList.remove('recording');
-    voiceRecordingBar.classList.add('hidden');
-    recordingTimerEl.textContent = '0:00';
+    if (micBtn) micBtn.classList.remove('recording');
+    if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
+    if (recordingTimerEl) recordingTimerEl.textContent = '0:00';
     audioChunks = [];
     recordedAudioBlob = null;
     if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
