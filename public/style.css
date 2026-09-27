@@ -436,7 +436,7 @@ body.light-mode .bg-moon {
 }
 
 /* Buttons */
-.btn, .btn-icon, button, .editor-tool-btn, .btn-text-danger, .avatar-scan-btn, .history-room-clear {
+.btn, .btn-icon, button, .editor-tool-btn, .btn-text-danger, .history-room-clear {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
     user-select: none;
@@ -467,8 +467,8 @@ body.light-mode .bg-moon {
     box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.4);
 }
 
-.btn:active, .btn-icon:active, button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active, .editor-tool-btn:active, .btn-text-danger:active, .history-room-clear:active, .avatar-scan-btn:active,
-.btn.touch-active, .btn-icon.touch-active, button.touch-active, .btn-primary.touch-active, .btn-secondary.touch-active, .btn-danger.touch-active, .editor-tool-btn.touch-active, .btn-text-danger.touch-active, .history-room-clear.touch-active, .avatar-scan-btn.touch-active {
+.btn:active, .btn-icon:active, button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active, .editor-tool-btn:active, .btn-text-danger:active, .history-room-clear:active,
+.btn.touch-active, .btn-icon.touch-active, button.touch-active, .btn-primary.touch-active, .btn-secondary.touch-active, .btn-danger.touch-active, .editor-tool-btn.touch-active, .btn-text-danger.touch-active, .history-room-clear.touch-active {
     transform: scale(0.95) translateY(0) !important;
     filter: brightness(0.92);
     transition: transform 0.04s cubic-bezier(0.2, 0, 0, 1) !important;
@@ -2004,7 +2004,7 @@ body:not(.light-mode) .image-editor-modal-overlay {
     position: absolute;
     bottom: 4px;
     right: 4px;
-    transform: translate(25%, 25%);
+    transform: translate(25%, 25%) !important;
     width: 38px;
     height: 38px;
     border-radius: 50%;
@@ -2019,7 +2019,7 @@ body:not(.light-mode) .image-editor-modal-overlay {
     outline: none;
     padding: 0;
     overflow: hidden;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    transition: none !important;
     z-index: 10;
     -webkit-tap-highlight-color: transparent;
 }
@@ -2035,12 +2035,14 @@ body:not(.light-mode) .image-editor-modal-overlay {
 }
 
 .avatar-scan-btn:hover {
-    transform: translate(25%, 25%) scale(1.15);
     box-shadow: 0 6px 16px rgba(29, 110, 245, 0.5);
 }
 
-.avatar-scan-btn:active {
-    transform: translate(25%, 25%) scale(0.92);
+.avatar-scan-btn:active,
+.avatar-scan-btn.touch-active {
+    transform: translate(25%, 25%) !important;
+    filter: none !important;
+    transition: none !important;
 }
 
 .badge {
