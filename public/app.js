@@ -2422,6 +2422,7 @@ class VoiceToTextEngine {
         this.analyser = null;
         this.animFrameId = null;
         this.timerInterval = null;
+        this.restartTimeout = null;
         this.seconds = 0;
         this.finalTranscript = '';
         this.interimTranscript = '';
@@ -2476,6 +2477,10 @@ class VoiceToTextEngine {
         }
 
         if (v2tPreviewTextarea) {
+            v2tPreviewTextarea.addEventListener('input', () => {
+                this.finalTranscript = v2tPreviewTextarea.value;
+                this.interimTranscript = '';
+            });
             v2tPreviewTextarea.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -2489,7 +2494,15 @@ class VoiceToTextEngine {
         if (this.selectedLang && this.selectedLang !== 'auto') {
             return this.selectedLang;
         }
-        return (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
+        if (typeof navigator !== 'undefined') {
+            if (navigator.languages && navigator.languages.length > 0) {
+                return navigator.languages[0];
+            }
+            if (navigator.language) {
+                return navigator.language;
+            }
+        }
+        return 'en-US';
     }
 
     async start() {
@@ -2497,7 +2510,7 @@ class VoiceToTextEngine {
         this.isRecording = true;
         this.isPaused = false;
         this.seconds = 0;
-        this.finalTranscript = (v2tPreviewTextarea && v2tPreviewTextarea.value.trim()) ? (v2tPreviewTextarea.value.trim() + ' ') : '';
+        this.finalTranscript = (v2tPreviewTextarea && v2tPreviewTextarea.value.trim()) ? v2tPreviewTextarea.value.trim() : '';
         this.interimTranscript = '';
 
         // UI state update
@@ -2537,11 +2550,16 @@ class VoiceToTextEngine {
             }
         }, 1000);
 
-        // Start Audio Visualizer
+        // Start Audio Visualizer with non-destructive microphone settings
         try {
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 this.mediaStream = await navigator.mediaDevices.getUserMedia({
-                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: false,
+                        autoGainControl: true,
+                        channelCount: 1
+                    }
                 });
                 this.startVisualizer(this.mediaStream);
             }
@@ -2568,60 +2586,132 @@ class VoiceToTextEngine {
         try {
             if (this.recognition) {
                 try { this.recognition.abort(); } catch(e){}
+                this.recognition = null;
             }
 
             this.recognition = new SpeechRec();
             this.recognition.continuous = true;
             this.recognition.interimResults = true;
+            this.recognition.maxAlternatives = 3;
             this.recognition.lang = this.getEffectiveLang();
 
+            this.recognition.onstart = () => {
+                if (this.isRecording && !this.isPaused) {
+                    if (v2tStatusText) v2tStatusText.textContent = 'Listening...';
+                }
+            };
+
             this.recognition.onresult = (event) => {
-                let currentInterim = '';
+                let interim = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        this.finalTranscript += transcript + ' ';
+                    const res = event.results[i];
+                    if (!res || !res.length) continue;
+                    const transcript = res[0].transcript;
+                    if (res.isFinal) {
+                        const cleaned = transcript.trim();
+                        if (cleaned) {
+                            this.appendFinalText(cleaned);
+                        }
                     } else {
-                        currentInterim += transcript;
+                        interim += transcript;
                     }
                 }
-                this.interimTranscript = currentInterim;
+                this.interimTranscript = interim;
                 this.updatePreviewText();
+                if (interim.trim() && v2tStatusText && this.isRecording && !this.isPaused) {
+                    v2tStatusText.textContent = 'Hearing you...';
+                }
             };
 
             this.recognition.onerror = (event) => {
-                console.warn('Speech recognition notice:', event.error);
+                if (event.error === 'no-speech') {
+                    if (v2tStatusText && this.isRecording && !this.isPaused) {
+                        v2tStatusText.textContent = 'Listening...';
+                    }
+                    return;
+                }
                 if (event.error === 'not-allowed') {
                     alert('Microphone access was not granted. Please allow microphone access in your browser settings.');
                     this.cancel();
-                } else if (event.error === 'network') {
-                    if (v2tStatusText) v2tStatusText.textContent = 'Network speech error • Type below';
+                    return;
+                }
+                console.warn('Speech recognition notice:', event.error);
+                if (this.isRecording && !this.isPaused) {
+                    this.restartRecognitionSafely();
                 }
             };
 
             this.recognition.onend = () => {
-                // Auto restart if still recording and not manually paused
+                // Commit any lingering interim text so not a single spoken word is lost
+                if (this.interimTranscript && this.interimTranscript.trim()) {
+                    this.appendFinalText(this.interimTranscript.trim());
+                    this.interimTranscript = '';
+                }
+                // Auto-restart immediately if recording
                 if (this.isRecording && !this.isPaused) {
-                    try { this.recognition.start(); } catch(e){}
+                    this.restartRecognitionSafely();
                 }
             };
 
             this.recognition.start();
         } catch(err) {
             console.error('Failed to start SpeechRecognition:', err);
+            if (this.isRecording && !this.isPaused) {
+                this.restartRecognitionSafely();
+            }
         }
+    }
+
+    appendFinalText(phrase) {
+        if (!phrase) return;
+        let base = (v2tPreviewTextarea ? v2tPreviewTextarea.value : this.finalTranscript).trim();
+        if (!base) {
+            this.finalTranscript = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+        } else {
+            if (!base.toLowerCase().endsWith(phrase.toLowerCase())) {
+                this.finalTranscript = base + ' ' + phrase;
+            } else {
+                this.finalTranscript = base;
+            }
+        }
+        this.interimTranscript = '';
+        this.updatePreviewText();
     }
 
     updatePreviewText() {
         if (!v2tPreviewTextarea) return;
-        const total = (this.finalTranscript + (this.interimTranscript ? this.interimTranscript : '')).trim();
-        v2tPreviewTextarea.value = total;
+        let text = this.finalTranscript ? this.finalTranscript.trim() : '';
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+            text = (text ? (text + ' ') : '') + this.interimTranscript.trim();
+        }
+        v2tPreviewTextarea.value = text;
         v2tPreviewTextarea.scrollTop = v2tPreviewTextarea.scrollHeight;
     }
 
+    restartRecognitionSafely() {
+        if (this.restartTimeout) clearTimeout(this.restartTimeout);
+        this.restartTimeout = setTimeout(() => {
+            if (this.isRecording && !this.isPaused) {
+                try {
+                    if (this.recognition) {
+                        this.recognition.start();
+                    } else {
+                        this.startSpeechRecognition();
+                    }
+                } catch (err) {
+                    if (err.name !== 'InvalidStateError') {
+                        this.startSpeechRecognition();
+                    }
+                }
+            }
+        }, 50);
+    }
+
     restartRecognition() {
+        if (this.restartTimeout) clearTimeout(this.restartTimeout);
         if (this.recognition) {
             try { this.recognition.abort(); } catch(e){}
+            this.recognition = null;
         }
         if (this.isRecording && !this.isPaused) {
             this.startSpeechRecognition();
@@ -2630,6 +2720,10 @@ class VoiceToTextEngine {
 
     pause() {
         this.isPaused = true;
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+            this.appendFinalText(this.interimTranscript.trim());
+            this.interimTranscript = '';
+        }
         if (this.recognition) {
             try { this.recognition.stop(); } catch(e){}
         }
@@ -2654,6 +2748,10 @@ class VoiceToTextEngine {
     }
 
     stopAndKeepPreview() {
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+            this.appendFinalText(this.interimTranscript.trim());
+            this.interimTranscript = '';
+        }
         this.cleanupRecording();
         if (v2tStatusText) v2tStatusText.textContent = 'Finished • Edit or Send';
         if (v2tToggleText) v2tToggleText.textContent = 'Record Again';
@@ -2673,6 +2771,10 @@ class VoiceToTextEngine {
     }
 
     send() {
+        if (this.interimTranscript && this.interimTranscript.trim()) {
+            this.appendFinalText(this.interimTranscript.trim());
+            this.interimTranscript = '';
+        }
         const text = (v2tPreviewTextarea ? v2tPreviewTextarea.value : this.finalTranscript).trim();
         if (!text) {
             alert('Please speak or type a message before sending.');
@@ -2697,6 +2799,7 @@ class VoiceToTextEngine {
         this.isRecording = false;
         this.isPaused = false;
         if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+        if (this.restartTimeout) { clearTimeout(this.restartTimeout); this.restartTimeout = null; }
         if (this.recognition) {
             try { this.recognition.abort(); } catch(e){}
             this.recognition = null;
