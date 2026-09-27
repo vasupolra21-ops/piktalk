@@ -5379,14 +5379,51 @@ const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.4
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
-// ── Load face-api.js neural network models (with auto-retry and WebGL shader pre-warming) ──
+// ── Lazy on-demand loader for face-api.js neural network library ──
+let _faceApiScriptLoading = null;
+async function ensureFaceApiLoaded() {
+    if (typeof faceapi !== 'undefined' && faceapi.nets) return true;
+    if (_faceApiScriptLoading) return _faceApiScriptLoading;
+
+    _faceApiScriptLoading = new Promise((resolve) => {
+        const existing = document.querySelector('script[src*="face-api"]');
+        if (existing) {
+            if (typeof faceapi !== 'undefined' && faceapi.nets) {
+                resolve(true);
+                return;
+            }
+            existing.addEventListener('load', () => resolve(true), { once: true });
+            existing.addEventListener('error', () => resolve(false), { once: true });
+            return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+        s.async = true;
+        s.onload = () => resolve(true);
+        s.onerror = (err) => {
+            console.warn('[FaceID] Script load failed:', err);
+            _faceApiScriptLoading = null;
+            resolve(false);
+        };
+        document.head.appendChild(s);
+    });
+
+    return _faceApiScriptLoading;
+}
+
+// ── Load face-api.js neural network models on demand ──
 async function loadFaceModels() {
     if (faceModelsLoaded || faceModelsLoading) return;
-    if (typeof faceapi === 'undefined' || !faceapi.nets) {
-        setTimeout(loadFaceModels, 80);
-        return;
-    }
     faceModelsLoading = true;
+
+    if (typeof faceapi === 'undefined' || !faceapi.nets) {
+        const ok = await ensureFaceApiLoaded();
+        if (!ok || typeof faceapi === 'undefined' || !faceapi.nets) {
+            faceModelsLoading = false;
+            setTimeout(loadFaceModels, 1500);
+            return;
+        }
+    }
 
     // Enable high-speed FP16 textures on Apple Silicon / mobile GPUs for 2x faster inference
     if (faceapi.tf && typeof faceapi.tf.env === 'function') {
@@ -5417,9 +5454,9 @@ async function loadFaceModels() {
             } catch(w) {}
         }, 100);
     } catch (e) {
-        console.warn('[FaceID] Model load error, retrying in 1s:', e);
+        console.warn('[FaceID] Model load error, retrying in 1.5s:', e);
         faceModelsLoading = false;
-        setTimeout(loadFaceModels, 1000);
+        setTimeout(loadFaceModels, 1500);
         return;
     }
     faceModelsLoading = false;
@@ -6751,9 +6788,6 @@ function saveSettingsNickname() {
         updateSettingsUI();
     }
 }
-
-// Pre-load AI models immediately on script execution
-loadFaceModels();
 
 // ═══════════════════════════════════════════════════════════════
 // FACE ID VERIFICATION BYPASS (Phone Modal Disabled)
