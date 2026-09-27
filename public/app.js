@@ -5868,10 +5868,12 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Scan progress: ultra-fast instant recognition
+        // Scan progress:
+        // - Re-scan / Settings: smooth ~1.8s progress (+1.8% per frame) so user has time to set their face properly
+        // - Login scan: ultra-fast 3-frame recognition (+34% per frame)
         if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += 12.5;
-            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
+            faceScanLivenessProgress += 1.8;
+            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold still, capturing face...';
         } else {
             faceScanLivenessProgress += 34;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
@@ -6147,7 +6149,12 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
 
     if (faceScanStatusEl) {
         faceScanStatusEl.className = 'face-status';
-        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
+        faceScanStatusEl.innerHTML = isReScan 
+            ? '<i class="fas fa-camera"></i> <span class="scan-status-text">Align face in frame...</span>'
+            : '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
+    }
+    if (faceScanDetailEl) {
+        faceScanDetailEl.textContent = isReScan ? 'Look directly at camera & hold still' : 'Hold steady...';
     }
     const initialBar = document.getElementById(isSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
     if (initialBar) initialBar.style.width = '0%';
@@ -6212,8 +6219,8 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.classList.add('ready');
                     }
 
-                    // Instant settle buffer (60ms)
-                    const WARMUP_MS = 60;
+                    // Buffer: give user 600ms on re-scan to position their face comfortably, 60ms on normal login
+                    const WARMUP_MS = faceScanIsReScan ? 600 : (faceScanIsSettings ? 400 : 60);
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
                     faceScanTimerId = setTimeout(() => {
                         if (!faceScanActive) return;
@@ -6226,7 +6233,9 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                                 faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
                             }
                         }
-                        if (faceScanDetailEl && !faceScanIsSettings) faceScanDetailEl.textContent = 'Hold steady...';
+                        if (faceScanDetailEl && !faceScanIsSettings) {
+                            faceScanDetailEl.textContent = faceScanIsReScan ? 'Hold still, capturing face...' : 'Hold steady...';
+                        }
                         if (faceScanTimerId) clearTimeout(faceScanTimerId);
                         faceScanTimerId = setTimeout(runFaceScanLoop, 20);
                     }, WARMUP_MS);
