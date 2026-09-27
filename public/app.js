@@ -1718,10 +1718,37 @@ function setupEventListeners() {
     if (homeThemeToggle) addFastClickListener(homeThemeToggle, toggleTheme);
     
     // ── Scan button: navigate back to biometric face scan ──
-    function triggerFaceReScan() {
+    let _lastReScanTap = 0;
+    function triggerFaceReScan(e) {
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
+        const now = Date.now();
+        if (now - _lastReScanTap < 400) return; // Debounce rapid double-taps
+        _lastReScanTap = now;
+
         if (profileSetupSection) profileSetupSection.classList.add('hidden');
         if (faceScanSection) faceScanSection.classList.remove('hidden');
-        setTimeout(() => startFaceScanFlow(false, true), 150);
+
+        // Immediately reset scan circle UI
+        if (faceVideo) {
+            const scanner = faceVideo.closest('.circular-scanner');
+            if (scanner) {
+                scanner.className = 'circular-scanner scanning';
+                scanner.style.borderColor = '';
+            }
+        }
+        if (faceStatus) {
+            faceStatus.className = 'face-status';
+            faceStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
+        }
+        const bar = document.getElementById('scan-progress-bar');
+        if (bar) bar.style.width = '0%';
+        const faceNotFoundEl = document.getElementById('face-not-found');
+        if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+
+        startFaceScanFlow(false, true);
     }
     const avatarScanBtn = document.getElementById('avatar-scan-btn');
     if (avatarScanBtn) {
@@ -6112,6 +6139,7 @@ function enforceCameraZoom(stream) {
 
 // Open camera stream and kick off scan loops
 function startFaceScanFlow(isSettings = false, isReScan = false) {
+    stopFaceScanFlow();
     loadFaceModels();
     faceScanIsSettings = isSettings;
     faceScanIsReScan   = isReScan;
@@ -6177,6 +6205,13 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
 
     getCamStream()
         .then(stream => {
+            if (!faceScanActive) {
+                // If scan was cancelled while requesting camera, immediately stop tracks
+                try {
+                    stream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+                } catch(e) {}
+                return;
+            }
             faceScanStream = stream;
             enforceCameraZoom(stream);
 
@@ -6266,13 +6301,15 @@ function stopFaceScanFlow() {
     if (faceScanTimerId) { clearTimeout(faceScanTimerId); faceScanTimerId = null; }
     if (faceScanAnimationId) { cancelAnimationFrame(faceScanAnimationId); faceScanAnimationId = null; }
     if (faceScanStream) {
-        faceScanStream.getTracks().forEach(t => t.stop());
+        try {
+            faceScanStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+        } catch(e) {}
         faceScanStream = null;
     }
     if (faceScanVideoEl) {
         try { faceScanVideoEl.pause(); } catch(e) {}
         faceScanVideoEl.classList.remove('ready');
-        faceScanVideoEl.srcObject = null;
+        try { faceScanVideoEl.srcObject = null; } catch(e) {}
     }
     const scanner = faceScanVideoEl ? faceScanVideoEl.closest('.circular-scanner') : null;
     if (scanner) scanner.classList.remove('has-video');
