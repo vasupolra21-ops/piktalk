@@ -1440,6 +1440,7 @@ function setupEventListeners() {
     // Host room creation modal triggers with 0ms fast tap
     if (createRoomBtn) {
         addFastClickListener(createRoomBtn, () => {
+            loadFaceModels();
             const randomID = Math.random().toString(36).substring(2, 9);
             if (createRoomIdInput) createRoomIdInput.value = randomID;
             if (createRoomPasswordInput) createRoomPasswordInput.value = '';
@@ -1460,6 +1461,7 @@ function setupEventListeners() {
 
     if (confirmCreateRoomBtn) {
         addFastClickListener(confirmCreateRoomBtn, () => {
+            loadFaceModels();
             let roomID = createRoomIdInput.value.trim();
             if (!roomID) {
                 roomID = Math.random().toString(36).substring(2, 9);
@@ -1499,6 +1501,7 @@ function setupEventListeners() {
     // Enter Room ID on home screen with fast tap
     if (joinRoomBtn) {
         addFastClickListener(joinRoomBtn, () => {
+            loadFaceModels();
             const roomID = joinRoomInput.value.trim();
             if (roomID) {
                 ensureSocketLive();
@@ -6100,16 +6103,7 @@ function enforceCameraZoom(stream) {
     };
 
     applyZoomConstraint();
-    [50, 150, 300, 600, 1000, 1500, 2500].forEach(delay => setTimeout(applyZoomConstraint, delay));
-
-    if (_zoomLockInterval) clearInterval(_zoomLockInterval);
-    _zoomLockInterval = setInterval(() => {
-        if (!faceScanActive || !track || track.readyState !== 'live') {
-            if (_zoomLockInterval) { clearInterval(_zoomLockInterval); _zoomLockInterval = null; }
-            return;
-        }
-        applyZoomConstraint();
-    }, 400);
+    setTimeout(applyZoomConstraint, 150);
 
     try {
         track.onunmute = () => applyZoomConstraint();
@@ -6169,17 +6163,15 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
+    // 640×480 opens ~3× faster than 1280×720 on mobile — ideal for instant face detection
     const videoConstraints = {
         facingMode: 'user',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-        aspectRatio: { ideal: 1.7777777778 }
+        width: { ideal: 640 },
+        height: { ideal: 480 }
     };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } }))
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 }, aspectRatio: { ideal: 1.7777777778 } } }))
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
@@ -6220,23 +6212,11 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.classList.add('ready');
                     }
 
-                    // Show stabilizing message while camera hardware settles (iOS auto-zoom fix)
-                    if (faceScanStatusEl) {
-                        faceScanStatusEl.className = 'face-status';
-                        faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Stabilizing camera...</span>';
-                    }
-                    if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold phone at arm\'s length';
-
-                    // Start overlay animation immediately
-                    if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
-                    faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
-
-                    // Wait 2000ms for iOS camera hardware to settle to wide angle BEFORE starting face detection
-                    const WARMUP_MS = 2000;
+                    // Settle buffer (200ms instead of old 2000ms lag)
+                    const WARMUP_MS = 200;
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
                     faceScanTimerId = setTimeout(() => {
                         if (!faceScanActive) return;
-                        // Update status to scanning after warmup
                         if (faceScanStatusEl) {
                             faceScanStatusEl.className = 'face-status';
                             let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
@@ -6248,8 +6228,12 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         }
                         if (faceScanDetailEl && !faceScanIsSettings) faceScanDetailEl.textContent = 'Hold steady...';
                         if (faceScanTimerId) clearTimeout(faceScanTimerId);
-                        faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+                        faceScanTimerId = setTimeout(runFaceScanLoop, 20);
                     }, WARMUP_MS);
+
+                    // Start overlay animation immediately
+                    if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
+                    faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
                 };
 
                 // Trigger play immediately and start detection loops
@@ -7173,4 +7157,24 @@ document.addEventListener('DOMContentLoaded', () => {
     _initSettingsEnhancements();
 });
 
-
+// Idle background preload of face AI models
+(function _idleFacePreload() {
+    const doPreload = () => {
+        if (typeof loadFaceModels === 'function') loadFaceModels();
+    };
+    if (document.readyState === 'complete') {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(doPreload, { timeout: 5000 });
+        } else {
+            setTimeout(doPreload, 2000);
+        }
+    } else {
+        window.addEventListener('load', () => {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(doPreload, { timeout: 5000 });
+            } else {
+                setTimeout(doPreload, 2000);
+            }
+        }, { once: true });
+    }
+})();
