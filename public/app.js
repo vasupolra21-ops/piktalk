@@ -2583,25 +2583,51 @@ class VoiceToTextEngine {
             return;
         }
 
+        // Always cleanly tear down the old instance before creating a new one
+        if (this.recognition) {
+            this.recognition.onstart = null;
+            this.recognition.onresult = null;
+            this.recognition.onerror = null;
+            this.recognition.onend = null;
+            this.recognition.onsoundstart = null;
+            this.recognition.onsoundend = null;
+            try { this.recognition.abort(); } catch(e){}
+            this.recognition = null;
+        }
+
+        if (!this.isRecording || this.isPaused) return;
+
         try {
-            if (this.recognition) {
-                try { this.recognition.abort(); } catch(e){}
-                this.recognition = null;
-            }
+            const rec = new SpeechRec();
+            this.recognition = rec;
 
-            this.recognition = new SpeechRec();
-            this.recognition.continuous = true;
-            this.recognition.interimResults = true;
-            this.recognition.maxAlternatives = 3;
-            this.recognition.lang = this.getEffectiveLang();
+            rec.continuous = true;
+            rec.interimResults = true;
+            rec.maxAlternatives = 1;
+            rec.lang = this.getEffectiveLang();
 
-            this.recognition.onstart = () => {
-                if (this.isRecording && !this.isPaused) {
-                    if (v2tStatusText) v2tStatusText.textContent = 'Listening...';
+            rec.onstart = () => {
+                if (v2tStatusText && this.isRecording && !this.isPaused) {
+                    v2tStatusText.textContent = 'Listening...';
                 }
             };
 
-            this.recognition.onresult = (event) => {
+            rec.onsoundstart = () => {
+                if (v2tStatusText && this.isRecording && !this.isPaused) {
+                    v2tStatusText.textContent = 'Hearing you...';
+                }
+            };
+
+            rec.onsoundend = () => {
+                if (v2tStatusText && this.isRecording && !this.isPaused) {
+                    v2tStatusText.textContent = 'Listening...';
+                }
+            };
+
+            rec.onresult = (event) => {
+                // Clear any pending silence-gap flush timer
+                if (this._silenceTimer) { clearTimeout(this._silenceTimer); this._silenceTimer = null; }
+
                 let interim = '';
                 for (let i = event.resultIndex; i < event.results.length; i++) {
                     const res = event.results[i];
@@ -2609,22 +2635,32 @@ class VoiceToTextEngine {
                     const transcript = res[0].transcript;
                     if (res.isFinal) {
                         const cleaned = transcript.trim();
-                        if (cleaned) {
-                            this.appendFinalText(cleaned);
-                        }
+                        if (cleaned) this.appendFinalText(cleaned);
                     } else {
                         interim += transcript;
                     }
                 }
                 this.interimTranscript = interim;
                 this.updatePreviewText();
-                if (interim.trim() && v2tStatusText && this.isRecording && !this.isPaused) {
-                    v2tStatusText.textContent = 'Hearing you...';
+
+                // If interim text stalls for 2.5 s with no final event, rescue it as final
+                if (interim.trim()) {
+                    this._silenceTimer = setTimeout(() => {
+                        if (this.interimTranscript && this.interimTranscript.trim()) {
+                            this.appendFinalText(this.interimTranscript.trim());
+                            this.interimTranscript = '';
+                        }
+                    }, 2500);
                 }
             };
 
-            this.recognition.onerror = (event) => {
+            rec.onerror = (event) => {
                 if (event.error === 'no-speech') {
+                    // Flush interim on silence gap — onend will restart
+                    if (this.interimTranscript && this.interimTranscript.trim()) {
+                        this.appendFinalText(this.interimTranscript.trim());
+                        this.interimTranscript = '';
+                    }
                     if (v2tStatusText && this.isRecording && !this.isPaused) {
                         v2tStatusText.textContent = 'Listening...';
                     }
@@ -2635,43 +2671,58 @@ class VoiceToTextEngine {
                     this.cancel();
                     return;
                 }
+                if (event.error === 'aborted') return; // intentional abort
                 console.warn('Speech recognition notice:', event.error);
-                if (this.isRecording && !this.isPaused) {
-                    this.restartRecognitionSafely();
-                }
+                // onend will handle restart
             };
 
-            this.recognition.onend = () => {
-                // Commit any lingering interim text so not a single spoken word is lost
+            rec.onend = () => {
+                // Guard: ignore if this is a stale instance
+                if (rec !== this.recognition) return;
+
+                // Flush any lingering interim so no spoken word is ever lost
                 if (this.interimTranscript && this.interimTranscript.trim()) {
                     this.appendFinalText(this.interimTranscript.trim());
                     this.interimTranscript = '';
                 }
-                // Auto-restart immediately if recording
+
+                // Restart with a small delay to avoid InvalidStateError rapid loops
                 if (this.isRecording && !this.isPaused) {
-                    this.restartRecognitionSafely();
+                    if (this.restartTimeout) clearTimeout(this.restartTimeout);
+                    this.restartTimeout = setTimeout(() => {
+                        if (this.isRecording && !this.isPaused) {
+                            this.startSpeechRecognition();
+                        }
+                    }, 80);
                 }
             };
 
-            this.recognition.start();
+            rec.start();
         } catch(err) {
             console.error('Failed to start SpeechRecognition:', err);
             if (this.isRecording && !this.isPaused) {
-                this.restartRecognitionSafely();
+                if (this.restartTimeout) clearTimeout(this.restartTimeout);
+                this.restartTimeout = setTimeout(() => this.startSpeechRecognition(), 300);
             }
         }
     }
 
     appendFinalText(phrase) {
         if (!phrase) return;
-        let base = (v2tPreviewTextarea ? v2tPreviewTextarea.value : this.finalTranscript).trim();
+        const trimmed = phrase.trim();
+        if (!trimmed) return;
+        // Read actual textarea value as source of truth (user may have edited it)
+        let base = v2tPreviewTextarea ? v2tPreviewTextarea.value.trim() : this.finalTranscript.trim();
         if (!base) {
-            this.finalTranscript = phrase.charAt(0).toUpperCase() + phrase.slice(1);
+            // Capitalize first letter only
+            this.finalTranscript = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
         } else {
-            if (!base.toLowerCase().endsWith(phrase.toLowerCase())) {
-                this.finalTranscript = base + ' ' + phrase;
+            // Only skip if EXACTLY the same phrase was just appended (prevents duplicate on rapid restart)
+            const lastChunk = base.split(' ').slice(-trimmed.split(' ').length).join(' ');
+            if (lastChunk.toLowerCase() === trimmed.toLowerCase()) {
+                this.finalTranscript = base; // skip exact duplicate
             } else {
-                this.finalTranscript = base;
+                this.finalTranscript = base + ' ' + trimmed;
             }
         }
         this.interimTranscript = '';
@@ -2800,7 +2851,14 @@ class VoiceToTextEngine {
         this.isPaused = false;
         if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
         if (this.restartTimeout) { clearTimeout(this.restartTimeout); this.restartTimeout = null; }
+        if (this._silenceTimer) { clearTimeout(this._silenceTimer); this._silenceTimer = null; }
         if (this.recognition) {
+            this.recognition.onstart = null;
+            this.recognition.onresult = null;
+            this.recognition.onerror = null;
+            this.recognition.onend = null;
+            this.recognition.onsoundstart = null;
+            this.recognition.onsoundend = null;
             try { this.recognition.abort(); } catch(e){}
             this.recognition = null;
         }
