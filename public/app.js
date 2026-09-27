@@ -3092,8 +3092,9 @@ if (socket) {
     });
 
     // Real-time reaction update
-    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic, previousEmoji }) => {
-        applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji);
+    socket.on('reaction-toggled', ({ msgId, emoji, socketId, nickname, profilePic, previousEmoji, action }) => {
+        if (socket && socketId === socket.id) return; // sender already applied optimistically
+        applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji, action || 'add');
     });
 
     socket.on('system-message', (data) => {
@@ -4146,7 +4147,7 @@ function getMyReactionOnMsg(msgId) {
 }
 
 // ── Apply reaction locally in memory + update DOM (instant 0ms) ──
-function applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji) {
+function applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, previousEmoji, action = 'toggle') {
     if (!msgId || !emoji) return;
     if (!msgReactions[msgId]) msgReactions[msgId] = {};
 
@@ -4158,11 +4159,20 @@ function applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, prev
 
     if (!msgReactions[msgId][emoji]) msgReactions[msgId][emoji] = new Map();
     const map = msgReactions[msgId][emoji];
-    if (map.has(socketId)) {
+
+    if (action === 'add') {
+        map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
+    } else if (action === 'remove') {
         map.delete(socketId);
     } else {
-        map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
+        // Toggle fallback
+        if (map.has(socketId)) {
+            map.delete(socketId);
+        } else {
+            map.set(socketId, { nickname: nickname || 'Anonymous', profilePic: profilePic || null });
+        }
     }
+
     if (map.size === 0) delete msgReactions[msgId][emoji];
 
     renderReactions(msgId);
@@ -4172,12 +4182,14 @@ function applyReactionLocally(msgId, emoji, socketId, nickname, profilePic, prev
 function triggerReactionOnMsg(targetMsgId, emoji) {
     if (!targetMsgId || !emoji || !socket) return;
     const previousEmoji = getMyReactionOnMsg(targetMsgId);
+    const isRemoving = (previousEmoji === emoji);
+    const action = isRemoving ? 'remove' : 'add';
 
     // 1. Instant 0ms local optimistic UI
-    applyReactionLocally(targetMsgId, emoji, socket.id, myNickname || 'Me', myProfilePic || null, previousEmoji);
+    applyReactionLocally(targetMsgId, emoji, socket.id, myNickname || 'Me', myProfilePic || null, previousEmoji, action);
 
     // 2. Real-time broadcast to room members
-    socket.emit('toggle-reaction', { msgId: targetMsgId, emoji, previousEmoji });
+    socket.emit('toggle-reaction', { msgId: targetMsgId, emoji, previousEmoji, action });
 
     // 3. Smooth focus & auto-scroll to ensure reacted message stays nicely in view
     if (messagesContainer) {

@@ -436,18 +436,19 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Real-time emoji reactions — relay to whole room
-    socket.on('toggle-reaction', ({ msgId, emoji, previousEmoji }) => {
+    // Real-time emoji reactions — relay to room members
+    socket.on('toggle-reaction', ({ msgId, emoji, previousEmoji, action }) => {
         const user = users[socket.id];
         if (user && msgId && emoji && user.roomID) {
             const cleanRoomID = String(user.roomID).trim();
-            io.to(cleanRoomID).emit('reaction-toggled', {
+            socket.to(cleanRoomID).emit('reaction-toggled', {
                 msgId,
                 emoji,
                 socketId: socket.id,
                 nickname: user.nickname,
                 profilePic: user.profilePic || null,
-                previousEmoji: previousEmoji || null
+                previousEmoji: previousEmoji || null,
+                action: action || 'toggle'
             });
         }
     });
