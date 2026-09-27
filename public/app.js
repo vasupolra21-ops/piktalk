@@ -2730,57 +2730,101 @@ class VoiceToTextEngine {
             const source = this.audioContext.createMediaStreamSource(stream);
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 64;
+            this.analyser.smoothingTimeConstant = 0.8;
             source.connect(this.analyser);
 
             const bufferLength = this.analyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
 
+            const barCount = 30;
+            const smoothedHeights = new Float32Array(barCount).fill(4);
+            let phase = 0;
+
             const draw = () => {
                 if (!this.isRecording) return;
                 this.animFrameId = requestAnimationFrame(draw);
 
+                const width = canvas.width = canvas.offsetWidth || 280;
+                const height = canvas.height = canvas.offsetHeight || 38;
+
+                ctx.clearRect(0, 0, width, height);
+
                 if (this.isPaused) {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
                     return;
                 }
 
                 this.analyser.getByteFrequencyData(dataArray);
 
-                const width = canvas.width = canvas.offsetWidth || 280;
-                const height = canvas.height = canvas.offsetHeight || 34;
+                // Calculate average audio level
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const avgVolume = sum / bufferLength;
+                const normalizedVol = Math.min(1, avgVolume / 140);
 
-                ctx.clearRect(0, 0, width, height);
+                phase += 0.07;
 
-                const barCount = 28;
-                const barSpacing = 3;
-                const barWidth = Math.max(2, (width - (barCount - 1) * barSpacing) / barCount);
                 const isLight = document.body.classList.contains('light-mode');
+                const barSpacing = 3;
+                const totalSpacing = (barCount - 1) * barSpacing;
+                const barWidth = Math.max(3, (width - totalSpacing - 16) / barCount);
+                const startX = (width - (barCount * barWidth + totalSpacing)) / 2;
+
+                // Create sleek linear gradient across the waveform
+                const grad = ctx.createLinearGradient(0, 0, width, 0);
+                if (isLight) {
+                    grad.addColorStop(0, '#6366f1');
+                    grad.addColorStop(0.5, '#a855f7');
+                    grad.addColorStop(1, '#ec4899');
+                } else {
+                    grad.addColorStop(0, '#818cf8');
+                    grad.addColorStop(0.5, '#c084fc');
+                    grad.addColorStop(1, '#f43f5e');
+                }
+
+                ctx.save();
+                ctx.fillStyle = grad;
+                ctx.shadowColor = isLight ? 'rgba(99, 102, 241, 0.35)' : 'rgba(168, 85, 247, 0.45)';
+                ctx.shadowBlur = 6;
 
                 for (let i = 0; i < barCount; i++) {
-                    const dataIdx = Math.floor(i * (bufferLength / barCount));
-                    const val = dataArray[dataIdx] || 0;
-                    const percent = Math.max(0.12, val / 255);
-                    const barHeight = Math.max(3, height * percent * 0.9);
-                    const x = i * (barWidth + barSpacing);
-                    const y = (height - barHeight) / 2;
+                    // Audio frequency value mapped to bar
+                    const freqIdx = Math.floor(Math.abs(i - barCount / 2) / (barCount / 2) * (bufferLength - 1));
+                    const freqVal = (dataArray[freqIdx] || 0) / 255;
 
-                    const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
-                    if (isLight) {
-                        gradient.addColorStop(0, '#6366f1');
-                        gradient.addColorStop(1, '#ec4899');
-                    } else {
-                        gradient.addColorStop(0, '#818cf8');
-                        gradient.addColorStop(1, '#f43f5e');
-                    }
-                    ctx.fillStyle = gradient;
+                    // Bell-curve weighting so center bars are naturally more expressive
+                    const bell = Math.sin((i / (barCount - 1)) * Math.PI);
+                    const envelope = 0.45 + 0.55 * bell;
+
+                    // Idle ambient harmonic wave (gentle pulsing wave when quiet)
+                    const idleWave = Math.sin(phase + i * 0.3) * 0.5 + Math.cos(phase * 0.8 + i * 0.2) * 0.3;
+                    const idleHeight = (4 + idleWave * 3) * (0.6 + 0.4 * bell);
+
+                    // Dynamic active height from microphone input
+                    const activeHeight = (freqVal * 0.7 + normalizedVol * 0.3) * (height * 0.82) * envelope;
+
+                    // Target height combines idle baseline + active voice energy
+                    const targetHeight = Math.max(4, Math.min(height * 0.88, idleHeight + activeHeight));
+
+                    // Smooth transition (lerp)
+                    smoothedHeights[i] += (targetHeight - smoothedHeights[i]) * 0.22;
+
+                    const bHeight = smoothedHeights[i];
+                    const x = startX + i * (barWidth + barSpacing);
+                    const y = (height - bHeight) / 2;
+                    const radius = barWidth / 2;
+
                     ctx.beginPath();
                     if (ctx.roundRect) {
-                        ctx.roundRect(x, y, barWidth, barHeight, 2);
+                        ctx.roundRect(x, y, barWidth, bHeight, radius);
                     } else {
-                        ctx.rect(x, y, barWidth, barHeight);
+                        ctx.rect(x, y, barWidth, bHeight);
                     }
                     ctx.fill();
                 }
+
+                ctx.restore();
             };
             draw();
         } catch(e) {
