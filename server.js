@@ -129,6 +129,46 @@ app.post('/api/send-otp', async (req, res) => {
     }
 });
 
+// POST endpoint to translate text between languages (multilingual support)
+app.post('/api/translate', async (req, res) => {
+    const { text, targetLang, sourceLang } = req.body;
+    if (!text || !targetLang) {
+        return res.status(400).json({ error: 'Missing text or targetLang' });
+    }
+
+    try {
+        const src = (!sourceLang || sourceLang === 'auto') ? 'autodetect' : sourceLang;
+        const tgt = targetLang;
+        const langPair = `${src}|${tgt}`;
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(String(text).substring(0, 1000))}&langpair=${encodeURIComponent(langPair)}`;
+
+        https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } }, (apiRes) => {
+            let data = '';
+            apiRes.on('data', chunk => data += chunk);
+            apiRes.on('end', () => {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed && parsed.responseData && parsed.responseData.translatedText) {
+                        return res.json({
+                            success: true,
+                            translatedText: parsed.responseData.translatedText,
+                            targetLang: tgt,
+                            sourceLang: src
+                        });
+                    }
+                    return res.status(500).json({ error: 'Translation response invalid' });
+                } catch(e) {
+                    return res.status(500).json({ error: e.message });
+                }
+            });
+        }).on('error', (e) => {
+            res.status(500).json({ error: e.message });
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Serve static files with robust caching headers
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '7d',   // Cache CSS/JS/images for 7 days (versioned via ?v=N)

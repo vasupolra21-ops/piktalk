@@ -162,7 +162,8 @@ function addFastClickListener(element, handler) {
 
 // DOM Elements
 let homeView, chatView, createRoomBtn, nicknameModal, nicknameInput, joinChatBtn, roomDisplayId, onlineStatus, messagesContainer, messageInput, sendBtn, inviteBtn, shareSection, roomLinkInput, copyBtn, leaveBtn, msgSound, emojiBtn, themeToggle, homeThemeToggle, attachBtn, imgInput, joinRoomInput, joinRoomBtn, emojiPicker, profilePicInput, avatarPreviewContainer, avatarPreviewImg, avatarPreviewIcon;
-let micBtn, voiceRecordingBar, cancelRecordingBtn, recordingTimerEl, audioPreviewBar, discardAudioBtn, playPreviewBtn, audioProgressBar, audioPreviewDuration, sendAudioBtn;
+let v2tMicBtn, v2tPanel, v2tStatusText, v2tTimer, v2tLangSelect, v2tWaveformCanvas, v2tPreviewTextarea, v2tCancelBtn, v2tToggleRecBtn, v2tToggleText, v2tSendBtn;
+let voiceToTextEngine;
 let attachMenu, attachDocInput, attachCameraInput, attachGalleryInput, attachPollBtn, attachLocationBtn, attachAudioInput;
 let pollModal, closePollBtn, pollQuestionInput, pollOptionsList, pollAddOptionBtn, pollMultipleToggle, pollSubmitBtn, pollError;
 const _pollData = {};
@@ -188,6 +189,15 @@ let replyBarEl = null;     // the reply preview bar DOM element
 let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
+
+function safeCssEscape(str) {
+    if (!str) return '';
+    if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(str);
+    }
+    return String(str).replace(/["'\\]/g, '\\$&');
+}
+
 // Multi-message optimistic deduplication tracking Set
 const _sentOptimisticMsgIds = new Set();
 function markOptimisticMsg(msgId) {
@@ -266,16 +276,19 @@ function initDOMElements() {
     avatarPreviewContainer = document.getElementById('avatar-preview-container');
     avatarPreviewImg = document.getElementById('avatar-preview-img');
     avatarPreviewIcon = avatarPreviewContainer ? avatarPreviewContainer.querySelector('i') : null;
-    micBtn = document.getElementById('mic-btn');
-    voiceRecordingBar = document.getElementById('voice-recording-bar');
-    cancelRecordingBtn = document.getElementById('cancel-recording-btn');
-    recordingTimerEl = document.getElementById('recording-timer');
-    audioPreviewBar = document.getElementById('audio-preview-bar');
-    discardAudioBtn = document.getElementById('discard-audio-btn');
-    playPreviewBtn = document.getElementById('play-preview-btn');
-    audioProgressBar = document.getElementById('audio-progress-bar');
-    audioPreviewDuration = document.getElementById('audio-preview-duration');
-    sendAudioBtn = document.getElementById('send-audio-btn');
+
+    // Multilingual Voice-to-Text Elements
+    v2tMicBtn = document.getElementById('v2t-mic-btn');
+    v2tPanel = document.getElementById('v2t-recording-panel');
+    v2tStatusText = document.getElementById('v2t-status-text');
+    v2tTimer = document.getElementById('v2t-timer');
+    v2tLangSelect = document.getElementById('v2t-lang-select');
+    v2tWaveformCanvas = document.getElementById('v2t-waveform-canvas');
+    v2tPreviewTextarea = document.getElementById('v2t-preview-textarea');
+    v2tCancelBtn = document.getElementById('v2t-cancel-btn');
+    v2tToggleRecBtn = document.getElementById('v2t-toggle-rec-btn');
+    v2tToggleText = document.getElementById('v2t-toggle-text');
+    v2tSendBtn = document.getElementById('v2t-send-btn');
 
     // AI smart reply element initializations
     aiBtn = document.getElementById('ai-btn');
@@ -2370,33 +2383,9 @@ function setupEventListeners() {
         });
     }
 
-    // ── Voice message listeners ──
-    if (micBtn) {
-        // Desktop: mousedown / mouseup
-        micBtn.addEventListener('mousedown', startRecording);
-        micBtn.addEventListener('mouseup',   stopRecording);
-        micBtn.addEventListener('mouseleave', () => { if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording(); });
-
-        // Mobile: touchstart / touchend
-        micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, { passive: false });
-        micBtn.addEventListener('touchend',   (e) => { e.preventDefault(); stopRecording(); },  { passive: false });
-    }
-
-    // Voice bar buttons: prevent focus steal so keyboard stays open
-    const noFocusSteal = (btn, handler) => {
-        if (!btn) return;
-        btn.addEventListener('mousedown', (e) => e.preventDefault());
-        btn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (handler) handler();
-        }, { passive: false });
-        btn.addEventListener('click', (e) => { if (handler) handler(); });
-    };
-
-    noFocusSteal(cancelRecordingBtn, cancelRecording);
-    noFocusSteal(discardAudioBtn,    discardPreview);
-    noFocusSteal(playPreviewBtn,     togglePreviewPlayback);
-    noFocusSteal(sendAudioBtn,       sendVoiceMessage);
+    // ── Multilingual Voice-to-Text Engine Initialization ──
+    voiceToTextEngine = new VoiceToTextEngine();
+    voiceToTextEngine.init();
 
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
     document.addEventListener('click', (e) => {
@@ -2415,7 +2404,7 @@ function setupEventListeners() {
     }
 }
 
-// ── Voice Recording Functions ──
+// ── Modern Multilingual Voice-to-Text Engine ──
 
 function formatSeconds(s) {
     const m = Math.floor(s / 60);
@@ -2423,158 +2412,381 @@ function formatSeconds(s) {
     return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
-function startRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') return;
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Your browser does not support voice recording.');
-        return;
+class VoiceToTextEngine {
+    constructor() {
+        this.recognition = null;
+        this.isRecording = false;
+        this.isPaused = false;
+        this.mediaStream = null;
+        this.audioContext = null;
+        this.analyser = null;
+        this.animFrameId = null;
+        this.timerInterval = null;
+        this.seconds = 0;
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+        this.selectedLang = localStorage.getItem('piktalk_v2t_lang') || 'auto';
+        this.hasWebSpeech = (typeof window !== 'undefined') && (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window));
     }
 
-    // Immediately activate UI & notify room (0ms latency)
-    if (micBtn) micBtn.classList.add('recording');
-    if (voiceRecordingBar) voiceRecordingBar.classList.remove('hidden');
-    if (socket && currentRoomID) {
-        const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
-        socket.emit('voice-recording-start', {
-            roomID: currentRoomID,
-            nickname: currentName,
-            profilePic: myProfilePic || null
-        });
+    init() {
+        if (v2tLangSelect) {
+            v2tLangSelect.value = this.selectedLang;
+            v2tLangSelect.addEventListener('change', (e) => {
+                this.selectedLang = e.target.value;
+                localStorage.setItem('piktalk_v2t_lang', this.selectedLang);
+                if (this.isRecording) {
+                    this.restartRecognition();
+                }
+            });
+        }
+
+        if (v2tMicBtn) {
+            addFastClickListener(v2tMicBtn, () => {
+                if (this.isRecording) {
+                    this.stopAndKeepPreview();
+                } else {
+                    this.start();
+                }
+            });
+        }
+
+        if (v2tCancelBtn) {
+            addFastClickListener(v2tCancelBtn, () => {
+                this.cancel();
+            });
+        }
+
+        if (v2tToggleRecBtn) {
+            addFastClickListener(v2tToggleRecBtn, () => {
+                if (this.isRecording && !this.isPaused) {
+                    this.pause();
+                } else if (this.isPaused) {
+                    this.resume();
+                } else {
+                    this.start();
+                }
+            });
+        }
+
+        if (v2tSendBtn) {
+            addFastClickListener(v2tSendBtn, () => {
+                this.send();
+            });
+        }
+
+        if (v2tPreviewTextarea) {
+            v2tPreviewTextarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.send();
+                }
+            });
+        }
     }
 
-    navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-            audioChunks = [];
-            recordingSeconds = 0;
+    getEffectiveLang() {
+        if (this.selectedLang && this.selectedLang !== 'auto') {
+            return this.selectedLang;
+        }
+        return (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
+    }
 
-            const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/ogg',''].find(t => !t || MediaRecorder.isTypeSupported(t));
-            mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    async start() {
+        if (this.isRecording) return;
+        this.isRecording = true;
+        this.isPaused = false;
+        this.seconds = 0;
+        this.finalTranscript = (v2tPreviewTextarea && v2tPreviewTextarea.value.trim()) ? (v2tPreviewTextarea.value.trim() + ' ') : '';
+        this.interimTranscript = '';
 
-            mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-            mediaRecorder.onstop = () => {
-                stream.getTracks().forEach(t => t.stop());
-                const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-                recordedAudioBlob = blob;
-                _precomputedAudioDataUrl = null;
+        // UI state update
+        if (v2tPanel) v2tPanel.classList.remove('hidden');
+        if (v2tMicBtn) v2tMicBtn.classList.add('recording');
+        if (v2tStatusText) v2tStatusText.textContent = 'Listening...';
+        if (v2tToggleText) v2tToggleText.textContent = 'Stop';
+        if (v2tToggleRecBtn) {
+            const icon = v2tToggleRecBtn.querySelector('i');
+            if (icon) icon.className = 'fas fa-stop';
+        }
+        if (v2tTimer) v2tTimer.textContent = '0:00';
 
-                // Pre-convert to base64 immediately using fast native FileReader
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    _precomputedAudioDataUrl = e.target.result;
-                };
-                reader.readAsDataURL(blob);
+        // Notify room via socket (0ms latency typing/voice indicator)
+        if (socket && currentRoomID) {
+            const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+            socket.emit('voice-recording-start', {
+                roomID: currentRoomID,
+                nickname: currentName,
+                profilePic: myProfilePic || null
+            });
+        }
 
-                showAudioPreview(blob, recordingSeconds);
+        // Start timer
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+            if (!this.isPaused) {
+                this.seconds++;
+                if (v2tTimer) v2tTimer.textContent = formatSeconds(this.seconds);
+                if (this.seconds % 2 === 0 && socket && currentRoomID) {
+                    const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+                    socket.emit('voice-recording-start', { roomID: currentRoomID, nickname: currentName, profilePic: myProfilePic || null });
+                }
+                if (this.seconds >= 180) {
+                    this.stopAndKeepPreview();
+                }
+            }
+        }, 1000);
+
+        // Start Audio Visualizer
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                    audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                });
+                this.startVisualizer(this.mediaStream);
+            }
+        } catch (e) {
+            console.warn('Microphone visualizer permission notice:', e);
+        }
+
+        // Start Speech Recognition
+        this.startSpeechRecognition();
+
+        setTimeout(() => {
+            if (v2tPreviewTextarea) v2tPreviewTextarea.focus();
+        }, 100);
+    }
+
+    startSpeechRecognition() {
+        const SpeechRec = (typeof window !== 'undefined') ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+        if (!SpeechRec) {
+            console.warn('Web Speech API not natively supported on this browser.');
+            if (v2tStatusText) v2tStatusText.textContent = 'Speak or type your message';
+            return;
+        }
+
+        try {
+            if (this.recognition) {
+                try { this.recognition.abort(); } catch(e){}
+            }
+
+            this.recognition = new SpeechRec();
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.lang = this.getEffectiveLang();
+
+            this.recognition.onresult = (event) => {
+                let currentInterim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        this.finalTranscript += transcript + ' ';
+                    } else {
+                        currentInterim += transcript;
+                    }
+                }
+                this.interimTranscript = currentInterim;
+                this.updatePreviewText();
             };
 
-            mediaRecorder.start(100);
-
-            if (recordingTimerInterval) clearInterval(recordingTimerInterval);
-            recordingTimerInterval = setInterval(() => {
-                recordingSeconds++;
-                if (recordingTimerEl) recordingTimerEl.textContent = formatSeconds(recordingSeconds);
-                // Heartbeat every 2s
-                if (recordingSeconds % 2 === 0 && socket && currentRoomID) {
-                    const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
-                    socket.emit('voice-recording-start', {
-                        roomID: currentRoomID,
-                        nickname: currentName,
-                        profilePic: myProfilePic || null
-                    });
+            this.recognition.onerror = (event) => {
+                console.warn('Speech recognition notice:', event.error);
+                if (event.error === 'not-allowed') {
+                    alert('Microphone access was not granted. Please allow microphone access in your browser settings.');
+                    this.cancel();
+                } else if (event.error === 'network') {
+                    if (v2tStatusText) v2tStatusText.textContent = 'Network speech error • Type below';
                 }
-                if (recordingSeconds >= 180) stopRecording();
-            }, 1000);
-        })
-        .catch(err => {
-            console.error('Mic permission denied:', err);
-            if (micBtn) micBtn.classList.remove('recording');
-            if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
-            if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
-            alert('Microphone access denied. Please allow microphone access to record voice messages.');
-        });
-}
+            };
 
-function stopRecording() {
-    // Immediately emit stop event and reset UI
-    if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
-    if (micBtn) micBtn.classList.remove('recording');
-    if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
-    if (recordingTimerEl) recordingTimerEl.textContent = '0:00';
-    if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+            this.recognition.onend = () => {
+                // Auto restart if still recording and not manually paused
+                if (this.isRecording && !this.isPaused) {
+                    try { this.recognition.start(); } catch(e){}
+                }
+            };
 
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
+            this.recognition.start();
+        } catch(err) {
+            console.error('Failed to start SpeechRecognition:', err);
+        }
     }
-    setTimeout(() => {
-        if (messageInput && !messageInput.disabled) messageInput.focus();
-    }, 50);
-}
 
-function cancelRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.ondataavailable = null; // discard chunks
-        mediaRecorder.onstop = null;
-        mediaRecorder.stop();
-        if (mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    updatePreviewText() {
+        if (!v2tPreviewTextarea) return;
+        const total = (this.finalTranscript + (this.interimTranscript ? this.interimTranscript : '')).trim();
+        v2tPreviewTextarea.value = total;
+        v2tPreviewTextarea.scrollTop = v2tPreviewTextarea.scrollHeight;
     }
-    clearInterval(recordingTimerInterval);
-    if (micBtn) micBtn.classList.remove('recording');
-    if (voiceRecordingBar) voiceRecordingBar.classList.add('hidden');
-    if (recordingTimerEl) recordingTimerEl.textContent = '0:00';
-    audioChunks = [];
-    recordedAudioBlob = null;
-    if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
-    setTimeout(() => {
-        if (messageInput && !messageInput.disabled) messageInput.focus();
-    }, 50);
-}
 
-function showAudioPreview(blob, durationSec) {
-    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
-    previewAudio = new Audio(URL.createObjectURL(blob));
-    previewAudio.ontimeupdate = () => {
-        const pct = previewAudio.duration ? (previewAudio.currentTime / previewAudio.duration) * 100 : 0;
-        audioProgressBar.style.width = pct + '%';
-        audioPreviewDuration.textContent = formatSeconds(Math.floor(previewAudio.currentTime));
-    };
-    previewAudio.onended = () => {
-        previewPlaying = false;
-        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
-        audioProgressBar.style.width = '0%';
-        audioPreviewDuration.textContent = formatSeconds(durationSec);
-    };
-    audioPreviewDuration.textContent = formatSeconds(durationSec);
-    audioProgressBar.style.width = '0%';
-    audioPreviewBar.classList.remove('hidden');
-}
-
-function togglePreviewPlayback() {
-    if (!previewAudio) return;
-    if (previewPlaying) {
-        previewAudio.pause();
-        previewPlaying = false;
-        playPreviewBtn.innerHTML = '<i class="fas fa-play"></i>';
-    } else {
-        previewAudio.play();
-        previewPlaying = true;
-        playPreviewBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    restartRecognition() {
+        if (this.recognition) {
+            try { this.recognition.abort(); } catch(e){}
+        }
+        if (this.isRecording && !this.isPaused) {
+            this.startSpeechRecognition();
+        }
     }
-    setTimeout(() => {
-        if (messageInput && !messageInput.disabled) messageInput.focus();
-    }, 50);
-}
 
-function discardPreview() {
-    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
-    previewPlaying = false;
-    audioPreviewBar.classList.add('hidden');
-    audioProgressBar.style.width = '0%';
-    recordedAudioBlob = null;
-    _precomputedAudioDataUrl = null;
-    setTimeout(() => {
+    pause() {
+        this.isPaused = true;
+        if (this.recognition) {
+            try { this.recognition.stop(); } catch(e){}
+        }
+        if (v2tStatusText) v2tStatusText.textContent = 'Paused';
+        if (v2tToggleText) v2tToggleText.textContent = 'Resume';
+        if (v2tToggleRecBtn) {
+            const icon = v2tToggleRecBtn.querySelector('i');
+            if (icon) icon.className = 'fas fa-microphone';
+        }
+        if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
+    }
+
+    resume() {
+        this.isPaused = false;
+        if (v2tStatusText) v2tStatusText.textContent = 'Listening...';
+        if (v2tToggleText) v2tToggleText.textContent = 'Stop';
+        if (v2tToggleRecBtn) {
+            const icon = v2tToggleRecBtn.querySelector('i');
+            if (icon) icon.className = 'fas fa-stop';
+        }
+        this.startSpeechRecognition();
+    }
+
+    stopAndKeepPreview() {
+        this.cleanupRecording();
+        if (v2tStatusText) v2tStatusText.textContent = 'Finished • Edit or Send';
+        if (v2tToggleText) v2tToggleText.textContent = 'Record Again';
+        if (v2tToggleRecBtn) {
+            const icon = v2tToggleRecBtn.querySelector('i');
+            if (icon) icon.className = 'fas fa-microphone';
+        }
+    }
+
+    cancel() {
+        this.cleanupRecording();
+        if (v2tPanel) v2tPanel.classList.add('hidden');
+        if (v2tPreviewTextarea) v2tPreviewTextarea.value = '';
+        this.finalTranscript = '';
+        this.interimTranscript = '';
         if (messageInput && !messageInput.disabled) messageInput.focus();
-    }, 50);
+    }
+
+    send() {
+        const text = (v2tPreviewTextarea ? v2tPreviewTextarea.value : this.finalTranscript).trim();
+        if (!text) {
+            alert('Please speak or type a message before sending.');
+            return;
+        }
+
+        // Clean up recording
+        this.cleanupRecording();
+        if (v2tPanel) v2tPanel.classList.add('hidden');
+        if (v2tPreviewTextarea) v2tPreviewTextarea.value = '';
+        this.finalTranscript = '';
+        this.interimTranscript = '';
+
+        // Populate messageInput and trigger standard sendMessage()
+        if (messageInput) {
+            messageInput.value = text;
+            sendMessage();
+        }
+    }
+
+    cleanupRecording() {
+        this.isRecording = false;
+        this.isPaused = false;
+        if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+        if (this.recognition) {
+            try { this.recognition.abort(); } catch(e){}
+            this.recognition = null;
+        }
+        if (this.mediaStream) {
+            this.mediaStream.getTracks().forEach(t => t.stop());
+            this.mediaStream = null;
+        }
+        if (this.audioContext) {
+            try { this.audioContext.close(); } catch(e){}
+            this.audioContext = null;
+        }
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
+        if (v2tMicBtn) v2tMicBtn.classList.remove('recording');
+        if (socket && currentRoomID) socket.emit('voice-recording-stop', { roomID: currentRoomID });
+    }
+
+    startVisualizer(stream) {
+        if (!v2tWaveformCanvas) return;
+        const canvas = v2tWaveformCanvas;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            this.audioContext = new AudioCtx();
+            const source = this.audioContext.createMediaStreamSource(stream);
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 64;
+            source.connect(this.analyser);
+
+            const bufferLength = this.analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const draw = () => {
+                if (!this.isRecording) return;
+                this.animFrameId = requestAnimationFrame(draw);
+
+                if (this.isPaused) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    return;
+                }
+
+                this.analyser.getByteFrequencyData(dataArray);
+
+                const width = canvas.width = canvas.offsetWidth || 280;
+                const height = canvas.height = canvas.offsetHeight || 34;
+
+                ctx.clearRect(0, 0, width, height);
+
+                const barCount = 28;
+                const barSpacing = 3;
+                const barWidth = Math.max(2, (width - (barCount - 1) * barSpacing) / barCount);
+                const isLight = document.body.classList.contains('light-mode');
+
+                for (let i = 0; i < barCount; i++) {
+                    const dataIdx = Math.floor(i * (bufferLength / barCount));
+                    const val = dataArray[dataIdx] || 0;
+                    const percent = Math.max(0.12, val / 255);
+                    const barHeight = Math.max(3, height * percent * 0.9);
+                    const x = i * (barWidth + barSpacing);
+                    const y = (height - barHeight) / 2;
+
+                    const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+                    if (isLight) {
+                        gradient.addColorStop(0, '#6366f1');
+                        gradient.addColorStop(1, '#ec4899');
+                    } else {
+                        gradient.addColorStop(0, '#818cf8');
+                        gradient.addColorStop(1, '#f43f5e');
+                    }
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(x, y, barWidth, barHeight, 2);
+                    } else {
+                        ctx.rect(x, y, barWidth, barHeight);
+                    }
+                    ctx.fill();
+                }
+            };
+            draw();
+        } catch(e) {
+            console.warn('Visualizer setup error:', e);
+        }
+    }
 }
 
 // ── File Attachment Send ──
@@ -2813,59 +3025,75 @@ window.openPollModal = openPollModal;
 window.closePollModal = closePollModal;
 window.submitPoll = submitPoll;
 
-function sendVoiceMessage() {
-    if (!recordedAudioBlob) return;
+// ── Multilingual Message Translation Controller ──
+async function translateMessage(msgId, text, targetLang = null) {
+    if (!msgId || !text) return;
+    const msgEl = messagesContainer ? messagesContainer.querySelector(`.message[data-msg-id="${safeCssEscape(msgId)}"]`) : null;
+    if (!msgEl) return;
 
-    const doSend = (dataUrl) => {
-        if (socket) {
-            const optMsgId = '_opt_voice_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-            const optimisticData = {
-                msgId: optMsgId,
-                id: socket.id,
-                nickname: myNickname || 'Me',
-                message: '',
-                audio: dataUrl,
-                audioDuration: recordingSeconds,
-                profilePic: myProfilePic || null,
-                replyTo: replyingTo || null
-            };
-            appendMessage(optimisticData, true);
-            markOptimisticMsg(optMsgId);
-            emitMyStopTyping();
+    let target = targetLang || localStorage.getItem('piktalk_translate_lang') || 'en';
+    if (!target || target === 'auto') target = 'en';
 
-            socket.emit('voice-recording-stop');
-            socket.emit('send-message', {
-                roomID: currentRoomID,
-                nickname: myNickname || 'Anonymous',
-                profilePic: myProfilePic || null,
-                message: '',
-                audio: dataUrl,
-                audioDuration: recordingSeconds,
-                replyTo: replyingTo || null,
-                msgId: optMsgId
-            });
-            clearReply();
-            discardPreview();
-            if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
-            _precomputedAudioDataUrl = null;
-            setTimeout(() => {
-                if (messageInput && !messageInput.disabled) messageInput.focus();
-            }, 50);
-        } else {
-            alert("Not connected to server. Voice message could not be sent.");
-        }
-    };
-
-    // If pre-conversion finished during preview → INSTANT send, zero wait
-    if (_precomputedAudioDataUrl) {
-        doSend(_precomputedAudioDataUrl);
-        return;
+    let transBox = msgEl.querySelector('.message-translation-box');
+    if (!transBox) {
+        transBox = document.createElement('div');
+        transBox.className = 'message-translation-box';
+        const bubbleWrapper = msgEl.querySelector('.bubble-wrapper') || msgEl.querySelector('.message-content') || msgEl;
+        bubbleWrapper.appendChild(transBox);
     }
 
-    // Direct fast FileReader conversion
-    const reader = new FileReader();
-    reader.onload = (e) => doSend(e.target.result);
-    reader.readAsDataURL(recordedAudioBlob);
+    const langNames = {
+        'en': 'English', 'gu': 'Gujarati', 'hi': 'Hindi', 'es': 'Spanish',
+        'fr': 'French', 'de': 'German', 'ar': 'Arabic', 'mr': 'Marathi',
+        'bn': 'Bengali', 'ta': 'Tamil', 'te': 'Telugu', 'kn': 'Kannada',
+        'ml': 'Malayalam', 'pa': 'Punjabi', 'ur': 'Urdu', 'zh': 'Chinese',
+        'ja': 'Japanese', 'ko': 'Korean', 'pt': 'Portuguese', 'ru': 'Russian',
+        'it': 'Italian', 'tr': 'Turkish'
+    };
+
+    const targetKey = target.split('-')[0].toLowerCase();
+    const targetDisplayName = langNames[targetKey] || target;
+
+    transBox.innerHTML = `
+        <div class="translation-meta-bar">
+            <span><i class="fas fa-spinner fa-spin"></i> Translating to ${targetDisplayName}...</span>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, targetLang: targetKey })
+        });
+
+        const data = await response.json();
+        if (data && data.success && data.translatedText) {
+            transBox.innerHTML = `
+                <div class="translation-meta-bar">
+                    <span><i class="fas fa-language"></i> Translated (${targetDisplayName})</span>
+                    <button type="button" class="translation-close-btn" title="Hide Translation"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="translation-content">${escapeHtml(data.translatedText)}</div>
+            `;
+            const closeBtn = transBox.querySelector('.translation-close-btn');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => transBox.remove());
+            }
+        } else {
+            transBox.innerHTML = `
+                <div class="translation-meta-bar" style="color:#ef4444;">
+                    <span><i class="fas fa-circle-exclamation"></i> Translation unavailable</span>
+                    <button type="button" class="translation-close-btn"><i class="fas fa-times"></i></button>
+                </div>
+            `;
+            const closeBtn = transBox.querySelector('.translation-close-btn');
+            if (closeBtn) closeBtn.addEventListener('click', () => transBox.remove());
+        }
+    } catch(err) {
+        console.error('Translation error:', err);
+        transBox.remove();
+    }
 }
 
 function applyTheme(theme) {
@@ -3800,6 +4028,20 @@ function appendMessage(data, isSentByMe) {
                 }
             });
             actionBar.appendChild(barDlBtn);
+        }
+
+        // Translate button (for text messages)
+        if (data.message && data.message.trim() && !isSingleEmoji(data.message)) {
+            const transBtn = document.createElement('button');
+            transBtn.className = 'msg-action-btn msg-translate-btn';
+            transBtn.title = 'Translate Message';
+            transBtn.innerHTML = '<i class="fas fa-language"></i>';
+            transBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                msgDiv.classList.remove('action-visible');
+                translateMessage(effectiveMsgId, data.message);
+            });
+            actionBar.appendChild(transBtn);
         }
 
         actionBar.appendChild(replyBtn);

@@ -43,13 +43,13 @@
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=319" as="style">
+    <link rel="preload" href="/style.css?v=330" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=319" as="script">
+    <link rel="preload" href="/app.js?v=330" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=319">
+    <link rel="stylesheet" href="/style.css?v=330">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (loaded with defer so it never blocks page load) -->
@@ -169,35 +169,68 @@
             <div class="chat-input-area">
                 <div id="emoji-picker" class="emoji-picker hidden"></div>
 
-                <!-- Voice Recording Overlay -->
-                <div id="voice-recording-bar" class="voice-recording-bar hidden">
-                    <button id="cancel-recording-btn" class="voice-cancel-btn" title="Cancel">
-                        <i class="fas fa-times"></i>
-                    </button>
-                    <div class="voice-waveform">
-                        <span></span><span></span><span></span><span></span><span></span>
-                        <span></span><span></span><span></span><span></span><span></span>
+                <!-- Multilingual Voice-to-Text Recording Panel -->
+                <div id="v2t-recording-panel" class="v2t-recording-panel glass-card hidden" role="region" aria-label="Voice to Text Recording">
+                    <!-- Top Bar: Status indicator, Timer, Language Selector -->
+                    <div class="v2t-top-bar">
+                        <div class="v2t-status-wrap">
+                            <span class="v2t-recording-pulse"></span>
+                            <span id="v2t-status-text" class="v2t-status-text">Listening...</span>
+                            <span id="v2t-timer" class="v2t-timer">0:00</span>
+                        </div>
+                        <div class="v2t-lang-wrap">
+                            <i class="fas fa-globe v2t-lang-icon" title="Spoken Language"></i>
+                            <select id="v2t-lang-select" class="v2t-lang-select" aria-label="Spoken Language">
+                                <option value="auto">🌐 Auto Detect</option>
+                                <option value="en-IN">🇮🇳 English (India)</option>
+                                <option value="en-US">🇺🇸 English (US)</option>
+                                <option value="gu-IN">🇮🇳 ગુજરાતી (Gujarati)</option>
+                                <option value="hi-IN">🇮🇳 हिन्दी (Hindi)</option>
+                                <option value="es-ES">🇪🇸 Español (Spanish)</option>
+                                <option value="fr-FR">🇫🇷 Français (French)</option>
+                                <option value="de-DE">🇩🇪 Deutsch (German)</option>
+                                <option value="ar-SA">🇸🇦 العربية (Arabic)</option>
+                                <option value="mr-IN">🇮🇳 मराठी (Marathi)</option>
+                                <option value="bn-IN">🇮🇳 বাংলা (Bengali)</option>
+                                <option value="ta-IN">🇮🇳 தமிழ் (Tamil)</option>
+                                <option value="te-IN">🇮🇳 తెలుగు (Telugu)</option>
+                                <option value="kn-IN">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+                                <option value="ml-IN">🇮🇳 മലയാളം (Malayalam)</option>
+                                <option value="pa-IN">🇮🇳 ਪੰਜਾਬੀ (Punjabi)</option>
+                                <option value="ur-PK">🇵🇰 اردو (Urdu)</option>
+                                <option value="zh-CN">🇨🇳 中文 (Chinese)</option>
+                                <option value="ja-JP">🇯🇵 日本語 (Japanese)</option>
+                                <option value="ko-KR">🇰🇷 한국어 (Korean)</option>
+                                <option value="pt-BR">🇧🇷 Português (Portuguese)</option>
+                                <option value="ru-RU">🇷🇺 Русский (Russian)</option>
+                                <option value="it-IT">🇮🇹 Italiano (Italian)</option>
+                                <option value="tr-TR">🇹🇷 Türkçe (Turkish)</option>
+                            </select>
+                        </div>
                     </div>
-                    <span id="recording-timer" class="recording-timer">0:00</span>
-                    <div class="recording-dot"></div>
-                    <span class="recording-label">Recording...</span>
-                </div>
 
-                <!-- Audio Preview Bar -->
-                <div id="audio-preview-bar" class="audio-preview-bar hidden">
-                    <button id="discard-audio-btn" class="voice-cancel-btn" title="Discard">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                    <button id="play-preview-btn" class="voice-play-btn" title="Play preview">
-                        <i class="fas fa-play"></i>
-                    </button>
-                    <div class="audio-progress-wrap">
-                        <div id="audio-progress-bar" class="audio-progress-bar"></div>
+                    <!-- Live Audio Waveform Visualizer -->
+                    <div class="v2t-waveform-container">
+                        <canvas id="v2t-waveform-canvas" class="v2t-waveform-canvas" height="34"></canvas>
                     </div>
-                    <span id="audio-preview-duration" class="audio-preview-duration">0:00</span>
-                    <button id="send-audio-btn" class="btn btn-send" title="Send voice message" style="flex-shrink:0;">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+
+                    <!-- Editable Transcription Preview Box -->
+                    <div class="v2t-preview-container">
+                        <textarea id="v2t-preview-textarea" class="v2t-preview-textarea" placeholder="Listening... Speak now and your words will appear here (editable)" rows="2"></textarea>
+                    </div>
+
+                    <!-- Bottom Controls: Cancel, Toggle Stop/Resume, Send -->
+                    <div class="v2t-actions-row">
+                        <button type="button" id="v2t-cancel-btn" class="btn v2t-btn v2t-btn-cancel" title="Cancel & Discard">
+                            <i class="fas fa-times"></i> <span>Cancel</span>
+                        </button>
+                        <button type="button" id="v2t-toggle-rec-btn" class="btn v2t-btn v2t-btn-toggle" title="Pause / Resume Recording">
+                            <i class="fas fa-stop"></i> <span id="v2t-toggle-text">Stop</span>
+                        </button>
+                        <button type="button" id="v2t-send-btn" class="btn v2t-btn v2t-btn-send" title="Send Converted Text">
+                            <i class="fas fa-paper-plane"></i> <span>Send</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- AI Smart Replies Bar -->
@@ -272,6 +305,9 @@
                     </div>
                     <button id="ai-btn" class="btn btn-ai" title="Get AI Smart Reply">
                         <i class="fas fa-wand-magic-sparkles"></i><span>AI</span>
+                    </button>
+                    <button id="v2t-mic-btn" class="btn btn-mic" title="Voice to Text" aria-label="Voice to Text">
+                        <i class="fas fa-microphone"></i>
                     </button>
                     <button id="send-btn" class="btn btn-send">
                         <i class="fas fa-paper-plane"></i>
@@ -662,7 +698,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=319" defer></script>
+    <script src="/app.js?v=330" defer></script>
 </body>
 </html>
 
