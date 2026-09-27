@@ -6310,7 +6310,7 @@ function runFaceScanOverlay() {
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
 }
 
-// ── Main async detection loop (ultra-fast instant scan cadence) ──
+// ── Main async detection loop (adaptive cadence: instant on desktop, paced on mobile) ──
 async function runFaceScanLoop() {
     if (!faceScanActive) return;
     // Guard: stop if profile setup is visible (login scan only)
@@ -6319,11 +6319,21 @@ async function runFaceScanLoop() {
         return;
     }
 
+    // Detect mobile for slightly slower, natural-feeling scan pacing
+    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    // On mobile: scan loop runs at ~100ms (10 fps) instead of 15ms (66 fps) — enough to feel responsive but not rushed
+    const loopDelay      = isMobileDevice ? 100 : 15;
+    const overlapDelay   = isMobileDevice ? 80  : 15;
+    const rescanDelay    = isMobileDevice ? 100 : 16;
+    // Progress per frame: on mobile login takes ~8 frames (~800ms), desktop stays ~3 frames
+    const loginStep      = isMobileDevice ? 13  : 34;
+    const rescanStep     = isMobileDevice ? 5.5 : 5.5; // registration stays the same on all devices
+
     const video = faceScanVideoEl;
 
     // Wait for video to be ready
     if (!video || video.readyState < 2) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 25);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 120 : 25);
         return;
     }
 
@@ -6340,13 +6350,13 @@ async function runFaceScanLoop() {
             }
         }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, 30);
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 150 : 30);
         return;
     }
 
     // Prevent overlapping async frames
     if (faceScanIsProcessing) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 15);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, overlapDelay);
         return;
     }
 
@@ -6354,7 +6364,7 @@ async function runFaceScanLoop() {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
 
     try {
-        // Ultra-fast lightweight face detection (<6ms)
+        // Lightweight face detection
         const detection = await detectFaceFast(video);
 
         if (!faceScanActive) return;
@@ -6380,12 +6390,12 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Scan progress: comfortably paced for rescan (~600ms), instant for initial login
+        // Scan progress: paced for rescan/registration, adaptive for login
         if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += 5.5;
+            faceScanLivenessProgress += rescanStep;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
         } else {
-            faceScanLivenessProgress += 34;
+            faceScanLivenessProgress += loginStep;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
         }
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
@@ -6416,7 +6426,7 @@ async function runFaceScanLoop() {
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? 16 : 15);
+            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? rescanDelay : loopDelay);
         }
     }
 }
