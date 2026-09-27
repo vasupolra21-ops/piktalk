@@ -1623,7 +1623,7 @@ body.light-mode .chat-input-area::before {
     font-size: 1.15rem;
     cursor: pointer;
     opacity: 0.75;
-    transition: opacity 0.2s, transform 0.2s, color 0.2s;
+    transition: opacity 0.15s, color 0.15s;
     color: var(--text-main);
     display: flex;
     align-items: center;
@@ -1641,7 +1641,19 @@ body.light-mode .chat-input-area::before {
 
 .btn-icon-small:hover {
     opacity: 1;
-    transform: translateY(-50%) scale(1.1);
+    transform: translateY(-50%);
+    color: var(--primary);
+}
+
+.btn-icon-small:active,
+.btn-icon-small.touch-active,
+#attach-btn:active,
+#attach-btn.touch-active,
+#emoji-btn:active,
+#emoji-btn.touch-active {
+    transform: translateY(-50%) !important;
+    filter: none !important;
+    transition: none !important;
 }
 
 .btn-icon-small.left { left: 4px; }
@@ -1649,7 +1661,7 @@ body.light-mode .chat-input-area::before {
 
 /* Attach button (+ icon) */
 .attach-plus-btn {
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s, opacity 0.2s;
+    transition: color 0.15s, opacity 0.15s;
     cursor: pointer !important;
 }
 .attach-plus-btn::after {
@@ -1659,9 +1671,23 @@ body.light-mode .chat-input-area::before {
     z-index: 21;
 }
 .attach-plus-btn.menu-open {
-    transform: translateY(-50%) rotate(45deg) scale(1.15);
+    transform: translateY(-50%);
     color: var(--primary);
     opacity: 1;
+}
+.attach-plus-btn:active,
+.attach-plus-btn.touch-active {
+    transform: translateY(-50%) !important;
+    filter: none !important;
+    transition: none !important;
+}
+.attach-plus-btn i,
+#emoji-btn i {
+    transition: color 0.15s;
+}
+.attach-plus-btn:active i,
+#emoji-btn:active i {
+    transform: none !important;
 }
 
 /* â”€â”€ Send Button Interactive Animations & Physics â”€â”€ */
@@ -5717,11 +5743,11 @@ body.light-mode .editor-select {
    WHATSAPP ATTACHMENT MENU & PLUS BUTTON
 ═══════════════════════════════════════════════ */
 .attach-plus-btn {
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s !important;
+    transition: opacity 0.15s, color 0.15s !important;
 }
 .attach-plus-btn i {
     pointer-events: none;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: color 0.15s, transform 0.2s ease;
 }
 .attach-plus-btn.menu-open i {
     transform: rotate(45deg);
