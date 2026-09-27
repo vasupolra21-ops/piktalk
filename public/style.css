@@ -6477,3 +6477,51 @@ body.light-mode .editor-select {
     word-break: break-word;
 }
 
+/* ═══════════════════════════════════════════════
+   V2T TTS SPEAKER BUTTON (receiver side)
+═══════════════════════════════════════════════ */
+.v2t-tts-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--primary);
+    font-size: 0.7rem;
+    cursor: pointer;
+    margin-left: 6px;
+    margin-bottom: 2px;
+    vertical-align: middle;
+    flex-shrink: 0;
+    transition: background 0.18s ease, transform 0.15s ease, color 0.18s ease;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.v2t-tts-btn:hover {
+    background: rgba(99, 102, 241, 0.22);
+    transform: scale(1.12);
+}
+
+.v2t-tts-btn:active {
+    transform: scale(0.94);
+}
+
+.v2t-tts-btn.v2t-tts-speaking {
+    background: rgba(99, 102, 241, 0.2);
+    color: #6366f1;
+    animation: v2tSpeakPulse 1s ease-in-out infinite;
+}
+
+@keyframes v2tSpeakPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+    50%       { box-shadow: 0 0 0 5px rgba(99, 102, 241, 0); }
+}
+
+/* V2T badge indicator on the bubble — tiny mic icon below timestamp */
+.v2t-tts-btn i {
+    pointer-events: none;
+}

@@ -2842,6 +2842,7 @@ class VoiceToTextEngine {
         // Populate messageInput and trigger standard sendMessage()
         if (messageInput) {
             messageInput.value = text;
+            window._nextMsgIsV2T = true; // flag so sendMessage() attaches isV2T to the payload
             sendMessage();
         }
     }
@@ -3477,6 +3478,10 @@ function sendMessage() {
     // Generate deterministic unique clientMsgId for 0ms latency
     const clientMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
 
+    // Consume V2T flag (set by VoiceToTextEngine.send() just before calling sendMessage)
+    const isV2T = !!window._nextMsgIsV2T;
+    window._nextMsgIsV2T = false;
+
     // Optimistic UI: render message instantly without waiting for server echo
     const optimisticData = {
         msgId: clientMsgId,
@@ -3485,7 +3490,8 @@ function sendMessage() {
         nickname: myNickname || 'Me',
         message: text,
         profilePic: myProfilePic || null,
-        replyTo: replyingTo || null
+        replyTo: replyingTo || null,
+        isV2T: isV2T
     };
     appendMessage(optimisticData, true);
     setTimeout(() => saveMsgToHistory(optimisticData), 0);
@@ -3498,7 +3504,8 @@ function sendMessage() {
         nickname: myNickname || 'Anonymous',
         profilePic: myProfilePic || null,
         message: text,
-        replyTo: replyingTo || null
+        replyTo: replyingTo || null,
+        isV2T: isV2T
     });
 
     if (sendBtn) {
@@ -4114,6 +4121,37 @@ function appendMessage(data, isSentByMe) {
             bubble.appendChild(timeSpan);
         }
         contentEl = bubble;
+
+        // ── V2T Speaker button: shown on received voice-to-text messages ──
+        if (data.isV2T && !isSentByMe && data.message && data.message.trim()) {
+            const ttsBtn = document.createElement('button');
+            ttsBtn.className = 'v2t-tts-btn';
+            ttsBtn.title = 'Listen to this message';
+            ttsBtn.innerHTML = '<i class="fas fa-volume-low"></i>';
+            ttsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!window.speechSynthesis) return;
+                // Stop any currently speaking
+                window.speechSynthesis.cancel();
+                const utt = new SpeechSynthesisUtterance(data.message.trim());
+                utt.lang = navigator.language || 'en-US';
+                utt.rate = 1;
+                utt.pitch = 1;
+                // Visual feedback: pulse while speaking
+                ttsBtn.classList.add('v2t-tts-speaking');
+                ttsBtn.innerHTML = '<i class="fas fa-volume-high"></i>';
+                utt.onend = () => {
+                    ttsBtn.classList.remove('v2t-tts-speaking');
+                    ttsBtn.innerHTML = '<i class="fas fa-volume-low"></i>';
+                };
+                utt.onerror = () => {
+                    ttsBtn.classList.remove('v2t-tts-speaking');
+                    ttsBtn.innerHTML = '<i class="fas fa-volume-low"></i>';
+                };
+                window.speechSynthesis.speak(utt);
+            });
+            bubble.appendChild(ttsBtn);
+        }
     }
 
     // Build message DOM
