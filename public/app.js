@@ -4,11 +4,11 @@
 const _origFetch = window.fetch;
 window.fetch = async function(...args) {
     const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-    if (url && url.includes('@vladmandic/face-api/model') && 'caches' in window) {
+    if (url && url.includes('@vladmandic/face-api/model') && typeof caches !== 'undefined') {
         try {
             const cache = await caches.open('piktalk-face-models-v2');
             const match = await cache.match(url);
-            if (match) return match;
+            if (match) return match.clone();
             const res = await _origFetch.apply(this, args);
             if (res && res.status === 200) {
                 cache.put(url, res.clone()).catch(() => {});
@@ -181,6 +181,8 @@ let createRoomModal, createRoomIdInput, createRoomPasswordInput, confirmCreateRo
 let passwordModal, joinRoomPasswordInput, submitPasswordBtn, cancelPasswordBtn, joinPasswordError, toggleJoinPasswordBtn;
 let roomNotFoundModal, roomNotFoundHomeBtn;
 let sharePasswordArea, sharePasswordInput, copyPasswordBtn;
+let _createRoomFallbackTimer = null;
+let _joinRoomFallbackTimer = null;
 
 // Reactions + Reply state
 const msgReactions = {};   // msgId → { emoji → Map<socketId, nickname> }
@@ -1489,10 +1491,13 @@ function setupEventListeners() {
 
             ensureSocketLive();
 
+            if (_createRoomFallbackTimer) clearTimeout(_createRoomFallbackTimer);
+
             if (socket && socket.connected) {
                 socket.emit('check-room-id-available', { roomID });
-                // Safety optimistic fallback: if server takes > 500ms, proceed immediately
-                setTimeout(() => {
+                // Safety optimistic fallback: if server takes > 600ms, proceed immediately
+                _createRoomFallbackTimer = setTimeout(() => {
+                    _createRoomFallbackTimer = null;
                     if (createRoomModal && createRoomModal.classList.contains('active')) {
                         currentRoomID = roomID;
                         currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
@@ -1500,7 +1505,7 @@ function setupEventListeners() {
                         window.history.pushState({}, '', `/chat/${currentRoomID}`);
                         showPhoneModal(showNicknameModal);
                     }
-                }, 500);
+                }, 600);
             } else {
                 currentRoomID = roomID;
                 currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
@@ -1518,15 +1523,17 @@ function setupEventListeners() {
             const roomID = joinRoomInput.value.trim();
             if (roomID) {
                 ensureSocketLive();
+                if (_joinRoomFallbackTimer) clearTimeout(_joinRoomFallbackTimer);
                 if (socket && socket.connected) {
                     socket.emit('check-room', { roomID });
-                    setTimeout(() => {
+                    _joinRoomFallbackTimer = setTimeout(() => {
+                        _joinRoomFallbackTimer = null;
                         if (homeView && homeView.classList.contains('active') && !document.querySelector('.modal.active')) {
                             currentRoomID = roomID;
                             window.history.pushState({}, '', `/chat/${currentRoomID}`);
                             showPhoneModal(showNicknameModal);
                         }
-                    }, 600);
+                    }, 650);
                 } else {
                     currentRoomID = roomID;
                     window.history.pushState({}, '', `/chat/${currentRoomID}`);
@@ -3415,8 +3422,6 @@ function showChat() {
 
     updateInputsState();
     updateThemeColor();
-    // Load chat history for this room
-    setTimeout(() => loadAndRenderHistory(currentRoomID), 100);
 }
 
 // Show or hide admin-only UI elements based on current admin status
@@ -3676,6 +3681,7 @@ if (socket) {
 
     // Room ID verification during host creation
     socket.on('room-id-available-checked', ({ roomID, available }) => {
+        if (_createRoomFallbackTimer) { clearTimeout(_createRoomFallbackTimer); _createRoomFallbackTimer = null; }
         if (available) {
             if (createRoomError) createRoomError.style.display = 'none';
             if (createRoomModal) createRoomModal.classList.remove('active');
@@ -3695,6 +3701,7 @@ if (socket) {
 
     // Room presence and password requirement verification
     socket.on('room-checked', ({ roomID, exists, hasPassword }) => {
+        if (_joinRoomFallbackTimer) { clearTimeout(_joinRoomFallbackTimer); _joinRoomFallbackTimer = null; }
         hideConnectingOverlay();
         if (!exists) {
             if (roomNotFoundModal) roomNotFoundModal.classList.add('active');
@@ -5940,12 +5947,12 @@ async function loadFaceModels() {
         }
     }
 
-    // Enable high-speed FP16 textures on Apple Silicon / mobile GPUs for 2x faster inference
+    // Optimize WebGL settings for mobile without leaking texture memory
     if (faceapi.tf && typeof faceapi.tf.env === 'function') {
         try {
-            faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
             faceapi.tf.env().set('WEBGL_PACK', true);
-            faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', -1);
+            // Delete textures regularly to keep GPU memory light and prevent iOS WebKit context crashes
+            faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0);
         } catch(e) {}
     }
 
@@ -5977,12 +5984,16 @@ async function loadFaceModels() {
     faceModelsLoading = false;
 }
 
-// Hardware-accelerated 2D downscale canvas for instant 60fps mobile face detection
+// Hardware-accelerated 2D downscale canvas for instant mobile face detection
 let _downscaleCanvas = null;
 let _downscaleCtx = null;
 
 function getDownscaledDetectionCanvas(video, targetSize = 160) {
     if (!video || video.readyState < 2) return null;
+    const vw = video.videoWidth || 0;
+    const vh = video.videoHeight || 0;
+    if (vw <= 0 || vh <= 0) return null;
+
     if (!_downscaleCanvas) {
         _downscaleCanvas = document.createElement('canvas');
         _downscaleCanvas.width = targetSize;
@@ -5994,19 +6005,25 @@ function getDownscaledDetectionCanvas(video, targetSize = 160) {
         _downscaleCanvas.height = targetSize;
     }
     
-    const vw = video.videoWidth || 300;
-    const vh = video.videoHeight || 300;
     const minDim = Math.min(vw, vh);
     const sx = (vw - minDim) / 2;
     const sy = (vh - minDim) / 2;
     
-    _downscaleCtx.drawImage(video, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
-    return _downscaleCanvas;
+    try {
+        _downscaleCtx.drawImage(video, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+        return _downscaleCanvas;
+    } catch(e) {
+        return null;
+    }
 }
 
 // Ultra-fast lightweight detector for instant tracking (<5ms on mobile)
 async function detectFaceFast(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
+    const vw = video.videoWidth || 0;
+    const vh = video.videoHeight || 0;
+    if (vw <= 0 || vh <= 0) return null;
+
     try {
         const source = getDownscaledDetectionCanvas(video, 160) || video;
         const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.20 });
@@ -6020,6 +6037,10 @@ async function detectFaceFast(video) {
 // Full descriptor extractor called ONCE upon reaching 100% (runs in < 15ms)
 async function extractFaceDescriptor(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
+    const vw = video.videoWidth || 0;
+    const vh = video.videoHeight || 0;
+    if (vw <= 0 || vh <= 0) return null;
+
     try {
         const source = getDownscaledDetectionCanvas(video, 224) || video;
         const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 });
