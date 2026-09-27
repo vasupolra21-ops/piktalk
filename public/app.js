@@ -6302,50 +6302,12 @@ function runFaceScanOverlay() {
         // High-tech glowing biometric oval guide
         ctx.save();
         ctx.strokeStyle = `rgba(16, 185, 129, ${0.35 + pct * 0.65})`;
-        ctx.lineWidth   = 2.5 + pct * 1.5;
+        ctx.lineWidth   = 3 + pct * 1.5;
         ctx.shadowColor = '#10b981';
-        ctx.shadowBlur  = 6 + pct * 8;
+        ctx.shadowBlur  = 6 + pct * 10;
         ctx.beginPath();
         ctx.ellipse(100, 100, 56, 76, 0, 0, 2 * Math.PI);
         ctx.stroke();
-        ctx.restore();
-
-        // Ultra-smooth 60fps/120fps time-based horizontal scanning laser
-        const now = performance.now();
-        // Smooth sine wave bounce between top (y=36) and bottom (y=164)
-        const laserY = 100 + Math.sin((now / 850) * Math.PI) * 64;
-
-        ctx.save();
-        // Clip to oval face frame for a clean, professional HUD boundary
-        ctx.beginPath();
-        ctx.ellipse(100, 100, 56, 76, 0, 0, 2 * Math.PI);
-        ctx.clip();
-
-        // Soft laser glow gradient trail
-        const beamGrad = ctx.createLinearGradient(0, laserY - 14, 0, laserY + 14);
-        beamGrad.addColorStop(0, 'rgba(16, 185, 129, 0)');
-        beamGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.2)');
-        beamGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
-        ctx.fillStyle = beamGrad;
-        ctx.fillRect(40, laserY - 14, 120, 28);
-
-        // Crisp neon laser scanning line with bright white core
-        const lineGrad = ctx.createLinearGradient(42, 0, 158, 0);
-        lineGrad.addColorStop(0, 'rgba(16, 185, 129, 0.1)');
-        lineGrad.addColorStop(0.25, 'rgba(16, 185, 129, 0.85)');
-        lineGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-        lineGrad.addColorStop(0.75, 'rgba(16, 185, 129, 0.85)');
-        lineGrad.addColorStop(1, 'rgba(16, 185, 129, 0.1)');
-
-        ctx.strokeStyle = lineGrad;
-        ctx.lineWidth = 2;
-        ctx.shadowColor = '#10b981';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.moveTo(42, laserY);
-        ctx.lineTo(158, laserY);
-        ctx.stroke();
-
         ctx.restore();
     }
 
