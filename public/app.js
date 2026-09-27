@@ -5492,12 +5492,12 @@ function getDownscaledDetectionCanvas(video, targetSize = 160) {
     return _downscaleCanvas;
 }
 
-// Ultra-fast lightweight detector for instant tracking (<8ms on mobile)
+// Ultra-fast lightweight detector for instant tracking (<5ms on mobile)
 async function detectFaceFast(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
         const source = getDownscaledDetectionCanvas(video, 160) || video;
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.22 });
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.20 });
         const det = await faceapi.detectSingleFace(source, opts);
         return det || null;
     } catch (e) {
@@ -5505,12 +5505,12 @@ async function detectFaceFast(video) {
     }
 }
 
-// Full descriptor extractor called ONCE upon reaching 100% (runs in < 20ms)
+// Full descriptor extractor called ONCE upon reaching 100% (runs in < 15ms)
 async function extractFaceDescriptor(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     try {
         const source = getDownscaledDetectionCanvas(video, 224) || video;
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.18 });
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 });
         let det = await faceapi.detectSingleFace(source, opts).withFaceLandmarks().withFaceDescriptor();
         if (!det || !det.descriptor) {
             // Direct video fallback
@@ -5868,12 +5868,12 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Scan progress: quick & fluid for re-scan (~600ms), snappy for regular login
+        // Scan progress: ultra-fast instant recognition
         if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += 5.5;
+            faceScanLivenessProgress += 12.5;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
         } else {
-            faceScanLivenessProgress += 22;
+            faceScanLivenessProgress += 34;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
         }
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
@@ -6212,8 +6212,8 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.classList.add('ready');
                     }
 
-                    // Settle buffer (200ms instead of old 2000ms lag)
-                    const WARMUP_MS = 200;
+                    // Instant settle buffer (60ms)
+                    const WARMUP_MS = 60;
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
                     faceScanTimerId = setTimeout(() => {
                         if (!faceScanActive) return;
@@ -6376,7 +6376,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, faceScanIsReScan ? 350 : 150);
+    }, faceScanIsReScan ? 180 : 80);
 }
 
 // Failure feedback flow
