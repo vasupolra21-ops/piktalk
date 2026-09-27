@@ -1475,25 +1475,14 @@ function setupEventListeners() {
             }
 
             ensureSocketLive();
+            currentRoomID = roomID;
+            currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
+            if (createRoomModal) createRoomModal.classList.remove('active');
+            window.history.pushState({}, '', `/chat/${currentRoomID}`);
+            showNicknameModal();
 
             if (socket && socket.connected) {
                 socket.emit('check-room-id-available', { roomID });
-                // Safety optimistic fallback: if server takes > 500ms, proceed immediately
-                setTimeout(() => {
-                    if (createRoomModal && createRoomModal.classList.contains('active')) {
-                        currentRoomID = roomID;
-                        currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
-                        createRoomModal.classList.remove('active');
-                        window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                        showPhoneModal(showNicknameModal);
-                    }
-                }, 500);
-            } else {
-                currentRoomID = roomID;
-                currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
-                if (createRoomModal) createRoomModal.classList.remove('active');
-                window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                showPhoneModal(showNicknameModal);
             }
         });
     }
@@ -1505,20 +1494,12 @@ function setupEventListeners() {
             const roomID = joinRoomInput.value.trim();
             if (roomID) {
                 ensureSocketLive();
+                currentRoomID = roomID;
                 if (socket && socket.connected) {
                     socket.emit('check-room', { roomID });
-                    setTimeout(() => {
-                        if (homeView && homeView.classList.contains('active') && !document.querySelector('.modal.active')) {
-                            currentRoomID = roomID;
-                            window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                            showPhoneModal(showNicknameModal);
-                        }
-                    }, 600);
-                } else {
-                    currentRoomID = roomID;
-                    window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                    showPhoneModal(showNicknameModal);
                 }
+                window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                showNicknameModal();
             }
         });
     }
@@ -5870,13 +5851,13 @@ async function runFaceScanLoop() {
 
         // Scan progress:
         // - Re-scan / Settings: smooth ~1.8s progress (+1.8% per frame) so user has time to set their face properly
-        // - Login scan: ultra-fast 3-frame recognition (+34% per frame)
+        // - Login scan: ultra-fast 2-frame recognition (+55% per frame)
         if (faceScanIsReScan || faceScanIsSettings) {
             faceScanLivenessProgress += 1.8;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold still, capturing face...';
         } else {
-            faceScanLivenessProgress += 34;
-            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
+            faceScanLivenessProgress += 55;
+            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Authenticating...';
         }
         faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
 
@@ -6219,10 +6200,9 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.classList.add('ready');
                     }
 
-                    // Buffer: give user 600ms on re-scan to position their face comfortably, 60ms on normal login
-                    const WARMUP_MS = faceScanIsReScan ? 600 : (faceScanIsSettings ? 400 : 60);
-                    if (faceScanTimerId) clearTimeout(faceScanTimerId);
-                    faceScanTimerId = setTimeout(() => {
+                    // Buffer: give user 600ms on re-scan to position their face comfortably, 0ms on normal login
+                    const WARMUP_MS = faceScanIsReScan ? 600 : (faceScanIsSettings ? 350 : 0);
+                    const kickOffScan = () => {
                         if (!faceScanActive) return;
                         if (faceScanStatusEl) {
                             faceScanStatusEl.className = 'face-status';
@@ -6237,8 +6217,15 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                             faceScanDetailEl.textContent = faceScanIsReScan ? 'Hold still, capturing face...' : 'Hold steady...';
                         }
                         if (faceScanTimerId) clearTimeout(faceScanTimerId);
-                        faceScanTimerId = setTimeout(runFaceScanLoop, 20);
-                    }, WARMUP_MS);
+                        faceScanTimerId = setTimeout(runFaceScanLoop, 10);
+                    };
+
+                    if (faceScanTimerId) clearTimeout(faceScanTimerId);
+                    if (WARMUP_MS === 0) {
+                        kickOffScan();
+                    } else {
+                        faceScanTimerId = setTimeout(kickOffScan, WARMUP_MS);
+                    }
 
                     // Start overlay animation immediately
                     if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
@@ -6385,7 +6372,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, faceScanIsReScan ? 180 : 80);
+    }, faceScanIsReScan ? 180 : 0);
 }
 
 // Failure feedback flow
