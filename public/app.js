@@ -6099,9 +6099,17 @@ function enforceCameraZoom(stream) {
         } catch(e) {}
     };
 
-    // Apply once immediately + once more via onloadedmetadata callback (in startFaceScanFlow)
     applyZoomConstraint();
-    setTimeout(applyZoomConstraint, 200);
+    [50, 150, 300, 600, 1000, 1500, 2500].forEach(delay => setTimeout(applyZoomConstraint, delay));
+
+    if (_zoomLockInterval) clearInterval(_zoomLockInterval);
+    _zoomLockInterval = setInterval(() => {
+        if (!faceScanActive || !track || track.readyState !== 'live') {
+            if (_zoomLockInterval) { clearInterval(_zoomLockInterval); _zoomLockInterval = null; }
+            return;
+        }
+        applyZoomConstraint();
+    }, 400);
 
     try {
         track.onunmute = () => applyZoomConstraint();
@@ -6161,15 +6169,17 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanVideoEl.classList.remove('ready');
     }
 
-    // 640×480 opens ~3× faster than 1280×720 on mobile — sufficient for face detection
     const videoConstraints = {
         facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 480 }
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        aspectRatio: { ideal: 1.7777777778 }
     };
 
     const getCamStream = () => navigator.mediaDevices.getUserMedia({ video: videoConstraints })
-        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 540 }, aspectRatio: { ideal: 1.7777777778 } } }))
+        .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', aspectRatio: { ideal: 1.7777777778 } } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }))
         .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
@@ -6221,8 +6231,8 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                     if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
 
-                    // Short settle buffer (iOS cameras settle within ~200ms); was 2000ms — too slow
-                    const WARMUP_MS = 300;
+                    // Wait 2000ms for iOS camera hardware to settle to wide angle BEFORE starting face detection
+                    const WARMUP_MS = 2000;
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
                     faceScanTimerId = setTimeout(() => {
                         if (!faceScanActive) return;
@@ -7162,27 +7172,5 @@ document.addEventListener('DOMContentLoaded', () => {
     migrateOldFaceProfile();
     _initSettingsEnhancements();
 });
-
-// Idle background preload of face AI models — so they're ready before user taps Create Room
-(function _idleFacePreload() {
-    const doPreload = () => {
-        if (typeof loadFaceModels === 'function') loadFaceModels();
-    };
-    if (document.readyState === 'complete') {
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(doPreload, { timeout: 6000 });
-        } else {
-            setTimeout(doPreload, 2500);
-        }
-    } else {
-        window.addEventListener('load', () => {
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(doPreload, { timeout: 6000 });
-            } else {
-                setTimeout(doPreload, 2500);
-            }
-        }, { once: true });
-    }
-})();
 
 
