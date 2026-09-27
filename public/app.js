@@ -5895,9 +5895,9 @@ async function runFaceScanLoop() {
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
 
-        // Scan progress: ultra-fast instant recognition
+        // Scan progress: comfortably paced for rescan (~600ms), instant for initial login
         if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += 12.5;
+            faceScanLivenessProgress += 5.5;
             if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
         } else {
             faceScanLivenessProgress += 34;
@@ -6247,8 +6247,8 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                         faceScanVideoEl.classList.add('ready');
                     }
 
-                    // Instant settle buffer (60ms)
-                    const WARMUP_MS = 60;
+                    // Camera settle buffer (220ms for rescan, 60ms for instant login)
+                    const WARMUP_MS = (faceScanIsReScan || faceScanIsSettings) ? 220 : 60;
                     if (faceScanTimerId) clearTimeout(faceScanTimerId);
                     faceScanTimerId = setTimeout(() => {
                         if (!faceScanActive) return;
@@ -6413,7 +6413,7 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         }
-    }, faceScanIsReScan ? 180 : 80);
+    }, faceScanIsReScan ? 240 : 80);
 }
 
 // Failure feedback flow
