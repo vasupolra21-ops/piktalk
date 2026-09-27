@@ -22,14 +22,10 @@ window.fetch = async function(...args) {
 };
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // SOUND MANAGER — respects device silent/mute state & settings
 // ─────────────────────────────────────────────────────────────
 const SoundManager = (() => {
-    let _audioCtx = null;
-    let _muted = false;          // true = audio is blocked or device is muted
-    let _muteCheckAt = 0;        // timestamp of last check
-    const MUTE_RECHECK_MS = 3000;// re-check every 3 seconds
-
     function isSoundEnabled() {
         const pref = localStorage.getItem('piktalk_sound_enabled');
         return pref === null ? true : pref === 'true';
@@ -39,87 +35,24 @@ const SoundManager = (() => {
         localStorage.setItem('piktalk_sound_enabled', enabled ? 'true' : 'false');
     }
 
-    function _getCtx() {
-        try {
-            if (!_audioCtx || _audioCtx.state === 'closed') {
-                _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            return _audioCtx;
-        } catch(e) { return null; }
-    }
-
-    // Try to resume a suspended AudioContext
-    async function _ensureRunning(ctx) {
-        if (ctx.state === 'suspended') {
-            try { await ctx.resume(); } catch(e) {}
-        }
-        return ctx.state === 'running';
-    }
-
-    // Check if device output is suppressed/silent
-    async function _checkMuted(ctx) {
-        return new Promise(resolve => {
-            try {
-                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
-                const src = ctx.createBufferSource();
-                src.buffer = buf;
-                src.connect(ctx.destination);
-                const t0 = ctx.currentTime;
-                src.start();
-                setTimeout(() => {
-                    const elapsed = (ctx.currentTime - t0) * 1000;
-                    resolve(elapsed < 20); // if context clock didn't tick, audio is muted/blocked
-                }, 60);
-            } catch(e) {
-                resolve(false);
-            }
-        });
-    }
-
     async function play(audioEl) {
-        // 1. Don't play if sound is disabled by user setting
         if (!isSoundEnabled()) return;
-
-        // 2. Never play if tab/app is hidden in background
         if (document.hidden) return;
         if (!audioEl) return;
 
-        const now = Date.now();
-        const needsCheck = now - _muteCheckAt > MUTE_RECHECK_MS;
-
-        if (needsCheck) {
-            _muteCheckAt = now;
-            const ctx = _getCtx();
-            if (ctx) {
-                const running = await _ensureRunning(ctx);
-                if (running) {
-                    _muted = await _checkMuted(ctx);
-                } else {
-                    _muted = true;
-                }
-            }
-        }
-
-        if (_muted) return; // Silent mode or suppressed
-
         try {
             audioEl.currentTime = 0;
-            const playPromise = audioEl.play();
-            if (playPromise !== undefined) {
-                await playPromise;
+            const p = audioEl.play();
+            if (p !== undefined) {
+                await p;
             }
         } catch(e) {
-            // Audio blocked or device in silent mode
-            _muted = true;
-            _muteCheckAt = 0;
+            // Audio play prevented or muted
         }
     }
 
     return { play, isSoundEnabled, setSoundEnabled };
 })();
-
-
-
 
 // Initialize Socket.io – websocket-first with permanent auto-reconnect and zero-latency recovery
 let socket;
@@ -131,8 +64,8 @@ try {
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 100,
-        reconnectionDelayMax: 500,
+        reconnectionDelay: 200,
+        reconnectionDelayMax: 1000,
         randomizationFactor: 0.1,
         timeout: 8000
     });
@@ -152,9 +85,13 @@ try {
     console.error("Socket.io initialization failed:", e);
 }
 
-// Proactive instant reconnection on mobile tab wake / user interaction
+// Proactive throttled reconnection on mobile tab wake / visibility change
+let _lastSocketLiveCheck = 0;
 function ensureSocketLive() {
     if (!socket) return;
+    const now = Date.now();
+    if (now - _lastSocketLiveCheck < 1500) return;
+    _lastSocketLiveCheck = now;
     if (!socket.connected) {
         try {
             socket.connect();
@@ -168,30 +105,52 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('focus', ensureSocketLive);
 window.addEventListener('pageshow', ensureSocketLive);
 window.addEventListener('online', ensureSocketLive);
-document.addEventListener('touchstart', ensureSocketLive, { passive: true });
 
-// Zero-delay fast click handler for mobile and desktop (eliminates 300ms tap delay & handles fast taps smoothly)
+// Zero-delay super fast click handler for mobile and desktop (eliminates 300ms tap delay & gives instant response)
 function addFastClickListener(element, handler) {
     if (!element) return;
     let touchHandled = false;
     let startX = 0, startY = 0;
+    let touchMoved = false;
+
     element.addEventListener('touchstart', (e) => {
         if (e.touches && e.touches.length === 1) {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
+            touchMoved = false;
+            element.classList.add('touch-active');
         }
     }, { passive: true });
-    element.addEventListener('touchend', (e) => {
-        if (e.changedTouches && e.changedTouches.length === 1) {
-            const dx = Math.abs(e.changedTouches[0].clientX - startX);
-            const dy = Math.abs(e.changedTouches[0].clientY - startY);
-            if (dx < 12 && dy < 12) {
-                touchHandled = true;
-                handler(e);
-                setTimeout(() => { touchHandled = false; }, 350);
+
+    element.addEventListener('touchmove', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            const dx = Math.abs(e.touches[0].clientX - startX);
+            const dy = Math.abs(e.touches[0].clientY - startY);
+            if (dx > 20 || dy > 20) {
+                touchMoved = true;
+                element.classList.remove('touch-active');
             }
         }
     }, { passive: true });
+
+    element.addEventListener('touchend', (e) => {
+        element.classList.remove('touch-active');
+        if (touchMoved) return;
+        if (e.changedTouches && e.changedTouches.length === 1) {
+            const dx = Math.abs(e.changedTouches[0].clientX - startX);
+            const dy = Math.abs(e.changedTouches[0].clientY - startY);
+            if (dx < 24 && dy < 24) {
+                touchHandled = true;
+                handler(e);
+                setTimeout(() => { touchHandled = false; }, 300);
+            }
+        }
+    }, { passive: true });
+
+    element.addEventListener('touchcancel', () => {
+        element.classList.remove('touch-active');
+    }, { passive: true });
+
     element.addEventListener('click', (e) => {
         if (touchHandled) {
             e.preventDefault();
@@ -517,11 +476,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     } else {
         showHome();
-    }
-
-    // Populate Emoji Categories
-    if (emojiPicker) {
-        renderEmojiPicker();
     }
 
     // Load theme: use saved theme if set, otherwise detect OS system default mode
@@ -1715,7 +1669,12 @@ function setupEventListeners() {
 
     if (emojiBtn) {
         let _emojiBtnTouchHandled = false;
+        let _emojiRendered = false;
         const toggleEmojiPicker = (keepKeyboard) => {
+            if (!_emojiRendered) {
+                renderEmojiPicker();
+                _emojiRendered = true;
+            }
             emojiPicker.classList.toggle('hidden');
             if (keepKeyboard) {
                 setTimeout(() => {
@@ -5408,14 +5367,51 @@ const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.4
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
-// ── Load face-api.js neural network models (with auto-retry and WebGL shader pre-warming) ──
+// ── Lazy on-demand loader for face-api.js neural network library ──
+let _faceApiScriptLoading = null;
+async function ensureFaceApiLoaded() {
+    if (typeof faceapi !== 'undefined' && faceapi.nets) return true;
+    if (_faceApiScriptLoading) return _faceApiScriptLoading;
+
+    _faceApiScriptLoading = new Promise((resolve) => {
+        const existing = document.querySelector('script[src*="face-api"]');
+        if (existing) {
+            if (typeof faceapi !== 'undefined' && faceapi.nets) {
+                resolve(true);
+                return;
+            }
+            existing.addEventListener('load', () => resolve(true), { once: true });
+            existing.addEventListener('error', () => resolve(false), { once: true });
+            return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js';
+        s.async = true;
+        s.onload = () => resolve(true);
+        s.onerror = (err) => {
+            console.warn('[FaceID] Script load failed:', err);
+            _faceApiScriptLoading = null;
+            resolve(false);
+        };
+        document.head.appendChild(s);
+    });
+
+    return _faceApiScriptLoading;
+}
+
+// ── Load face-api.js neural network models on demand ──
 async function loadFaceModels() {
     if (faceModelsLoaded || faceModelsLoading) return;
-    if (typeof faceapi === 'undefined' || !faceapi.nets) {
-        setTimeout(loadFaceModels, 80);
-        return;
-    }
     faceModelsLoading = true;
+
+    if (typeof faceapi === 'undefined' || !faceapi.nets) {
+        const ok = await ensureFaceApiLoaded();
+        if (!ok || typeof faceapi === 'undefined' || !faceapi.nets) {
+            faceModelsLoading = false;
+            setTimeout(loadFaceModels, 1500);
+            return;
+        }
+    }
 
     // Enable high-speed FP16 textures on Apple Silicon / mobile GPUs for 2x faster inference
     if (faceapi.tf && typeof faceapi.tf.env === 'function') {
@@ -5446,9 +5442,9 @@ async function loadFaceModels() {
             } catch(w) {}
         }, 100);
     } catch (e) {
-        console.warn('[FaceID] Model load error, retrying in 1s:', e);
+        console.warn('[FaceID] Model load error, retrying in 1.5s:', e);
         faceModelsLoading = false;
-        setTimeout(loadFaceModels, 1000);
+        setTimeout(loadFaceModels, 1500);
         return;
     }
     faceModelsLoading = false;
@@ -6780,10 +6776,6 @@ function saveSettingsNickname() {
         updateSettingsUI();
     }
 }
-
-// Pre-load AI models immediately on script execution
-loadFaceModels();
-
 
 // ═══════════════════════════════════════════════════════════════
 // FACE ID VERIFICATION BYPASS (Phone Modal Disabled)
