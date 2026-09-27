@@ -6281,11 +6281,13 @@ function runFaceScanOverlay() {
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Interpolation of displayed percentage (smooth & fast)
-    const interpFactor = (faceScanIsReScan || faceScanIsSettings) ? 0.45 : 0.5;
-    if (faceScanLivenessDisplayProgress < faceScanLivenessProgress) {
-        faceScanLivenessDisplayProgress += (faceScanLivenessProgress - faceScanLivenessDisplayProgress) * interpFactor;
-        if (faceScanLivenessDisplayProgress > 98 && faceScanLivenessProgress >= 100) {
+    // Fluid continuous interpolation of displayed percentage at 60fps/120fps
+    const diff = faceScanLivenessProgress - faceScanLivenessDisplayProgress;
+    if (diff > 0.02) {
+        // Continuous smooth easing step with adaptive acceleration
+        const step = Math.max(0.35, diff * 0.12);
+        faceScanLivenessDisplayProgress = Math.min(faceScanLivenessProgress, faceScanLivenessDisplayProgress + step);
+        if (faceScanLivenessDisplayProgress > 98.8 && faceScanLivenessProgress >= 100) {
             faceScanLivenessDisplayProgress = 100;
         }
     }
@@ -6311,11 +6313,11 @@ function runFaceScanOverlay() {
         ctx.restore();
     }
 
-    // Update status UI text and progress bar smoothly at 60fps
+    // Update status UI text and progress bar smoothly at 60fps/120fps with sub-pixel precision
     const displayPercent = Math.floor(faceScanLivenessDisplayProgress);
     const progressBar = document.getElementById(faceScanIsSettings ? 'settings-scan-progress-bar' : 'scan-progress-bar');
     if (progressBar) {
-        progressBar.style.width = displayPercent + '%';
+        progressBar.style.width = faceScanLivenessDisplayProgress.toFixed(1) + '%';
     }
 
     if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified && faceScanLivenessProgress < 100) {
