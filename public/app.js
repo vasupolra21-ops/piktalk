@@ -90,7 +90,7 @@ let _lastSocketLiveCheck = 0;
 function ensureSocketLive() {
     if (!socket) return;
     const now = Date.now();
-    if (now - _lastSocketLiveCheck < 1500) return;
+    if (now - _lastSocketLiveCheck < 800) return;
     _lastSocketLiveCheck = now;
     if (!socket.connected) {
         try {
@@ -99,11 +99,31 @@ function ensureSocketLive() {
     }
 }
 
+// Full background wake recovery for iOS Safari & Android Chrome
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') ensureSocketLive();
+    if (document.visibilityState === 'visible') {
+        ensureSocketLive();
+        faceScanIsProcessing = false;
+        if (typeof faceapi !== 'undefined' && faceapi.tf && typeof faceapi.tf.setBackend === 'function') {
+            try { faceapi.tf.setBackend('webgl').catch(() => {}); } catch(e) {}
+        }
+        // If camera stream was active and lost during sleep, recover camera
+        if (faceScanActive && faceScanVideoEl && faceScanVideoEl.readyState < 2) {
+            startFaceScanFlow(faceScanIsSettings, faceScanIsReScan);
+        }
+    }
 });
-window.addEventListener('focus', ensureSocketLive);
-window.addEventListener('pageshow', ensureSocketLive);
+window.addEventListener('focus', () => {
+    ensureSocketLive();
+    faceScanIsProcessing = false;
+});
+window.addEventListener('pageshow', (e) => {
+    ensureSocketLive();
+    faceScanIsProcessing = false;
+    if (faceScanActive && faceScanVideoEl && faceScanVideoEl.readyState < 2) {
+        startFaceScanFlow(faceScanIsSettings, faceScanIsReScan);
+    }
+});
 window.addEventListener('online', ensureSocketLive);
 
 // Zero-delay super fast click handler for mobile and desktop (eliminates 300ms tap delay & gives instant response)
@@ -1491,27 +1511,14 @@ function setupEventListeners() {
 
             ensureSocketLive();
 
-            if (_createRoomFallbackTimer) clearTimeout(_createRoomFallbackTimer);
+            currentRoomID = roomID;
+            currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
+            if (createRoomModal) createRoomModal.classList.remove('active');
+            window.history.pushState({}, '', `/chat/${currentRoomID}`);
+            showPhoneModal(showNicknameModal);
 
             if (socket && socket.connected) {
                 socket.emit('check-room-id-available', { roomID });
-                // Safety optimistic fallback: if server takes > 600ms, proceed immediately
-                _createRoomFallbackTimer = setTimeout(() => {
-                    _createRoomFallbackTimer = null;
-                    if (createRoomModal && createRoomModal.classList.contains('active')) {
-                        currentRoomID = roomID;
-                        currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
-                        createRoomModal.classList.remove('active');
-                        window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                        showPhoneModal(showNicknameModal);
-                    }
-                }, 600);
-            } else {
-                currentRoomID = roomID;
-                currentRoomPassword = (createRoomPasswordInput && createRoomPasswordInput.value.trim()) || null;
-                if (createRoomModal) createRoomModal.classList.remove('active');
-                window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                showPhoneModal(showNicknameModal);
             }
         });
     }
@@ -1523,22 +1530,12 @@ function setupEventListeners() {
             const roomID = joinRoomInput.value.trim();
             if (roomID) {
                 ensureSocketLive();
-                if (_joinRoomFallbackTimer) clearTimeout(_joinRoomFallbackTimer);
                 if (socket && socket.connected) {
                     socket.emit('check-room', { roomID });
-                    _joinRoomFallbackTimer = setTimeout(() => {
-                        _joinRoomFallbackTimer = null;
-                        if (homeView && homeView.classList.contains('active') && !document.querySelector('.modal.active')) {
-                            currentRoomID = roomID;
-                            window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                            showPhoneModal(showNicknameModal);
-                        }
-                    }, 650);
-                } else {
-                    currentRoomID = roomID;
-                    window.history.pushState({}, '', `/chat/${currentRoomID}`);
-                    showPhoneModal(showNicknameModal);
                 }
+                currentRoomID = roomID;
+                window.history.pushState({}, '', `/chat/${currentRoomID}`);
+                showPhoneModal(showNicknameModal);
             }
         });
     }
@@ -5897,7 +5894,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.40;   // euclidean distance threshold — strict (0.40) so different people don't match
+const FACE_MATCH_DIST  = 0.58;   // euclidean distance — 0.58 reliably matches same person across lighting/angle/distance changes
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
@@ -5951,8 +5948,7 @@ async function loadFaceModels() {
     if (faceapi.tf && typeof faceapi.tf.env === 'function') {
         try {
             faceapi.tf.env().set('WEBGL_PACK', true);
-            // Delete textures regularly to keep GPU memory light and prevent iOS WebKit context crashes
-            faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', 0);
+            faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', -1);
         } catch(e) {}
     }
 
@@ -6025,9 +6021,12 @@ async function detectFaceFast(video) {
     if (vw <= 0 || vh <= 0) return null;
 
     try {
-        const source = getDownscaledDetectionCanvas(video, 160) || video;
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.20 });
-        const det = await faceapi.detectSingleFace(source, opts);
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.10 });
+        let det = await faceapi.detectSingleFace(video, opts);
+        if (!det) {
+            const source = getDownscaledDetectionCanvas(video, 160);
+            if (source) det = await faceapi.detectSingleFace(source, opts);
+        }
         return det || null;
     } catch (e) {
         return null;
@@ -6042,12 +6041,11 @@ async function extractFaceDescriptor(video) {
     if (vw <= 0 || vh <= 0) return null;
 
     try {
-        const source = getDownscaledDetectionCanvas(video, 224) || video;
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.15 });
-        let det = await faceapi.detectSingleFace(source, opts).withFaceLandmarks().withFaceDescriptor();
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.10 });
+        let det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks().withFaceDescriptor();
         if (!det || !det.descriptor) {
-            // Direct video fallback
-            det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks().withFaceDescriptor();
+            const fallbackOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.08 });
+            det = await faceapi.detectSingleFace(video, fallbackOpts).withFaceLandmarks().withFaceDescriptor();
         }
         return det || null;
     } catch (e) {
@@ -6083,20 +6081,48 @@ function getRegisteredUsers() {
     }
 }
 
-// Find matching user for a descriptor
+// Find matching user for a descriptor — checks user list and direct descriptor storage
 function findMatchingUser(desc) {
     if (!desc) return null;
+
+    // Primary: check registered users list
     const users = getRegisteredUsers();
+    let bestMatch = null;
+    let bestDist = Infinity;
     for (const u of users) {
         if (u.descriptor) {
             const storedDesc = new Float32Array(u.descriptor);
             const dist = faceapi.euclideanDistance(storedDesc, desc);
-            console.log(`[FaceID] Comparing against user "${u.nickname || 'Unknown'}". Distance: ${dist.toFixed(4)}`);
-            if (dist < FACE_MATCH_DIST) {
-                return u;
+            console.log(`[FaceID] Comparing against "${u.nickname || 'Unknown'}". Distance: ${dist.toFixed(4)}`);
+            if (dist < FACE_MATCH_DIST && dist < bestDist) {
+                bestDist = dist;
+                bestMatch = u;
             }
         }
     }
+    if (bestMatch) return bestMatch;
+
+    // Fallback: check piktalk_face_descriptor directly
+    try {
+        const raw = localStorage.getItem('piktalk_face_descriptor');
+        const faceUserId = localStorage.getItem('piktalk_face_userid');
+        if (raw) {
+            const storedDesc = new Float32Array(JSON.parse(raw));
+            const dist = faceapi.euclideanDistance(storedDesc, desc);
+            console.log(`[FaceID] Fallback descriptor check. Distance: ${dist.toFixed(4)}`);
+            if (dist < FACE_MATCH_DIST) {
+                const uid = faceUserId || 'u-face-' + Date.now().toString(36);
+                const profile = JSON.parse(localStorage.getItem(`piktalk_profile_${uid}`) || '{}');
+                return {
+                    faceUserId: uid,
+                    descriptor: JSON.parse(raw),
+                    nickname: profile.nickname || localStorage.getItem('piktalk_face_nickname') || '',
+                    profilePic: profile.profilePic || null
+                };
+            }
+        }
+    } catch(e) {}
+
     return null;
 }
 
@@ -6274,22 +6300,28 @@ function processLivenessFrame(video) {
 
 let faceScanIsProcessing = false;
 
-// ── rAF overlay draw loop (smooth 60fps HUD guide + progress rendering) ──
+// ── rAF overlay draw loop (smooth 60fps/120fps continuous progress rendering) ──
 function runFaceScanOverlay() {
     if (!faceScanActive) return;
     const video  = faceScanVideoEl;
     const canvas = faceScanCanvasEl;
     const ctx    = canvas ? canvas.getContext('2d') : null;
 
-    // Fluid continuous interpolation of displayed percentage at 60fps/120fps
-    const diff = faceScanLivenessProgress - faceScanLivenessDisplayProgress;
-    if (diff > 0.02) {
-        // Continuous smooth easing step with adaptive acceleration
-        const step = Math.max(0.35, diff * 0.12);
-        faceScanLivenessDisplayProgress = Math.min(faceScanLivenessProgress, faceScanLivenessDisplayProgress + step);
-        if (faceScanLivenessDisplayProgress > 98.8 && faceScanLivenessProgress >= 100) {
-            faceScanLivenessDisplayProgress = 100;
+    const isCameraStreaming = video && video.readyState >= 2;
+
+    // Smooth continuous progression: advance smoothly while streaming
+    if (isCameraStreaming && !faceScanLivenessVerified) {
+        const stepRate = (faceScanIsReScan || faceScanIsSettings) ? 1.8 : 2.6;
+        if (faceScanFaceInFrame) {
+            // Full speed when face is actively locked
+            faceScanLivenessDisplayProgress = Math.min(100, faceScanLivenessDisplayProgress + stepRate);
+        } else if (faceScanLivenessDisplayProgress < 30) {
+            // Initial smooth warmup so progress never sits frozen at 0%
+            faceScanLivenessDisplayProgress = Math.min(30, faceScanLivenessDisplayProgress + 1.2);
         }
+    } else if (!faceScanFaceInFrame && !faceScanLivenessVerified && faceScanLivenessDisplayProgress > 0) {
+        // Smooth gentle decay if face completely leaves frame
+        faceScanLivenessDisplayProgress = Math.max(0, faceScanLivenessDisplayProgress - 0.6);
     }
 
     if (canvas && ctx && video && video.readyState >= 2) {
@@ -6304,9 +6336,9 @@ function runFaceScanOverlay() {
         // High-tech glowing biometric oval guide
         ctx.save();
         ctx.strokeStyle = `rgba(16, 185, 129, ${0.35 + pct * 0.65})`;
-        ctx.lineWidth   = 3 + pct * 1.5;
+        ctx.lineWidth   = 2.5 + pct * 1.5;
         ctx.shadowColor = '#10b981';
-        ctx.shadowBlur  = 6 + pct * 10;
+        ctx.shadowBlur  = 6 + pct * 8;
         ctx.beginPath();
         ctx.ellipse(100, 100, 56, 76, 0, 0, 2 * Math.PI);
         ctx.stroke();
@@ -6320,43 +6352,44 @@ function runFaceScanOverlay() {
         progressBar.style.width = faceScanLivenessDisplayProgress.toFixed(1) + '%';
     }
 
-    if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified && faceScanLivenessProgress < 100) {
+    if (faceScanStatusEl && faceScanActive && !faceScanLivenessVerified) {
         faceScanStatusEl.className = 'face-status';
         let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
+        const statusText = (displayPercent >= 100) ? 'Authenticating...' : `Scanning (${displayPercent}%)`;
         if (!textSpan || !faceScanStatusEl.querySelector('.fa-circle-notch')) {
-            faceScanStatusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (${displayPercent}%)</span>`;
+            faceScanStatusEl.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">${statusText}</span>`;
         } else {
-            textSpan.textContent = `Scanning (${displayPercent}%)`;
+            textSpan.textContent = statusText;
         }
+    }
+
+    // Check completion: when bar reaches 100% and descriptor is captured
+    if (faceScanLivenessDisplayProgress >= 100 && !faceScanLivenessVerified && faceCapturedDescriptor) {
+        faceScanLivenessVerified = true;
+        _onFaceScanComplete();
+        return;
     }
 
     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
 }
 
-// ── Main async detection loop (adaptive cadence: instant on desktop, paced on mobile) ──
+// ── Main async detection loop (lightweight continuous tracking) ──
 async function runFaceScanLoop() {
-    if (!faceScanActive) return;
+    if (!faceScanActive || faceScanLivenessVerified) return;
     // Guard: stop if profile setup is visible (login scan only)
     if (!faceScanIsSettings && profileSetupSection && !profileSetupSection.classList.contains('hidden')) {
         stopFaceScanFlow();
         return;
     }
 
-    // Detect mobile for slightly slower, natural-feeling scan pacing
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    // On mobile: scan loop runs at ~100ms (10 fps) instead of 15ms (66 fps) — enough to feel responsive but not rushed
-    const loopDelay      = isMobileDevice ? 100 : 15;
-    const overlapDelay   = isMobileDevice ? 80  : 15;
-    const rescanDelay    = isMobileDevice ? 100 : 16;
-    // Progress per frame: on mobile login takes ~8 frames (~800ms), desktop stays ~3 frames
-    const loginStep      = isMobileDevice ? 13  : 34;
-    const rescanStep     = isMobileDevice ? 5.5 : 5.5; // registration stays the same on all devices
+    const loopDelay = isMobileDevice ? 35 : 20;
 
     const video = faceScanVideoEl;
 
     // Wait for video to be ready
     if (!video || video.readyState < 2) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 120 : 25);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 50 : 25);
         return;
     }
 
@@ -6373,13 +6406,13 @@ async function runFaceScanLoop() {
             }
         }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 150 : 30);
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 60 : 30);
         return;
     }
 
     // Prevent overlapping async frames
     if (faceScanIsProcessing) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, overlapDelay);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 15);
         return;
     }
 
@@ -6387,13 +6420,16 @@ async function runFaceScanLoop() {
     const faceNotFoundEl = document.getElementById(faceScanIsSettings ? 'settings-face-not-found' : 'face-not-found');
 
     try {
-        // Lightweight face detection
+        // Fast lightweight face tracking
         const detection = await detectFaceFast(video);
 
-        if (!faceScanActive) return;
+        if (!faceScanActive || faceScanLivenessVerified) return;
 
         if (!detection) {
             faceNoFaceCount++;
+            if (faceNoFaceCount > 3) {
+                faceScanFaceInFrame = false;
+            }
             if (faceNoFaceCount >= FACE_NO_FACE_MAX) {
                 // Show face-not-found UI
                 stopFaceScanFlow();
@@ -6409,47 +6445,30 @@ async function runFaceScanLoop() {
             return;
         }
 
-        // Face detected — reset no-face counter
+        // Face detected in frame
+        faceScanFaceInFrame = true;
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
+        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
 
-        // Scan progress: paced for rescan/registration, adaptive for login
-        if (faceScanIsReScan || faceScanIsSettings) {
-            faceScanLivenessProgress += rescanStep;
-            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Align face & hold steady...';
-        } else {
-            faceScanLivenessProgress += loginStep;
-            if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
-        }
-        faceScanLivenessProgress = Math.min(100, faceScanLivenessProgress);
-
-        // Scan complete?
-        if (faceScanLivenessProgress >= 100) {
-            faceScanLivenessDisplayProgress = 100;
-            if (faceScanStatusEl) {
-                let textSpan = faceScanStatusEl.querySelector('.scan-status-text');
-                if (textSpan && faceScanStatusEl.querySelector('.fa-circle-notch')) {
-                    textSpan.textContent = 'Authenticating...';
-                } else {
-                    faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Authenticating...</span>';
+        // Extract full 128-dim descriptor in background immediately
+        if (!faceCapturedDescriptor) {
+            extractFaceDescriptor(video).then(fullDet => {
+                if (fullDet && fullDet.descriptor && faceScanActive) {
+                    faceCapturedDescriptor = fullDet.descriptor;
+                    if (faceScanLivenessDisplayProgress >= 100 && !faceScanLivenessVerified) {
+                        faceScanLivenessVerified = true;
+                        _onFaceScanComplete();
+                    }
                 }
-            }
-
-            // Extract 128-dim descriptor once upon completion
-            const fullDet = await extractFaceDescriptor(video);
-            if (fullDet && fullDet.descriptor) {
-                faceCapturedDescriptor = fullDet.descriptor;
-                faceScanLivenessVerified = true;
-                _onFaceScanComplete();
-                return;
-            }
+            }).catch(() => {});
         }
     } catch(err) {
-        console.warn('[FaceID] Scan loop iteration error:', err);
+        console.warn('[FaceID] Scan loop error:', err);
     } finally {
         faceScanIsProcessing = false;
         if (faceScanActive && !faceScanLivenessVerified) {
-            faceScanTimerId = setTimeout(runFaceScanLoop, faceScanIsReScan ? rescanDelay : loopDelay);
+            faceScanTimerId = setTimeout(runFaceScanLoop, loopDelay);
         }
     }
 }
@@ -6478,18 +6497,40 @@ async function _onFaceScanComplete() {
         localStorage.setItem('piktalk_face_userid', localMatch.faceUserId);
         myUserId = localMatch.faceUserId;
         sessionStorage.setItem('piktalk_userId', localMatch.faceUserId);
-        
-        // Ensure descriptor is stored in localStorage for future updates
-        if (descriptor) {
-            localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+
+        if (localMatch.nickname) {
+            localStorage.setItem('piktalk_face_nickname', localMatch.nickname);
+            const profKey = `piktalk_profile_${localMatch.faceUserId}`;
+            const prof = JSON.parse(localStorage.getItem(profKey) || '{}');
+            prof.nickname = localMatch.nickname;
+            if (localMatch.profilePic) prof.profilePic = localMatch.profilePic;
+            localStorage.setItem(profKey, JSON.stringify(prof));
         }
-        
+
+        // Update stored descriptor: blend 80% old + 20% new so it adapts over time
+        if (descriptor) {
+            try {
+                const oldRaw = localStorage.getItem('piktalk_face_descriptor');
+                if (oldRaw) {
+                    const old = new Float32Array(JSON.parse(oldRaw));
+                    const blended = new Float32Array(128);
+                    for (let i = 0; i < 128; i++) blended[i] = old[i] * 0.8 + descriptor[i] * 0.2;
+                    localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(blended)));
+                    saveUserInDatabase(localMatch.faceUserId, blended, localMatch.nickname, localMatch.profilePic);
+                } else {
+                    localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+                }
+            } catch(e) {
+                localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
+            }
+        }
+
         saveBiometrics(descriptor, faceScanVideoEl);
 
-        // Sync to server so cross-device match works!
+        // Sync updated descriptor to server for cross-device recognition
         const savedProfile = JSON.parse(localStorage.getItem(`piktalk_profile_${localMatch.faceUserId}`) || '{}');
         if (descriptor) {
-            _syncFaceToServer(localMatch.faceUserId, descriptor, savedProfile.nickname || '', savedProfile.profilePic || null);
+            _syncFaceToServer(localMatch.faceUserId, descriptor, savedProfile.nickname || localMatch.nickname || '', savedProfile.profilePic || localMatch.profilePic || null);
         }
 
         handleScanSuccess('Access Granted!');
@@ -6665,6 +6706,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
     faceScanLivenessProgress = 0;
     faceScanLivenessDisplayProgress = 0;
     faceScanLivenessVerified = false;
+    faceScanFaceInFrame  = false;
     faceScanDemoRunning = false;
     faceScanIsProcessing = false;
     faceNoFaceCount     = 0;
@@ -6734,13 +6776,13 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
             enforceCameraZoom(stream);
 
             if (faceScanVideoEl) {
-                faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.muted = true;
                 faceScanVideoEl.defaultMuted = true;
                 faceScanVideoEl.playsInline = true;
                 faceScanVideoEl.setAttribute('playsinline', 'true');
                 faceScanVideoEl.setAttribute('webkit-playsinline', 'true');
                 faceScanVideoEl.setAttribute('autoplay', '');
+                faceScanVideoEl.srcObject = stream;
                 faceScanVideoEl.style.display = 'block';
                 faceScanVideoEl.style.visibility = 'visible';
                 faceScanVideoEl.style.opacity = '1';
@@ -6759,7 +6801,10 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                     scanner.classList.add('scanning', 'has-video');
                 }
 
+                let loopsStarted = false;
                 const startLoops = () => {
+                    if (loopsStarted || !faceScanActive) return;
+                    loopsStarted = true;
                     if (faceScanVideoEl) {
                         faceScanVideoEl.style.opacity = '1';
                         faceScanVideoEl.classList.add('ready');
@@ -6788,6 +6833,9 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                     if (faceScanAnimationId) cancelAnimationFrame(faceScanAnimationId);
                     faceScanAnimationId = requestAnimationFrame(runFaceScanOverlay);
                 };
+
+                faceScanVideoEl.addEventListener('playing', startLoops, { once: true });
+                faceScanVideoEl.addEventListener('loadeddata', startLoops, { once: true });
 
                 // Trigger play immediately and start detection loops
                 const playPromise = faceScanVideoEl.play();
@@ -6875,7 +6923,8 @@ function handleScanSuccess(statusText) {
         
         if (statusText === "Access Granted!" || statusText.indexOf("Welcome back") !== -1) {
             // Autofill nickname from this person's own saved profile
-            if (nicknameInput) nicknameInput.value = savedProfile.nickname || '';
+            const recognizedName = savedProfile.nickname || localStorage.getItem('piktalk_face_nickname') || '';
+            if (nicknameInput) nicknameInput.value = recognizedName;
             
             // Restore avatar preview: use saved profile pic if available,
             // otherwise keep the freshly captured face photo currently in myProfilePic
