@@ -6449,7 +6449,7 @@ async function runFaceScanLoop() {
         faceScanFaceInFrame = true;
         faceNoFaceCount = 0;
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
-        if (faceScanDetailEl) faceScanDetailEl.textContent = 'Hold steady...';
+        if (faceScanDetailEl) faceScanDetailEl.textContent = "You're too hot to handle...";
 
         // Extract full 128-dim descriptor in background immediately
         if (!faceCapturedDescriptor) {
@@ -6824,7 +6824,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
                                 faceScanStatusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span class="scan-status-text">Scanning (0%)</span>';
                             }
                         }
-                        if (faceScanDetailEl && !faceScanIsSettings) faceScanDetailEl.textContent = 'Hold steady...';
+                        if (faceScanDetailEl && !faceScanIsSettings) faceScanDetailEl.textContent = "You're too hot to handle...";
                         if (faceScanTimerId) clearTimeout(faceScanTimerId);
                         faceScanTimerId = setTimeout(runFaceScanLoop, 20);
                     }, WARMUP_MS);
