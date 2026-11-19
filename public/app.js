@@ -5894,7 +5894,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.45;   // euclidean distance — 0.45 accurate threshold: same person matches at 0.20-0.40, different people rejected (usually >0.48)
+const FACE_MATCH_DIST  = 0.42;   // euclidean distance — tighter threshold for 160px descriptor accuracy; same person: 0.15-0.38, different people: usually >0.45
 const FACE_NO_FACE_MAX = 1;      // show face-not-found immediately on first failed check
 const FACE_LIVENESS_NEEDED = 12; // detected frames needed to complete scan (faster completion)
 
@@ -6084,11 +6084,15 @@ function getRegisteredUsers() {
     }
 }
 
-// Find matching user for a descriptor — checks user list and direct descriptor storage
+// Find matching user for a descriptor — checks registered users list only
 function findMatchingUser(desc) {
     if (!desc) return null;
 
-    // Primary: check registered users list
+    // Check registered users list (primary + only source of truth)
+    // The old piktalk_face_descriptor fallback was removed: it caused the wrong
+    // user's nickname to appear for new users because it still held the previous
+    // user's descriptor. migrateOldFaceProfile() already moves old data into
+    // piktalk_users on first load, so the fallback is both redundant and harmful.
     const users = getRegisteredUsers();
     let bestMatch = null;
     let bestDist = Infinity;
@@ -6103,30 +6107,7 @@ function findMatchingUser(desc) {
             }
         }
     }
-    if (bestMatch) return bestMatch;
-
-    // Fallback: check piktalk_face_descriptor directly
-    try {
-        const raw = localStorage.getItem('piktalk_face_descriptor');
-        const faceUserId = localStorage.getItem('piktalk_face_userid');
-        if (raw) {
-            const storedDesc = new Float32Array(JSON.parse(raw));
-            const dist = faceapi.euclideanDistance(storedDesc, desc);
-            console.log(`[FaceID] Fallback descriptor check. Distance: ${dist.toFixed(4)}`);
-            if (dist < FACE_MATCH_DIST) {
-                const uid = faceUserId || 'u-face-' + Date.now().toString(36);
-                const profile = JSON.parse(localStorage.getItem(`piktalk_profile_${uid}`) || '{}');
-                return {
-                    faceUserId: uid,
-                    descriptor: JSON.parse(raw),
-                    nickname: profile.nickname || '',
-                    profilePic: profile.profilePic || null
-                };
-            }
-        }
-    } catch(e) {}
-
-    return null;
+    return bestMatch || null;
 }
 
 // Save/update a user in the database
@@ -6761,7 +6742,11 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanCanvasEl = faceCanvas;
         faceScanStatusEl = faceStatus;
         faceScanDetailEl = faceDetail;
-        // Clear nickname so each person types their own name after scan
+        // Clear any stale identity from a previous session so it cannot bleed
+        // into the new scan and show the wrong person's nickname.
+        localStorage.removeItem('piktalk_face_userid');
+        localStorage.removeItem('piktalk_face_nickname');
+        // Clear nickname input so each new person types their own name
         if (nicknameInput) nicknameInput.value = '';
     }
 
