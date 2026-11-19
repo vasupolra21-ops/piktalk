@@ -5894,7 +5894,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.58;   // euclidean distance — 0.58 reliably matches same person across lighting/angle/distance changes
+const FACE_MATCH_DIST  = 0.45;   // euclidean distance — 0.45 accurate threshold: same person matches at 0.20-0.40, different people rejected (usually >0.48)
 const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
@@ -6116,7 +6116,7 @@ function findMatchingUser(desc) {
                 return {
                     faceUserId: uid,
                     descriptor: JSON.parse(raw),
-                    nickname: profile.nickname || localStorage.getItem('piktalk_face_nickname') || '',
+                    nickname: profile.nickname || '',
                     profilePic: profile.profilePic || null
                 };
             }
@@ -6508,6 +6508,8 @@ async function _onFaceScanComplete() {
             prof.nickname = localMatch.nickname;
             prof.profilePic = myProfilePic || localMatch.profilePic || null;
             localStorage.setItem(profKey, JSON.stringify(prof));
+        } else {
+            localStorage.removeItem('piktalk_face_nickname');
         }
 
         // Update stored descriptor: blend 80% old + 20% new so it adapts over time
@@ -6563,18 +6565,22 @@ async function _onFaceScanComplete() {
                 saveBiometrics(descriptor, faceScanVideoEl);
 
                 // Save their profile locally with recognized nickname and latest photo
-                if (data.nickname) localStorage.setItem('piktalk_face_nickname', data.nickname);
+                if (data.nickname) {
+                    localStorage.setItem('piktalk_face_nickname', data.nickname);
+                } else {
+                    localStorage.removeItem('piktalk_face_nickname');
+                }
                 
                 const profKey = `piktalk_profile_${data.faceUserId}`;
                 localStorage.setItem(profKey, JSON.stringify({ nickname: data.nickname || '', profilePic: myProfilePic || data.profilePic || null }));
 
-                saveUserInDatabase(data.faceUserId, descriptor, data.nickname, myProfilePic || data.profilePic || null);
+                saveUserInDatabase(data.faceUserId, descriptor, data.nickname || '', myProfilePic || data.profilePic || null);
                 if (descriptor) {
                     localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
                 }
 
                 if (descriptor) {
-                    _syncFaceToServer(data.faceUserId, descriptor, data.nickname, myProfilePic || data.profilePic || null);
+                    _syncFaceToServer(data.faceUserId, descriptor, data.nickname || '', myProfilePic || data.profilePic || null);
                 }
 
                 handleScanSuccess('Welcome back! (Recognized across devices)');
@@ -6590,6 +6596,10 @@ async function _onFaceScanComplete() {
     localStorage.setItem('piktalk_face_userid', newFaceUserId);
     myUserId = newFaceUserId;
     sessionStorage.setItem('piktalk_userId', newFaceUserId);
+    localStorage.removeItem('piktalk_face_nickname');
+
+    const newProfKey = `piktalk_profile_${newFaceUserId}`;
+    localStorage.setItem(newProfKey, JSON.stringify({ nickname: '', profilePic: null }));
 
     // Capture latest face snapshot from camera
     saveBiometrics(descriptor, faceScanVideoEl);
@@ -6685,7 +6695,7 @@ function saveBiometrics(signature, video) {
             // Also update in registered users database
             const faceUserId = localStorage.getItem('piktalk_face_userid');
             if (faceUserId) {
-                const nick = currentProfile.nickname || localStorage.getItem('piktalk_face_nickname') || '';
+                const nick = currentProfile.nickname || '';
                 saveUserInDatabase(faceUserId, signature, nick, avatarDataURL);
             }
         }
@@ -6947,8 +6957,8 @@ function handleScanSuccess(statusText) {
         const savedProfile = JSON.parse(localStorage.getItem(_profileKey()) || '{}');
         
         if (statusText === "Access Granted!" || statusText.indexOf("Welcome back") !== -1) {
-            // Autofill nickname from this person's own saved profile
-            const recognizedName = savedProfile.nickname || localStorage.getItem('piktalk_face_nickname') || '';
+            // Autofill nickname ONLY from this recognized person's own saved profile
+            const recognizedName = savedProfile.nickname || '';
             if (nicknameInput) nicknameInput.value = recognizedName;
             
             // Display latest captured face photo in avatar preview

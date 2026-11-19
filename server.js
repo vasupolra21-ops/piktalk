@@ -221,7 +221,7 @@ function euclidDist(a, b) {
     return Math.sqrt(sum);
 }
 
-const FACE_MATCH_THRESHOLD = 0.58; // 0.58 reliably matches same person across lighting/angle/device changes
+const FACE_MATCH_THRESHOLD = 0.45; // 0.45 accurate threshold: same person matches at 0.20-0.40, different people rejected (usually >0.48)
 
 // POST /api/face/register  — save or update a face profile
 app.post('/api/face/register', async (req, res) => {
