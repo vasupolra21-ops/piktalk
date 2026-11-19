@@ -5895,7 +5895,7 @@ let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const FACE_MATCH_DIST  = 0.45;   // euclidean distance — 0.45 accurate threshold: same person matches at 0.20-0.40, different people rejected (usually >0.48)
-const FACE_NO_FACE_MAX = 20;     // ~6 sec of no-face before showing warning
+const FACE_NO_FACE_MAX = 3;      // ~1 sec of no-face before showing warning (instant feedback)
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
 // ── Lazy on-demand loader for face-api.js neural network library ──
@@ -6427,7 +6427,7 @@ async function runFaceScanLoop() {
 
         if (!detection) {
             faceNoFaceCount++;
-            if (faceNoFaceCount > 3) {
+            if (faceNoFaceCount > 1) {
                 faceScanFaceInFrame = false;
             }
             if (faceNoFaceCount >= FACE_NO_FACE_MAX) {
