@@ -5894,7 +5894,7 @@ let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.42;   // euclidean distance — tighter threshold for 160px descriptor accuracy; same person: 0.15-0.38, different people: usually >0.45
+const FACE_MATCH_DIST  = 0.45;   // euclidean distance — same person: 0.15-0.40, different people: usually >0.48
 const FACE_NO_FACE_MAX = 1;      // show face-not-found immediately on first failed check
 const FACE_LIVENESS_NEEDED = 12; // detected frames needed to complete scan (faster completion)
 
@@ -6033,7 +6033,10 @@ async function detectFaceFast(video) {
     }
 }
 
-// Full descriptor extractor called ONCE upon reaching 100% (runs in < 15ms)
+// Full descriptor extractor called ONCE upon reaching 100%
+// Uses 224px input directly on the video element for maximum accuracy —
+// higher resolution = more precise 128-dim embedding = better recognition.
+// (160px is only used for fast detection, NOT here for recognition.)
 async function extractFaceDescriptor(video) {
     if (!faceModelsLoaded || !video || video.readyState < 2) return null;
     const vw = video.videoWidth || 0;
@@ -6041,13 +6044,12 @@ async function extractFaceDescriptor(video) {
     if (vw <= 0 || vh <= 0) return null;
 
     try {
-        // inputSize 160 is ~3x faster than 224 with negligible accuracy loss for 128-dim descriptor
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.10 });
-        const source = getDownscaledDetectionCanvas(video, 160) || video;
-        let det = await faceapi.detectSingleFace(source, opts).withFaceLandmarks().withFaceDescriptor();
+        // 224px on the raw video gives the most accurate 128-dim descriptor
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.10 });
+        let det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks().withFaceDescriptor();
         if (!det || !det.descriptor) {
-            // Fallback: try directly on video with slightly lower threshold
-            const fallbackOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.08 });
+            // Fallback: slightly lower threshold, same high-res input
+            const fallbackOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.08 });
             det = await faceapi.detectSingleFace(video, fallbackOpts).withFaceLandmarks().withFaceDescriptor();
         }
         return det || null;
