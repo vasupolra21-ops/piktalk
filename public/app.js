@@ -5895,7 +5895,7 @@ let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const FACE_MATCH_DIST  = 0.45;   // euclidean distance — 0.45 accurate threshold: same person matches at 0.20-0.40, different people rejected (usually >0.48)
-const FACE_NO_FACE_MAX = 3;      // ~1 sec of no-face before showing warning (instant feedback)
+const FACE_NO_FACE_MAX = 1;      // show face-not-found immediately on first failed check
 const FACE_LIVENESS_NEEDED = 18; // detected frames needed to complete scan
 
 // ── Lazy on-demand loader for face-api.js neural network library ──
@@ -6383,7 +6383,8 @@ async function runFaceScanLoop() {
     }
 
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    const loopDelay = isMobileDevice ? 35 : 20;
+    // When face is in frame: run fast to track liveness. When not: check every 1 second.
+    const loopDelay = faceScanFaceInFrame ? (isMobileDevice ? 35 : 20) : 1000;
 
     const video = faceScanVideoEl;
 
@@ -6427,9 +6428,7 @@ async function runFaceScanLoop() {
 
         if (!detection) {
             faceNoFaceCount++;
-            if (faceNoFaceCount > 1) {
-                faceScanFaceInFrame = false;
-            }
+            faceScanFaceInFrame = false;
             if (faceNoFaceCount >= FACE_NO_FACE_MAX) {
                 // Show face-not-found UI
                 stopFaceScanFlow();
