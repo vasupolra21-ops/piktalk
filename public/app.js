@@ -5895,8 +5895,10 @@ let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const FACE_MATCH_DIST  = 0.45;   // euclidean distance — same person: 0.15-0.40, different people: usually >0.48
-const FACE_NO_FACE_MAX = 1;      // show face-not-found immediately on first failed check
-const FACE_LIVENESS_NEEDED = 12; // detected frames needed to complete scan (faster completion)
+const FACE_NO_FACE_MAX = 2;      // 2 consecutive misses before stopping (grace frames prevent flicker)
+const FACE_LIVENESS_NEEDED = 8;  // fewer frames needed = faster scan completion
+const FACE_DETECT_SIZE = 160;    // downscaled canvas size for fast detection
+const FACE_DESC_SIZE   = 224;    // higher-res input for accurate 128-dim descriptor
 
 // ── Lazy on-demand loader for face-api.js neural network library ──
 let _faceApiScriptLoading = null;
@@ -5951,6 +5953,8 @@ async function loadFaceModels() {
             faceapi.tf.env().set('WEBGL_DELETE_TEXTURE_THRESHOLD', -1);
             faceapi.tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
             faceapi.tf.env().set('WEBGL_FLUSH_THRESHOLD', -1);
+            faceapi.tf.env().set('WEBGL_LAZILY_UNPACK_FLOAT_TEXTURES', true);
+            faceapi.tf.env().set('WEBGL_CPU_FORWARD', false);
         } catch(e) {}
     }
 
@@ -5967,10 +5971,11 @@ async function loadFaceModels() {
         setTimeout(async () => {
             try {
                 const dummy = document.createElement('canvas');
-                dummy.width = 128;
-                dummy.height = 128;
-                const dummyOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 128, scoreThreshold: 0.1 });
-                await faceapi.detectSingleFace(dummy, dummyOpts);
+                dummy.width = FACE_DETECT_SIZE;
+                dummy.height = FACE_DETECT_SIZE;
+                // Warm up both detector and descriptor nets so first real scan is instant
+                const dummyOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: FACE_DETECT_SIZE, scoreThreshold: 0.5 });
+                await faceapi.detectSingleFace(dummy, dummyOpts).withFaceLandmarks().withFaceDescriptor();
             } catch(w) {}
         }, 100);
     } catch (e) {
@@ -6023,9 +6028,9 @@ async function detectFaceFast(video) {
     if (vw <= 0 || vh <= 0) return null;
 
     try {
-        // Always use downscaled canvas as primary — avoids full-res GPU upload overhead
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.10 });
-        const source = getDownscaledDetectionCanvas(video, 160) || video;
+        // Downscaled canvas avoids full-res GPU upload overhead — fastest possible detection
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: FACE_DETECT_SIZE, scoreThreshold: 0.35 });
+        const source = getDownscaledDetectionCanvas(video, FACE_DETECT_SIZE) || video;
         const det = await faceapi.detectSingleFace(source, opts);
         return det || null;
     } catch (e) {
@@ -6045,11 +6050,11 @@ async function extractFaceDescriptor(video) {
 
     try {
         // 224px on the raw video gives the most accurate 128-dim descriptor
-        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.10 });
+        const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: FACE_DESC_SIZE, scoreThreshold: 0.35 });
         let det = await faceapi.detectSingleFace(video, opts).withFaceLandmarks().withFaceDescriptor();
         if (!det || !det.descriptor) {
-            // Fallback: slightly lower threshold, same high-res input
-            const fallbackOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.08 });
+            // Fallback: lower threshold, same high-res input
+            const fallbackOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: FACE_DESC_SIZE, scoreThreshold: 0.15 });
             det = await faceapi.detectSingleFace(video, fallbackOpts).withFaceLandmarks().withFaceDescriptor();
         }
         return det || null;
@@ -6231,13 +6236,19 @@ function rgbToGrayscale(r, g, b) {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// Persistent canvas reused every frame for liveness diff — avoids GC pressure
+let _livenessCanvas = null;
+let _livenessCtx = null;
+
 // Helper to check for frozen stream/static image and track motion/liveness
 function processLivenessFrame(video) {
     const size = 64;
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = size;
-    tempCanvas.height = size;
-    const tempCtx = tempCanvas.getContext('2d');
+    if (!_livenessCanvas) {
+        _livenessCanvas = document.createElement('canvas');
+        _livenessCanvas.width = size;
+        _livenessCanvas.height = size;
+        _livenessCtx = _livenessCanvas.getContext('2d', { willReadFrequently: true });
+    }
     
     // Grab center area
     const vSize = Math.min(video.videoWidth, video.videoHeight || 300) || 300;
@@ -6246,12 +6257,12 @@ function processLivenessFrame(video) {
     const sSize = vSize * 0.5;
     
     try {
-        tempCtx.drawImage(video, sx, sy, sSize, sSize, 0, 0, size, size);
+        _livenessCtx.drawImage(video, sx, sy, sSize, sSize, 0, 0, size, size);
     } catch(e) {
         return { isLive: false, diff: 0 };
     }
     
-    const imgData = tempCtx.getImageData(0, 0, size, size).data;
+    const imgData = _livenessCtx.getImageData(0, 0, size, size).data;
     
     const currentFrame = new Uint8Array(size * size);
     for (let i = 0; i < imgData.length; i += 4) {
@@ -6285,6 +6296,7 @@ function processLivenessFrame(video) {
 }
 
 let faceScanIsProcessing = false;
+let _descriptorExtracting = false; // guard: prevent parallel descriptor extraction calls
 
 // ── rAF overlay draw loop (smooth 60fps/120fps continuous progress rendering) ──
 function runFaceScanOverlay() {
@@ -6297,13 +6309,13 @@ function runFaceScanOverlay() {
 
     // Smooth continuous progression: advance smoothly while streaming
     if (isCameraStreaming && !faceScanLivenessVerified) {
-        const stepRate = (faceScanIsReScan || faceScanIsSettings) ? 1.8 : 2.6;
+        const stepRate = (faceScanIsReScan || faceScanIsSettings) ? 2.5 : 3.5;
         if (faceScanFaceInFrame) {
             // Full speed when face is actively locked
             faceScanLivenessDisplayProgress = Math.min(100, faceScanLivenessDisplayProgress + stepRate);
-        } else if (faceScanLivenessDisplayProgress < 30) {
+        } else if (faceScanLivenessDisplayProgress < 20) {
             // Initial smooth warmup so progress never sits frozen at 0%
-            faceScanLivenessDisplayProgress = Math.min(30, faceScanLivenessDisplayProgress + 1.2);
+            faceScanLivenessDisplayProgress = Math.min(20, faceScanLivenessDisplayProgress + 1.5);
         }
     } else if (!faceScanFaceInFrame && !faceScanLivenessVerified && faceScanLivenessDisplayProgress > 0) {
         // Smooth gentle decay if face completely leaves frame
@@ -6369,14 +6381,14 @@ async function runFaceScanLoop() {
     }
 
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    // Face in frame: run fast for smooth liveness. No face: re-check every 300ms (snappy, not wasteful).
-    const loopDelay = faceScanFaceInFrame ? (isMobileDevice ? 100 : 80) : 300;
+    // Face in frame: run as fast as possible (rAF-driven). No face: poll every 150ms (snappy, not wasteful).
+    const loopDelay = faceScanFaceInFrame ? (isMobileDevice ? 60 : 40) : 150;
 
     const video = faceScanVideoEl;
 
     // Wait for video to be ready
     if (!video || video.readyState < 2) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 200 : 100);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 150 : 80);
         return;
     }
 
@@ -6393,13 +6405,13 @@ async function runFaceScanLoop() {
             }
         }
         if (faceScanDetailEl) faceScanDetailEl.textContent = 'Loading neural network models...';
-        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 200 : 100);
+        if (faceScanActive)   faceScanTimerId = setTimeout(runFaceScanLoop, isMobileDevice ? 150 : 80);
         return;
     }
 
     // Prevent overlapping async frames
     if (faceScanIsProcessing) {
-        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 50);
+        if (faceScanActive) faceScanTimerId = setTimeout(runFaceScanLoop, 30);
         return;
     }
 
@@ -6436,9 +6448,11 @@ async function runFaceScanLoop() {
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
         if (faceScanDetailEl) faceScanDetailEl.textContent = "You're too hot to handle...";
 
-        // Extract full 128-dim descriptor in background immediately
-        if (!faceCapturedDescriptor) {
+        // Extract full 128-dim descriptor in background immediately (guard prevents parallel calls)
+        if (!faceCapturedDescriptor && !_descriptorExtracting) {
+            _descriptorExtracting = true;
             extractFaceDescriptor(video).then(fullDet => {
+                _descriptorExtracting = false;
                 if (fullDet && fullDet.descriptor && faceScanActive) {
                     faceCapturedDescriptor = fullDet.descriptor;
                     if (faceScanLivenessDisplayProgress >= 100 && !faceScanLivenessVerified) {
@@ -6446,7 +6460,7 @@ async function runFaceScanLoop() {
                         _onFaceScanComplete();
                     }
                 }
-            }).catch(() => {});
+            }).catch(() => { _descriptorExtracting = false; });
         }
     } catch(err) {
         console.warn('[FaceID] Scan loop error:', err);
@@ -6733,6 +6747,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
     facePrevLandmarks   = null;
     faceMotionSum       = 0;
     faceCapturedDescriptor = null;
+    _descriptorExtracting  = false;
 
     if (isSettings) {
         faceScanVideoEl  = settingsVideo;
