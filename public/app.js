@@ -1751,6 +1751,7 @@ function setupEventListeners() {
         myNickname = '';
         myUserId = '';
         faceCapturedDescriptor = null;
+        _descriptorSamples = [];
         _descriptorExtracting = false;
         localStorage.removeItem('piktalk_face_userid');
         localStorage.removeItem('piktalk_face_nickname');
@@ -5915,9 +5916,30 @@ let faceNoFaceCount   = 0;          // consecutive frames without a face
 let facePrevLandmarks = null;        // previous frame landmarks for liveness
 let faceMotionSum     = 0;           // accumulated motion score
 let faceCapturedDescriptor = null;   // Float32Array(128) for current scan
+let _descriptorSamples = [];          // multi-frame samples collected during scan for consensus centroid
+
+// Compute L2-normalized mean centroid vector from multiple sampled face descriptors
+function computeCentroidDescriptor(samples) {
+    if (!samples || samples.length === 0) return null;
+    if (samples.length === 1) return samples[0];
+    const centroid = new Float32Array(128);
+    for (const s of samples) {
+        for (let i = 0; i < 128; i++) centroid[i] += s[i];
+    }
+    let norm = 0;
+    for (let i = 0; i < 128; i++) {
+        centroid[i] /= samples.length;
+        norm += centroid[i] * centroid[i];
+    }
+    norm = Math.sqrt(norm);
+    if (norm > 0) {
+        for (let i = 0; i < 128; i++) centroid[i] /= norm;
+    }
+    return centroid;
+}
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.38;   // strict euclidean distance — same person: 0.15-0.34, different people: >0.40
+const FACE_MATCH_DIST  = 0.40;   // calibrated euclidean distance — same person: 0.15-0.32, different people: >0.43
 const FACE_NO_FACE_MAX = 15;     // 15 consecutive misses (~1.5s) before stopping to allow natural head adjustment
 const FACE_LIVENESS_NEEDED = 8;  // fewer frames needed = faster scan completion
 const FACE_DETECT_SIZE = 160;    // downscaled canvas size for fast detection
@@ -6182,9 +6204,12 @@ function saveUserInDatabase(faceUserId, descriptor, nickname, profilePic) {
         }
     }
 
+    const centroidDesc = descriptorsList.length > 0 ? computeCentroidDescriptor(descriptorsList.map(d => new Float32Array(d))) : null;
+    const finalDescriptor = centroidDesc ? Array.from(centroidDesc) : descriptorArray;
+
     const userObj = {
         faceUserId,
-        descriptor: descriptorArray,
+        descriptor: finalDescriptor,
         descriptors: descriptorsList.length > 0 ? descriptorsList : (descriptorArray ? [descriptorArray] : []),
         nickname: userNickname,
         profilePic: userProfilePic
@@ -6494,14 +6519,15 @@ async function runFaceScanLoop() {
         if (faceNotFoundEl) faceNotFoundEl.classList.add('hidden');
         if (faceScanDetailEl) faceScanDetailEl.textContent = "You're too hot to handle...";
 
-        // Extract full 128-dim descriptor in background immediately (guard prevents parallel calls)
-        if (!faceCapturedDescriptor && !_descriptorExtracting) {
+        // Sample multi-frame consensus descriptors while scan progress advances
+        if (_descriptorSamples.length < 3 && !_descriptorExtracting) {
             _descriptorExtracting = true;
             extractFaceDescriptor(video).then(fullDet => {
                 _descriptorExtracting = false;
                 if (fullDet && fullDet.descriptor && faceScanActive) {
-                    faceCapturedDescriptor = fullDet.descriptor;
-                    if (faceScanLivenessDisplayProgress >= 100 && !faceScanLivenessVerified) {
+                    _descriptorSamples.push(fullDet.descriptor);
+                    faceCapturedDescriptor = computeCentroidDescriptor(_descriptorSamples);
+                    if (faceScanLivenessDisplayProgress >= 100 && !faceScanLivenessVerified && faceCapturedDescriptor) {
                         faceScanLivenessVerified = true;
                         _onFaceScanComplete();
                     }
@@ -6788,6 +6814,7 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
     facePrevLandmarks   = null;
     faceMotionSum       = 0;
     faceCapturedDescriptor = null;
+    _descriptorSamples     = [];
     _descriptorExtracting  = false;
 
     if (isSettings) {

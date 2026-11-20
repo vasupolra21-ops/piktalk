@@ -242,7 +242,7 @@ function euclidDist(a, b) {
     return Math.sqrt(sum);
 }
 
-const FACE_MATCH_THRESHOLD = 0.38; // strict: same person: 0.15-0.34, different people: >0.40
+const FACE_MATCH_THRESHOLD = 0.40; // calibrated: same person centroid: 0.15-0.32, different people: >0.43
 
 // POST /api/face/register  — save or update a face profile
 app.post('/api/face/register', async (req, res) => {
