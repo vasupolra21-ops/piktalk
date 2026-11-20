@@ -194,18 +194,39 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Map: faceUserId -> { faceUserId, descriptor: number[], nickname, profilePic, updatedAt }
 const faceRegistry = new Map();
 
-// Load faces from database on startup
+// Load faces from database on startup with deduplication
 async function initFaceRegistry() {
     try {
         const saved = await db.getFaces();
         for (const f of saved) {
-            faceRegistry.set(f.faceUserId, {
-                faceUserId: f.faceUserId,
-                descriptor: f.descriptor,
-                nickname: f.nickname || '',
-                profilePic: f.profilePic || null,
-                updatedAt: Date.now()
-            });
+            if (!Array.isArray(f.descriptor) || f.descriptor.length !== 128) continue;
+            let duplicateId = null;
+            for (const [existingId, entry] of faceRegistry.entries()) {
+                if (entry.descriptor && euclidDist(entry.descriptor, f.descriptor) < FACE_MATCH_THRESHOLD) {
+                    duplicateId = existingId;
+                    break;
+                }
+            }
+
+            if (duplicateId) {
+                console.log(`👤 Pruning duplicate face in database: ${f.faceUserId} matches ${duplicateId}`);
+                const existing = faceRegistry.get(duplicateId);
+                if (!existing.nickname && f.nickname) {
+                    existing.nickname = f.nickname;
+                }
+                if (!existing.profilePic && f.profilePic) {
+                    existing.profilePic = f.profilePic;
+                }
+                try { await db.deleteFace(f.faceUserId); } catch(e) {}
+            } else {
+                faceRegistry.set(f.faceUserId, {
+                    faceUserId: f.faceUserId,
+                    descriptor: f.descriptor,
+                    nickname: f.nickname || '',
+                    profilePic: f.profilePic || null,
+                    updatedAt: Date.now()
+                });
+            }
         }
         console.log(`👤 Loaded ${faceRegistry.size} faces from database.`);
     } catch (e) {
@@ -229,6 +250,22 @@ app.post('/api/face/register', async (req, res) => {
     if (!faceUserId || !Array.isArray(descriptor) || descriptor.length !== 128) {
         return res.status(400).json({ error: 'Invalid payload' });
     }
+
+    // Check if this face already exists under a different faceUserId (same person)
+    // Remove duplicate so the registry only ever has ONE entry per human face!
+    for (const [existingId, entry] of faceRegistry.entries()) {
+        if (existingId !== faceUserId && entry.descriptor) {
+            const dist = euclidDist(entry.descriptor, descriptor);
+            if (dist < FACE_MATCH_THRESHOLD) {
+                console.log(`👤 Merging duplicate face on server: removing ${existingId} ("${entry.nickname}") in favor of ${faceUserId} ("${nickname}")`);
+                faceRegistry.delete(existingId);
+                try {
+                    await db.deleteFace(existingId);
+                } catch(e) {}
+            }
+        }
+    }
+
     faceRegistry.set(faceUserId, {
         faceUserId,
         descriptor,

@@ -244,6 +244,22 @@ const db = {
             profilePic: val.profilePic,
             dateTime: val.dateTime
         }));
+    },
+
+    deleteFace: async (faceUserId) => {
+        if (useMongo && mongoDb) {
+            try {
+                await mongoDb.collection('faces').deleteOne({ faceUserId });
+            } catch (err) {
+                console.error("MongoDB deleteFace error:", err.message);
+            }
+        }
+        const data = readJSON();
+        if (data.faces && data.faces[faceUserId]) {
+            delete data.faces[faceUserId];
+            writeJSON(data);
+        }
+        return true;
     }
 };
 
