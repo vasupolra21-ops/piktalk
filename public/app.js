@@ -5915,7 +5915,7 @@ function averageDescriptors(samples) {
 }
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.45;   // euclidean distance — same person: 0.15-0.40, different people: usually >0.48
+const FACE_MATCH_DIST  = 0.38;   // euclidean distance — same person: 0.15-0.32, different people: >0.40
 const FACE_NO_FACE_MAX = 2;      // 2 consecutive misses before stopping (grace frames prevent flicker)
 const FACE_LIVENESS_NEEDED = 8;  // fewer frames needed = faster scan completion
 const FACE_DETECT_SIZE = 160;    // downscaled canvas size for fast detection
@@ -6197,12 +6197,12 @@ function saveUserInDatabase(faceUserId, descriptor, nickname, profilePic) {
     let descriptorArray = descriptor ? Array.from(descriptor) : null;
     let descVec = descriptorArray ? new Float32Array(descriptorArray) : null;
 
-    // Check if face already belongs to an existing user (prevent duplicate registration of same person)
+    // Check if face already belongs to an existing user (only link if ultra-confident match < 0.28)
     let idx = users.findIndex(u => u.faceUserId === faceUserId);
     if (idx === -1 && descVec && typeof faceapi !== 'undefined' && faceapi.euclideanDistance) {
         idx = users.findIndex(u => {
             if (!u.descriptor) return false;
-            return faceapi.euclideanDistance(new Float32Array(u.descriptor), descVec) < FACE_MATCH_DIST;
+            return faceapi.euclideanDistance(new Float32Array(u.descriptor), descVec) < 0.28;
         });
         if (idx !== -1) {
             console.log(`[FaceID] Face matches existing registered user "${users[idx].nickname}" (${users[idx].faceUserId}) — linking`);
@@ -6605,15 +6605,17 @@ async function _onFaceScanComplete() {
             localStorage.removeItem('piktalk_face_nickname');
         }
 
-        // Update stored descriptor: blend 85% old + 15% new so it adapts smoothly
-        if (descriptor) {
+        // Update stored descriptor: blend 90% old + 10% new so it adapts smoothly, but ONLY on ultra-confident matches (< 0.28)
+        // Never blend on borderline frames to prevent template contamination between different people!
+        const matchDist = localMatch.descriptor ? faceapi.euclideanDistance(new Float32Array(localMatch.descriptor), descriptor) : 0;
+        if (descriptor && matchDist < 0.28) {
             try {
                 const oldDesc = localMatch.descriptor ? new Float32Array(localMatch.descriptor) : null;
                 let blended = new Float32Array(128);
                 if (oldDesc && oldDesc.length === 128) {
                     let norm = 0;
                     for (let i = 0; i < 128; i++) {
-                        blended[i] = oldDesc[i] * 0.85 + descriptor[i] * 0.15;
+                        blended[i] = oldDesc[i] * 0.90 + descriptor[i] * 0.10;
                         norm += blended[i] * blended[i];
                     }
                     norm = Math.sqrt(norm);
@@ -7084,8 +7086,12 @@ function handleScanSuccess(statusText) {
             if (faceScanSection) faceScanSection.classList.add('hidden');
             if (profileSetupSection) profileSetupSection.classList.remove('hidden');
         } else {
-            // First time login - clear previous nickname only. Keep the freshly captured face photo!
-            if (nicknameInput) nicknameInput.value = '';
+            // First time login - clear nickname field and prompt new person to type their name
+            if (nicknameInput) {
+                nicknameInput.value = '';
+                nicknameInput.placeholder = 'Enter your name';
+                setTimeout(() => { try { nicknameInput.focus(); } catch(e) {} }, 150);
+            }
             
             // Ensure the freshly captured face is shown in the preview
             if (myProfilePic) {

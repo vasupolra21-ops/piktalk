@@ -202,7 +202,7 @@ async function initFaceRegistry() {
             if (!Array.isArray(f.descriptor) || f.descriptor.length !== 128) continue;
             let duplicateId = null;
             for (const [existingId, entry] of faceRegistry.entries()) {
-                if (entry.descriptor && euclidDist(entry.descriptor, f.descriptor) < FACE_MATCH_THRESHOLD) {
+                if (entry.descriptor && euclidDist(entry.descriptor, f.descriptor) < 0.32) {
                     duplicateId = existingId;
                     break;
                 }
@@ -242,7 +242,7 @@ function euclidDist(a, b) {
     return Math.sqrt(sum);
 }
 
-const FACE_MATCH_THRESHOLD = 0.45; // same person: 0.15-0.40, different people: usually >0.48
+const FACE_MATCH_THRESHOLD = 0.38; // same person: 0.15-0.32, different people: >0.40
 
 // POST /api/face/register  — save or update a face profile
 app.post('/api/face/register', async (req, res) => {
@@ -256,7 +256,7 @@ app.post('/api/face/register', async (req, res) => {
     for (const [existingId, entry] of faceRegistry.entries()) {
         if (existingId !== faceUserId && entry.descriptor) {
             const dist = euclidDist(entry.descriptor, descriptor);
-            if (dist < FACE_MATCH_THRESHOLD) {
+            if (dist < 0.32) {
                 console.log(`👤 Merging duplicate face on server: removing ${existingId} ("${entry.nickname}") in favor of ${faceUserId} ("${nickname}")`);
                 faceRegistry.delete(existingId);
                 try {
