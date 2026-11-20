@@ -242,7 +242,7 @@ function euclidDist(a, b) {
     return Math.sqrt(sum);
 }
 
-const FACE_MATCH_THRESHOLD = 0.45; // same person: 0.15-0.40, different people: usually >0.48
+const FACE_MATCH_THRESHOLD = 0.38; // strict: same person: 0.15-0.34, different people: >0.40
 
 // POST /api/face/register  — save or update a face profile
 app.post('/api/face/register', async (req, res) => {
@@ -252,11 +252,11 @@ app.post('/api/face/register', async (req, res) => {
     }
 
     // Check if this face already exists under a different faceUserId (same person)
-    // Remove duplicate so the registry only ever has ONE entry per human face!
+    // Remove duplicate only when practically identical (< 0.28)
     for (const [existingId, entry] of faceRegistry.entries()) {
         if (existingId !== faceUserId && entry.descriptor) {
             const dist = euclidDist(entry.descriptor, descriptor);
-            if (dist < 0.32) {
+            if (dist < 0.28) {
                 console.log(`👤 Merging duplicate face on server: removing ${existingId} ("${entry.nickname}") in favor of ${faceUserId} ("${nickname}")`);
                 faceRegistry.delete(existingId);
                 try {
@@ -292,7 +292,8 @@ app.post('/api/face/match', (req, res) => {
     let best = null;
     let bestDist = Infinity;
     for (const entry of faceRegistry.values()) {
-        if (!entry.descriptor) continue;
+        // Only match profiles that have a valid descriptor and a non-empty registered nickname
+        if (!entry.descriptor || !entry.nickname || !entry.nickname.trim()) continue;
         const d = euclidDist(entry.descriptor, descriptor);
         if (d < bestDist) { bestDist = d; best = entry; }
     }
