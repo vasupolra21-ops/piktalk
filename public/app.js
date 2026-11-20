@@ -397,6 +397,7 @@ function getOrCreateUserId() {
     }
 }
 let myUserId = getOrCreateUserId();
+let _reScanOriginUserId = null;
 
 // Load this tab's saved profile directly from sessionStorage (no server needed).
 // This is isolated per tab: opening a new tab to test will start with a fresh, empty profile.
@@ -1745,6 +1746,9 @@ function setupEventListeners() {
         const now = Date.now();
         if (now - _lastReScanTap < 400) return; // Debounce rapid double-taps
         _lastReScanTap = now;
+
+        // Remember the user whose profile was active before clicking re-scan
+        _reScanOriginUserId = localStorage.getItem('piktalk_face_userid') || myUserId || null;
 
         // Fully reset previous user's temporary identity so re-scan starts 100% clean
         myProfilePic = null;
@@ -5939,7 +5943,8 @@ function computeCentroidDescriptor(samples) {
 }
 
 const FACE_MODEL_URL   = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
-const FACE_MATCH_DIST  = 0.40;   // calibrated euclidean distance — same person: 0.15-0.32, different people: >0.43
+const FACE_MATCH_DIST  = 0.33;   // calibrated euclidean distance with consensus centroid (same: 0.12-0.26, different: >=0.34)
+const RESCAN_ORIGIN_MATCH_DIST = 0.25; // strict threshold when re-scanning against the user already on screen
 const FACE_NO_FACE_MAX = 15;     // 15 consecutive misses (~1.5s) before stopping to allow natural head adjustment
 const FACE_LIVENESS_NEEDED = 8;  // fewer frames needed = faster scan completion
 const FACE_DETECT_SIZE = 160;    // downscaled canvas size for fast detection
@@ -6133,15 +6138,48 @@ function getRegisteredUsers() {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        return parsed.filter(u => u && u.faceUserId && Array.isArray(u.descriptor) && u.descriptor.length === 128);
+        let modified = false;
+        const validUsers = parsed.filter(u => u && u.faceUserId && Array.isArray(u.descriptor) && u.descriptor.length === 128);
+
+        // Sanitize existing stored profiles to purge contaminated descriptors from other people
+        for (const u of validUsers) {
+            if (Array.isArray(u.descriptors) && u.descriptors.length > 1) {
+                const primary = u.descriptors[0];
+                const cleanList = [primary];
+                for (let i = 1; i < u.descriptors.length; i++) {
+                    const d = u.descriptors[i];
+                    if (d && d.length === 128) {
+                        const dist = faceapi.euclideanDistance(new Float32Array(primary), new Float32Array(d));
+                        // If an exemplar differs by >= 0.25 from primary, it is a different person's face!
+                        if (dist < 0.25) {
+                            cleanList.push(d);
+                        } else {
+                            modified = true;
+                            console.warn(`[FaceID] Purged contaminated exemplar from user "${u.nickname}" (dist: ${dist.toFixed(4)})`);
+                        }
+                    }
+                }
+                if (cleanList.length !== u.descriptors.length) {
+                    u.descriptors = cleanList;
+                    const centroid = computeCentroidDescriptor(cleanList.map(d => new Float32Array(d)));
+                    if (centroid) u.descriptor = Array.from(centroid);
+                }
+            }
+        }
+        if (modified) {
+            localStorage.setItem('piktalk_users', JSON.stringify(validUsers));
+        }
+        return validUsers;
     } catch(e) {
         return [];
     }
 }
 
 // Find matching user for a descriptor — checks registered users list only
-function findMatchingUser(desc) {
+function findMatchingUser(desc, opts = {}) {
     if (!desc) return null;
+    const isReScan = opts.isReScan || false;
+    const originUserId = opts.originUserId || null;
 
     const users = getRegisteredUsers();
     let bestMatch = null;
@@ -6162,8 +6200,14 @@ function findMatchingUser(desc) {
                 const dist = faceapi.euclideanDistance(new Float32Array(u.descriptor), desc);
                 if (dist < minDistForUser) minDistForUser = dist;
             }
-            console.log(`[FaceID] Comparing against "${u.nickname}". Distance: ${minDistForUser.toFixed(4)}`);
-            if (minDistForUser < FACE_MATCH_DIST && minDistForUser < bestDist) {
+
+            // Stricter threshold if re-scanning from this specific user
+            const allowedDist = (isReScan && originUserId && u.faceUserId === originUserId)
+                ? RESCAN_ORIGIN_MATCH_DIST
+                : FACE_MATCH_DIST;
+
+            console.log(`[FaceID] Comparing against "${u.nickname}". Distance: ${minDistForUser.toFixed(4)} (Threshold: ${allowedDist})`);
+            if (minDistForUser < allowedDist && minDistForUser < bestDist) {
                 bestDist = minDistForUser;
                 bestMatch = u;
             }
@@ -6194,13 +6238,25 @@ function saveUserInDatabase(faceUserId, descriptor, nickname, profilePic) {
 
     let descriptorsList = (idx !== -1 && Array.isArray(users[idx].descriptors)) ? users[idx].descriptors : [];
     if (descriptorArray) {
-        const isDuplicate = descriptorsList.some(d => {
-            if (!d || d.length !== 128) return false;
-            return faceapi.euclideanDistance(new Float32Array(d), new Float32Array(descriptorArray)) < 0.15;
-        });
-        if (!isDuplicate) {
-            descriptorsList.push(descriptorArray);
-            if (descriptorsList.length > 4) descriptorsList.shift();
+        // Only accept exemplar if it belongs to THIS person (dist < 0.22 from primary)
+        const primary = descriptorsList.length > 0 ? descriptorsList[0] : null;
+        let isSamePerson = true;
+        if (primary && primary.length === 128) {
+            const distFromPrimary = faceapi.euclideanDistance(new Float32Array(primary), new Float32Array(descriptorArray));
+            if (distFromPrimary >= 0.22) {
+                isSamePerson = false; // reject contaminated descriptor from another person!
+            }
+        }
+
+        if (isSamePerson) {
+            const isDuplicate = descriptorsList.some(d => {
+                if (!d || d.length !== 128) return false;
+                return faceapi.euclideanDistance(new Float32Array(d), new Float32Array(descriptorArray)) < 0.12;
+            });
+            if (!isDuplicate) {
+                descriptorsList.push(descriptorArray);
+                if (descriptorsList.length > 4) descriptorsList.shift();
+            }
         }
     }
 
@@ -6550,7 +6606,7 @@ async function _onFaceScanComplete() {
 
     if (faceScanIsSettings) {
         // Settings re-registration: capture latest face photo
-        saveBiometrics(descriptor, faceScanVideoEl);
+        saveBiometrics(null, faceScanVideoEl);
         if (descriptor) saveFaceDescriptor(descriptor);
         // Also push updated descriptor and latest photo to server for cross-device sync
         const faceId = localStorage.getItem('piktalk_face_userid');
@@ -6559,18 +6615,23 @@ async function _onFaceScanComplete() {
             _syncFaceToServer(faceId, descriptor, nickname, myProfilePic || null);
         }
         handleScanSuccess('Face ID registered successfully!');
+        _reScanOriginUserId = null;
         return;
     }
 
     // ── Step 1: Check local device database first (fast) ──
-    const localMatch = findMatchingUser(descriptor);
+    const localMatch = findMatchingUser(descriptor, {
+        isReScan: faceScanIsReScan,
+        originUserId: _reScanOriginUserId
+    });
     if (localMatch) {
+        console.log(`[FaceID] Local match found: "${localMatch.nickname}" (ID: ${localMatch.faceUserId})`);
         localStorage.setItem('piktalk_face_userid', localMatch.faceUserId);
         myUserId = localMatch.faceUserId;
         sessionStorage.setItem('piktalk_userId', localMatch.faceUserId);
 
-        // Always capture latest live face snapshot immediately from camera
-        saveBiometrics(descriptor, faceScanVideoEl);
+        // Always capture latest live face snapshot immediately from camera (without mutating biometric template)
+        saveBiometrics(null, faceScanVideoEl);
 
         if (localMatch.nickname) {
             localStorage.setItem('piktalk_face_nickname', localMatch.nickname);
@@ -6583,14 +6644,14 @@ async function _onFaceScanComplete() {
             localStorage.removeItem('piktalk_face_nickname');
         }
 
-        // Only adapt/blend if it's very close (<0.25) to prevent template drift/poisoning
+        // Only adapt/blend if ultra close (< 0.20) to strictly prevent template drift/poisoning
         if (descriptor) {
             try {
                 const oldDesc = localMatch.descriptor ? new Float32Array(localMatch.descriptor) : null;
                 const matchDist = (oldDesc && oldDesc.length === 128) ? faceapi.euclideanDistance(oldDesc, descriptor) : 0;
-                if (oldDesc && oldDesc.length === 128 && matchDist < 0.25) {
+                if (oldDesc && oldDesc.length === 128 && matchDist < 0.20) {
                     let blended = new Float32Array(128);
-                    for (let i = 0; i < 128; i++) blended[i] = oldDesc[i] * 0.90 + descriptor[i] * 0.10;
+                    for (let i = 0; i < 128; i++) blended[i] = oldDesc[i] * 0.95 + descriptor[i] * 0.05;
                     localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(blended)));
                     saveUserInDatabase(localMatch.faceUserId, blended, localMatch.nickname, myProfilePic || localMatch.profilePic || null);
                     _syncFaceToServer(localMatch.faceUserId, blended, localMatch.nickname || '', myProfilePic || localMatch.profilePic || null);
@@ -6604,6 +6665,7 @@ async function _onFaceScanComplete() {
         }
 
         handleScanSuccess('Access Granted!');
+        _reScanOriginUserId = null;
         return;
     }
 
@@ -6616,7 +6678,11 @@ async function _onFaceScanComplete() {
         const resp = await fetch('/api/face/match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ descriptor: Array.from(descriptor) })
+            body: JSON.stringify({
+                descriptor: Array.from(descriptor),
+                isReScan: faceScanIsReScan,
+                originUserId: _reScanOriginUserId
+            })
         });
         if (resp.ok) {
             const data = await resp.json();
@@ -6627,8 +6693,8 @@ async function _onFaceScanComplete() {
                 myUserId = data.faceUserId;
                 sessionStorage.setItem('piktalk_userId', data.faceUserId);
 
-                // Capture latest face snapshot from camera
-                saveBiometrics(descriptor, faceScanVideoEl);
+                // Capture latest face snapshot from camera (without mutating biometric template)
+                saveBiometrics(null, faceScanVideoEl);
 
                 // Save their profile locally with recognized nickname and latest photo
                 if (data.nickname) {
@@ -6650,6 +6716,7 @@ async function _onFaceScanComplete() {
                 }
 
                 handleScanSuccess('Welcome back! (Recognized across devices)');
+                _reScanOriginUserId = null;
                 return;
             }
         }
@@ -6658,6 +6725,7 @@ async function _onFaceScanComplete() {
     }
 
     // ── Step 3: Truly new user — create profile ──
+    console.log('[FaceID] No match found. Registering as new person.');
     const newFaceUserId = 'u-face-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
     localStorage.setItem('piktalk_face_userid', newFaceUserId);
     myUserId = newFaceUserId;
@@ -6667,8 +6735,8 @@ async function _onFaceScanComplete() {
     const newProfKey = `piktalk_profile_${newFaceUserId}`;
     localStorage.setItem(newProfKey, JSON.stringify({ nickname: '', profilePic: null }));
 
-    // Capture latest face snapshot from camera
-    saveBiometrics(descriptor, faceScanVideoEl);
+    // Capture latest face snapshot from camera (without mutating biometric template)
+    saveBiometrics(null, faceScanVideoEl);
 
     if (descriptor) {
         localStorage.setItem('piktalk_face_descriptor', JSON.stringify(Array.from(descriptor)));
@@ -6677,6 +6745,7 @@ async function _onFaceScanComplete() {
     // Push to server so this face can be recognized on any other device
     if (descriptor) _syncFaceToServer(newFaceUserId, descriptor, '', myProfilePic || null);
     handleScanSuccess('Biometrics Registered!');
+    _reScanOriginUserId = null;
 }
 
 // Push a face descriptor + metadata to the server face registry
@@ -6758,11 +6827,11 @@ function saveBiometrics(signature, video) {
             currentProfile.profilePic = avatarDataURL;
             localStorage.setItem(_profileKey(), JSON.stringify(currentProfile));
 
-            // Also update in registered users database
+            // Also update in registered users database (ONLY update profilePic, NEVER contaminate descriptor!)
             const faceUserId = localStorage.getItem('piktalk_face_userid');
             if (faceUserId) {
                 const nick = currentProfile.nickname || '';
-                saveUserInDatabase(faceUserId, signature, nick, avatarDataURL);
+                saveUserInDatabase(faceUserId, null, nick, avatarDataURL);
             }
         }
     } catch(e) {
@@ -6827,6 +6896,9 @@ function startFaceScanFlow(isSettings = false, isReScan = false) {
         faceScanCanvasEl = faceCanvas;
         faceScanStatusEl = faceStatus;
         faceScanDetailEl = faceDetail;
+        if (!isReScan) {
+            _reScanOriginUserId = null;
+        }
         // Clear any stale identity from a previous session so it cannot bleed
         // into the new scan and show the wrong person's nickname.
         localStorage.removeItem('piktalk_face_userid');

@@ -202,7 +202,7 @@ async function initFaceRegistry() {
             if (!Array.isArray(f.descriptor) || f.descriptor.length !== 128) continue;
             let duplicateId = null;
             for (const [existingId, entry] of faceRegistry.entries()) {
-                if (entry.descriptor && euclidDist(entry.descriptor, f.descriptor) < 0.32) {
+                if (entry.descriptor && euclidDist(entry.descriptor, f.descriptor) < 0.22) {
                     duplicateId = existingId;
                     break;
                 }
@@ -242,7 +242,7 @@ function euclidDist(a, b) {
     return Math.sqrt(sum);
 }
 
-const FACE_MATCH_THRESHOLD = 0.40; // calibrated: same person centroid: 0.15-0.32, different people: >0.43
+const FACE_MATCH_THRESHOLD = 0.33; // calibrated: same person centroid: 0.12-0.26, different people: >=0.34
 
 // POST /api/face/register  — save or update a face profile
 app.post('/api/face/register', async (req, res) => {
@@ -252,11 +252,11 @@ app.post('/api/face/register', async (req, res) => {
     }
 
     // Check if this face already exists under a different faceUserId (same person)
-    // Remove duplicate only when practically identical (< 0.28)
+    // Remove duplicate only when practically identical (< 0.22)
     for (const [existingId, entry] of faceRegistry.entries()) {
         if (existingId !== faceUserId && entry.descriptor) {
             const dist = euclidDist(entry.descriptor, descriptor);
-            if (dist < 0.28) {
+            if (dist < 0.22) {
                 console.log(`👤 Merging duplicate face on server: removing ${existingId} ("${entry.nickname}") in favor of ${faceUserId} ("${nickname}")`);
                 faceRegistry.delete(existingId);
                 try {
@@ -284,7 +284,7 @@ app.post('/api/face/register', async (req, res) => {
 
 // POST /api/face/match  — find nearest registered face
 app.post('/api/face/match', (req, res) => {
-    const { descriptor } = req.body;
+    const { descriptor, isReScan, originUserId } = req.body;
     if (!Array.isArray(descriptor) || descriptor.length !== 128) {
         return res.status(400).json({ error: 'Invalid descriptor' });
     }
@@ -295,10 +295,17 @@ app.post('/api/face/match', (req, res) => {
         // Only match profiles that have a valid descriptor and a non-empty registered nickname
         if (!entry.descriptor || !entry.nickname || !entry.nickname.trim()) continue;
         const d = euclidDist(entry.descriptor, descriptor);
-        if (d < bestDist) { bestDist = d; best = entry; }
+
+        // If re-scanning from a displayed user, require strict < 0.25 to match that same user
+        const allowedDist = (isReScan && originUserId && entry.faceUserId === originUserId) ? 0.25 : FACE_MATCH_THRESHOLD;
+
+        if (d < allowedDist && d < bestDist) {
+            bestDist = d;
+            best = entry;
+        }
     }
 
-    if (best && bestDist < FACE_MATCH_THRESHOLD) {
+    if (best) {
         res.json({ matched: true, faceUserId: best.faceUserId, nickname: best.nickname, profilePic: best.profilePic, distance: bestDist });
     } else {
         res.json({ matched: false });
