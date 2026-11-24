@@ -3431,15 +3431,24 @@ async function sendFileAttachment(file) {
         updateProgress(0);
 
         // 1. Init session
-        const initRes = await fetch(
-            '/upload/init?name=' + encodeURIComponent(file.name) +
-            '&type=' + encodeURIComponent(file.type || 'application/octet-stream') +
-            '&size=' + file.size +
-            '&chunks=' + totalChunks,
-            { method: 'POST' }
-        );
-        if (!initRes.ok) throw new Error('Failed to init upload (' + initRes.status + ')');
+        let initRes;
+        try {
+            initRes = await fetch(
+                '/upload/init?name=' + encodeURIComponent(file.name) +
+                '&type=' + encodeURIComponent(file.type || 'application/octet-stream') +
+                '&size=' + file.size +
+                '&chunks=' + totalChunks,
+                { method: 'POST' }
+            );
+        } catch(netErr) {
+            throw new Error('Network error on init: ' + netErr.message);
+        }
+        if (!initRes.ok) {
+            const errText = await initRes.text().catch(() => '');
+            throw new Error('Init failed (' + initRes.status + '): ' + errText);
+        }
         const { sessionId } = await initRes.json();
+        updateProgress(2); // show that init succeeded
 
         // 2. Upload chunks with retry (up to 3 attempts per chunk)
         for (let i = 0; i < totalChunks; i++) {
@@ -3454,14 +3463,18 @@ async function sendFileAttachment(file) {
                         method: 'POST',
                         body: chunk
                     });
-                    if (!chunkRes.ok) throw new Error('Chunk ' + i + ' failed (' + chunkRes.status + ')');
+                    if (!chunkRes.ok) {
+                        const cErr = await chunkRes.text().catch(() => '');
+                        throw new Error('Chunk ' + i + ' failed (' + chunkRes.status + '): ' + cErr);
+                    }
                     uploaded = true;
                 } catch(e) {
+                    console.error('[upload] chunk', i, 'attempt', attempt, 'error:', e.message);
                     if (attempt === 2) throw e;
                     await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
-            updateProgress(Math.round(((i + 1) / totalChunks) * 100));
+            updateProgress(Math.round(2 + ((i + 1) / totalChunks) * 95));
         }
 
         // 3. Finalize — assemble chunks into final file

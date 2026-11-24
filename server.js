@@ -25,7 +25,12 @@ try {
 } catch(e) {}
 
 const app = express();
-app.use(express.json());
+// Apply express.json() only to non-upload routes — the chunked upload endpoints
+// stream raw binary bodies via req.pipe() and must NOT be parsed by body-parser.
+app.use((req, res, next) => {
+    if (req.path.startsWith('/upload')) return next();
+    express.json({ limit: '10mb' })(req, res, next);
+});
 const server = http.createServer(app);
 const io = new Server(server, {
     maxHttpBufferSize: 1e8, // 100 MB limit for large photos
@@ -90,15 +95,20 @@ function cleanExpiredFiles() {
 
 // 1. Init upload session — client calls this first to get a sessionId
 app.post('/upload/init', (req, res) => {
-    const name = decodeURIComponent(req.query.name || 'file');
-    const type = decodeURIComponent(req.query.type || 'application/octet-stream');
-    const size = parseInt(req.query.size || '0', 10);
-    const totalChunks = parseInt(req.query.chunks || '1', 10);
-    const sessionId = uuidv4();
-    UPLOAD_SESSIONS[sessionId] = { name, type, size, totalChunks, receivedChunks: 0, expires: Date.now() + FILE_TTL };
-    setTimeout(() => { delete UPLOAD_SESSIONS[sessionId]; }, FILE_TTL);
-    console.log(`[upload] init session=${sessionId} name=${name} chunks=${totalChunks} size=${size}`);
-    res.json({ sessionId });
+    try {
+        const name = decodeURIComponent(req.query.name || 'file');
+        const type = decodeURIComponent(req.query.type || 'application/octet-stream');
+        const size = parseInt(req.query.size || '0', 10);
+        const totalChunks = parseInt(req.query.chunks || '1', 10);
+        const sessionId = uuidv4();
+        UPLOAD_SESSIONS[sessionId] = { name, type, size, totalChunks, receivedChunks: 0, expires: Date.now() + FILE_TTL };
+        setTimeout(() => { delete UPLOAD_SESSIONS[sessionId]; }, FILE_TTL);
+        console.log(`[upload] init session=${sessionId} name=${name} chunks=${totalChunks} size=${size}`);
+        res.json({ sessionId });
+    } catch(e) {
+        console.error('[upload] init error:', e);
+        res.status(500).json({ error: 'Init failed: ' + e.message });
+    }
 });
 
 // 2. Receive a chunk — streams directly to disk, no memory buffering
@@ -106,7 +116,10 @@ app.post('/upload/chunk', (req, res) => {
     const sessionId = req.query.sessionId;
     const chunkIndex = parseInt(req.query.i || '0', 10);
     const session = UPLOAD_SESSIONS[sessionId];
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session) {
+        console.error(`[upload] chunk: session not found: ${sessionId}`);
+        return res.status(404).json({ error: 'Session not found' });
+    }
     const chunkPath = _path.join(UPLOAD_DIR, `${sessionId}_${chunkIndex}`);
     const ws = _fs.createWriteStream(chunkPath);
     req.setTimeout(300000); // 5 min per chunk
