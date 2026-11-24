@@ -511,9 +511,20 @@ io.on('connection', (socket) => {
                 timestamp: (data && data.timestamp) || Date.now()
             };
             io.to(cleanRoomID).emit('receive-message', messageData);
-            // Store message in room buffer for late joiners / reconnectors
+            // Store a lightweight copy in room buffer (strip base64 blobs so history payloads stay small)
             if (!roomMessages[cleanRoomID]) roomMessages[cleanRoomID] = [];
-            roomMessages[cleanRoomID].push(messageData);
+            const historyEntry = Object.assign({}, messageData);
+            // Keep file/image metadata but remove the raw base64 data to prevent huge payloads
+            if (historyEntry.file && historyEntry.file.data) {
+                historyEntry.file = { name: historyEntry.file.name, size: historyEntry.file.size, type: historyEntry.file.type, data: null };
+            }
+            if (historyEntry.image && typeof historyEntry.image === 'string' && historyEntry.image.length > 500) {
+                historyEntry.image = null; // images are re-sent in real-time; skip from history
+            }
+            if (historyEntry.audio && historyEntry.audio.data) {
+                historyEntry.audio = { duration: historyEntry.audio.duration || null, data: null };
+            }
+            roomMessages[cleanRoomID].push(historyEntry);
             if (roomMessages[cleanRoomID].length > ROOM_MSG_LIMIT) roomMessages[cleanRoomID].shift();
         }
     });
