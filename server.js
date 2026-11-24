@@ -325,6 +325,9 @@ app.get('/chat/:roomID', (req, res) => {
 // Store users and their rooms
 const users = {};
 const rooms = {}; // roomID -> { adminSocketId }
+// In-memory message buffer — last 50 messages per room (all types)
+const roomMessages = {};
+const ROOM_MSG_LIMIT = 50;
 let networkIP = '0.0.0.0';
 
 function updateNetworkIP() {
@@ -419,6 +422,11 @@ io.on('connection', (socket) => {
         // Send updated users list to all users in the room
         sendRoomUsers(cleanRoomID);
 
+        // Send buffered message history to the joining/reconnecting user
+        if (roomMessages[cleanRoomID] && roomMessages[cleanRoomID].length > 0) {
+            socket.emit('room-history', { messages: roomMessages[cleanRoomID] });
+        }
+
         // Tell the admin directly that they are the admin (with password)
         if (rooms[cleanRoomID] && rooms[cleanRoomID].adminSocketId === socket.id) {
             socket.emit('you-are-admin', { password: rooms[cleanRoomID].password || null });
@@ -503,6 +511,10 @@ io.on('connection', (socket) => {
                 timestamp: (data && data.timestamp) || Date.now()
             };
             io.to(cleanRoomID).emit('receive-message', messageData);
+            // Store message in room buffer for late joiners / reconnectors
+            if (!roomMessages[cleanRoomID]) roomMessages[cleanRoomID] = [];
+            roomMessages[cleanRoomID].push(messageData);
+            if (roomMessages[cleanRoomID].length > ROOM_MSG_LIMIT) roomMessages[cleanRoomID].shift();
         }
     });
 
