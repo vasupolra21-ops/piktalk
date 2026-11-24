@@ -33,8 +33,8 @@ const io = new Server(server, {
     allowUpgrades: true,
     perMessageDeflate: false, // Disables deflate buffer lag for instant sub-10ms delivery
     httpCompression: false,
-    pingTimeout: 10000,
-    pingInterval: 5000,
+    pingTimeout: 60000,     // Increased: Render WebSocket proxy can be slow to respond
+    pingInterval: 25000,    // Standard interval
     cors: { origin: '*' }
 });
 

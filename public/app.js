@@ -58,16 +58,16 @@ const SoundManager = (() => {
 let socket;
 try {
     socket = io({
-        transports: ['websocket', 'polling'],
-        upgrade: true,
-        rememberUpgrade: true,
+        transports: ['websocket'],   // WebSocket-only: polling has a ~1MB body limit on Render's proxy which drops large file payloads
+        upgrade: false,
+        rememberUpgrade: false,
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: Infinity,
-        reconnectionDelay: 200,
-        reconnectionDelayMax: 1000,
-        randomizationFactor: 0.1,
-        timeout: 8000
+        reconnectionDelay: 300,
+        reconnectionDelayMax: 2000,
+        randomizationFactor: 0.3,
+        timeout: 20000               // Longer timeout for large file transfers
     });
 
     socket.on('connect', () => {
