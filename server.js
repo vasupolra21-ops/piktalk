@@ -76,7 +76,7 @@ app.get('/ping', (req, res) => {
 const _fs = require('fs');
 const _path = require('path');
 
-const UPLOAD_DIR = '/tmp/piktalk_files';
+const UPLOAD_DIR = _path.join(os.tmpdir(), 'piktalk_files');
 try { _fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
 
 const FILE_META = {};        // fileId → { name, type, size, filePath, expires }
@@ -557,6 +557,18 @@ io.on('connection', (socket) => {
         // Send buffered message history to the joining/reconnecting user
         if (roomMessages[cleanRoomID] && roomMessages[cleanRoomID].length > 0) {
             socket.emit('room-history', { messages: roomMessages[cleanRoomID] });
+        } else {
+            // In-memory buffer is empty (server restarted) — load from DB
+            try {
+                const dbMsgs = await db.getMessages(cleanRoomID, 50);
+                if (dbMsgs && dbMsgs.length > 0) {
+                    // Warm the in-memory buffer too
+                    roomMessages[cleanRoomID] = dbMsgs.slice(-ROOM_MSG_LIMIT);
+                    socket.emit('room-history', { messages: dbMsgs });
+                }
+            } catch(e) {
+                console.error('[db] getMessages error:', e);
+            }
         }
 
         // Tell the admin directly that they are the admin (with password)
@@ -617,7 +629,7 @@ io.on('connection', (socket) => {
         socket.emit('profile-saved', saved);
     });
 
-    socket.on('send-message', (data) => {
+    socket.on('send-message', async (data) => {
         const user = users[socket.id];
         const roomID = (data && data.roomID) || (user && user.roomID);
         if (roomID) {
@@ -648,7 +660,7 @@ io.on('connection', (socket) => {
             const historyEntry = Object.assign({}, messageData);
             // Keep file/image metadata but remove the raw base64 data to prevent huge payloads
             if (historyEntry.file && historyEntry.file.data) {
-                historyEntry.file = { name: historyEntry.file.name, size: historyEntry.file.size, type: historyEntry.file.type, data: null };
+                historyEntry.file = { name: historyEntry.file.name, size: historyEntry.file.size, type: historyEntry.file.type, url: historyEntry.file.url || null };
             }
             if (historyEntry.image && typeof historyEntry.image === 'string' && historyEntry.image.length > 500) {
                 historyEntry.image = null; // images are re-sent in real-time; skip from history
@@ -658,6 +670,9 @@ io.on('connection', (socket) => {
             }
             roomMessages[cleanRoomID].push(historyEntry);
             if (roomMessages[cleanRoomID].length > ROOM_MSG_LIMIT) roomMessages[cleanRoomID].shift();
+
+            // Persist to database (non-blocking, best-effort)
+            db.saveMessage(cleanRoomID, historyEntry).catch(e => console.error('[db] saveMessage error:', e));
         }
     });
 

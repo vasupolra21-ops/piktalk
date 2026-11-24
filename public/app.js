@@ -3373,12 +3373,35 @@ function _formatFileSize(bytes) {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-// ── Chunked file upload — 5 MB chunks via fetch(), streams to disk on server ──
+// -- File Upload: XHR chunked, real progress, works on Render --
+// Each file is split into 5 MB chunks, each POSTed via XHR with FormData.
+// /upload/init -> /upload/chunk (x N) -> /upload/finalize -> socket emit URL
 const _FILE_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+
+function _uploadChunkXHR(sessionId, chunkIndex, chunkBlob, onProgress) {
+    return new Promise(function(resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload/chunk?sessionId=' + sessionId + '&i=' + chunkIndex, true);
+        xhr.timeout = 300000;
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+        if (onProgress) {
+            xhr.upload.onprogress = function(e) { if (e.lengthComputable) onProgress(e.loaded, e.total); };
+        }
+        xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); } catch(e) { resolve({}); }
+            } else {
+                reject(new Error('Chunk ' + chunkIndex + ' HTTP ' + xhr.status + ': ' + xhr.responseText));
+            }
+        };
+        xhr.onerror = function() { reject(new Error('Chunk ' + chunkIndex + ' network error')); };
+        xhr.ontimeout = function() { reject(new Error('Chunk ' + chunkIndex + ' timed out')); };
+        xhr.send(chunkBlob);
+    });
+}
 
 async function sendFileAttachment(file) {
     if (!socket || !currentRoomID) { alert('Not connected to chat room.'); return; }
-    // Max 1 GB — Render /tmp has ~10 GB free
     if (file.size > 1 * 1024 * 1024 * 1024) { alert('File too large (Max 1 GB)'); return; }
 
     const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
@@ -3405,7 +3428,7 @@ async function sendFileAttachment(file) {
             const bar = optEl.querySelector('.file-upload-progress-bar');
             const lbl = optEl.querySelector('.file-upload-pct');
             if (bar) bar.style.width = pct + '%';
-            if (lbl) lbl.textContent = pct + '%';
+            if (lbl) lbl.textContent = Math.round(pct) + '%';
         }
     };
 
@@ -3421,6 +3444,17 @@ async function sendFileAttachment(file) {
             if (progWrap) progWrap.style.display = 'none';
             const uploadingLbl = optEl.querySelector('.file-uploading-label');
             if (uploadingLbl) uploadingLbl.style.display = 'none';
+            const info = optEl.querySelector('.file-attach-info');
+            if (info && !info.querySelector('.pdf-preview-link') && (file.type === 'application/pdf' || /\.pdf$/i.test(file.name))) {
+                const link = document.createElement('a');
+                link.className = 'pdf-preview-link';
+                link.href = fileUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.style.cssText = 'font-size:0.75rem;color:var(--primary);display:inline-flex;align-items:center;gap:4px;margin-top:4px;text-decoration:none;font-weight:600;';
+                link.innerHTML = '<i class="fas fa-eye"></i> Open PDF';
+                info.appendChild(link);
+            }
             optEl.querySelectorAll('a[data-fileurl]').forEach(a => { a.href = fileUrl; a.removeAttribute('data-fileurl'); });
             optEl.querySelectorAll('audio[data-fileurl]').forEach(a => { a.src = fileUrl; a.removeAttribute('data-fileurl'); });
         }
@@ -3428,78 +3462,99 @@ async function sendFileAttachment(file) {
 
     try {
         const totalChunks = Math.max(1, Math.ceil(file.size / _FILE_CHUNK_SIZE));
-        updateProgress(0);
+        updateProgress(1);
 
-        // 1. Init session
-        let initRes;
-        try {
-            initRes = await fetch(
+        // STEP 1: Init session via XHR
+        const initXhr = new XMLHttpRequest();
+        const sessionId = await new Promise(function(resolve, reject) {
+            initXhr.open('POST',
                 '/upload/init?name=' + encodeURIComponent(file.name) +
                 '&type=' + encodeURIComponent(file.type || 'application/octet-stream') +
                 '&size=' + file.size +
-                '&chunks=' + totalChunks,
-                { method: 'POST' }
-            );
-        } catch(netErr) {
-            throw new Error('Network error on init: ' + netErr.message);
-        }
-        if (!initRes.ok) {
-            const errText = await initRes.text().catch(() => '');
-            throw new Error('Init failed (' + initRes.status + '): ' + errText);
-        }
-        const { sessionId } = await initRes.json();
-        updateProgress(2); // show that init succeeded
+                '&chunks=' + totalChunks, true);
+            initXhr.timeout = 15000;
+            initXhr.onload = function() {
+                if (initXhr.status >= 200 && initXhr.status < 300) {
+                    try { resolve(JSON.parse(initXhr.responseText).sessionId); }
+                    catch(e) { reject(new Error('Init parse error: ' + initXhr.responseText)); }
+                } else {
+                    reject(new Error('Init HTTP ' + initXhr.status + ': ' + initXhr.responseText));
+                }
+            };
+            initXhr.onerror = function() { reject(new Error('Init network error')); };
+            initXhr.ontimeout = function() { reject(new Error('Init timed out')); };
+            initXhr.send();
+        });
+        updateProgress(2);
+        console.log('[upload] session:', sessionId, 'chunks:', totalChunks);
 
-        // 2. Upload chunks with retry (up to 3 attempts per chunk)
+        // STEP 2: Upload chunks one by one with real XHR progress
+        let bytesUploaded = 0;
         for (let i = 0; i < totalChunks; i++) {
             const start = i * _FILE_CHUNK_SIZE;
             const end = Math.min(start + _FILE_CHUNK_SIZE, file.size);
             const chunk = file.slice(start, end);
-
+            const chunkSize = end - start;
             let uploaded = false;
-            for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
+            for (let attempt = 0; attempt < 4 && !uploaded; attempt++) {
                 try {
-                    const chunkRes = await fetch('/upload/chunk?sessionId=' + sessionId + '&i=' + i, {
-                        method: 'POST',
-                        body: chunk
+                    const prevBytes = bytesUploaded;
+                    await _uploadChunkXHR(sessionId, i, chunk, function(loaded) {
+                        updateProgress(2 + ((prevBytes + loaded) / file.size) * 92);
                     });
-                    if (!chunkRes.ok) {
-                        const cErr = await chunkRes.text().catch(() => '');
-                        throw new Error('Chunk ' + i + ' failed (' + chunkRes.status + '): ' + cErr);
-                    }
                     uploaded = true;
+                    bytesUploaded += chunkSize;
+                    updateProgress(2 + (bytesUploaded / file.size) * 92);
+                    console.log('[upload] chunk', i + 1, '/', totalChunks, 'done');
                 } catch(e) {
-                    console.error('[upload] chunk', i, 'attempt', attempt, 'error:', e.message);
-                    if (attempt === 2) throw e;
-                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    console.error('[upload] chunk', i, 'attempt', attempt, ':', e.message);
+                    if (attempt >= 3) throw new Error('Chunk ' + i + ' failed after 4 attempts: ' + e.message);
+                    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
                 }
             }
-            updateProgress(Math.round(2 + ((i + 1) / totalChunks) * 95));
         }
+        updateProgress(96);
 
-        // 3. Finalize — assemble chunks into final file
-        const finalRes = await fetch('/upload/finalize?sessionId=' + sessionId, { method: 'POST' });
-        if (!finalRes.ok) {
-            const errBody = await finalRes.text();
-            throw new Error('Finalize failed (' + finalRes.status + '): ' + errBody);
-        }
-        const result = await finalRes.json();
+        // STEP 3: Finalize via XHR
+        const finalXhr = new XMLHttpRequest();
+        const result = await new Promise(function(resolve, reject) {
+            finalXhr.open('POST', '/upload/finalize?sessionId=' + sessionId, true);
+            finalXhr.timeout = 60000;
+            finalXhr.onload = function() {
+                if (finalXhr.status >= 200 && finalXhr.status < 300) {
+                    try { resolve(JSON.parse(finalXhr.responseText)); }
+                    catch(e) { reject(new Error('Finalize parse: ' + finalXhr.responseText)); }
+                } else {
+                    reject(new Error('Finalize HTTP ' + finalXhr.status + ': ' + finalXhr.responseText));
+                }
+            };
+            finalXhr.onerror = function() { reject(new Error('Finalize network error')); };
+            finalXhr.ontimeout = function() { reject(new Error('Finalize timed out')); };
+            finalXhr.send();
+        });
+        updateProgress(100);
+        console.log('[upload] finalized:', result.url);
 
-        // 4. Update UI and broadcast URL via socket
+        // STEP 4: Update sender UI + broadcast URL to all room members via socket
         finalizeOptimistic(result.url);
         socket.emit('send-message', {
             roomID: currentRoomID,
             nickname: currentName,
             profilePic: myProfilePic || null,
             message: '',
-            file: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', url: result.url },
+            file: {
+                name: file.name,
+                size: file.size,
+                type: file.type || 'application/octet-stream',
+                url: result.url
+            },
             replyTo: replyingTo || null,
             msgId: optMsgId
         });
 
     } catch(err) {
-        console.error('File upload error:', err);
-        alert('File upload failed: ' + (err.message || 'Network error') + '\nPlease try again.');
+        console.error('[upload] fatal error:', err);
+        alert('File upload failed: ' + (err.message || 'Network error') + '\n\nPlease check your connection and try again.');
         removeOptimistic();
     }
 }

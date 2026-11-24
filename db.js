@@ -260,6 +260,61 @@ const db = {
             writeJSON(data);
         }
         return true;
+    },
+
+    // ── Message Persistence (keeps last 100 messages per room, file URL included) ──
+    saveMessage: async (roomID, msgData) => {
+        // Strip any raw base64 blobs — only keep lightweight metadata + URLs
+        const safe = Object.assign({}, msgData);
+        if (safe.file && safe.file.data) safe.file = { name: safe.file.name, size: safe.file.size, type: safe.file.type, url: safe.file.url || null };
+        if (safe.image && typeof safe.image === 'string' && safe.image.length > 500) safe.image = null;
+        if (safe.audio && safe.audio.data) safe.audio = { duration: safe.audio.duration || null, url: safe.audio.url || null, data: null };
+
+        if (useMongo && mongoDb) {
+            try {
+                await mongoDb.collection('messages').insertOne({ roomID, ...safe, savedAt: Date.now() });
+                // Keep only last 100 per room
+                const count = await mongoDb.collection('messages').countDocuments({ roomID });
+                if (count > 100) {
+                    const oldest = await mongoDb.collection('messages').find({ roomID }).sort({ savedAt: 1 }).limit(count - 100).toArray();
+                    const ids = oldest.map(d => d._id);
+                    if (ids.length) await mongoDb.collection('messages').deleteMany({ _id: { $in: ids } });
+                }
+                return true;
+            } catch (err) {
+                console.error("MongoDB saveMessage error:", err.message);
+            }
+        }
+
+        // Fallback: JSON file
+        const data = readJSON();
+        if (!data.messages) data.messages = {};
+        if (!data.messages[roomID]) data.messages[roomID] = [];
+        data.messages[roomID].push({ ...safe, savedAt: Date.now() });
+        if (data.messages[roomID].length > 100) data.messages[roomID] = data.messages[roomID].slice(-100);
+        writeJSON(data);
+        return true;
+    },
+
+    getMessages: async (roomID, limit = 100) => {
+        if (useMongo && mongoDb) {
+            try {
+                const msgs = await mongoDb.collection('messages')
+                    .find({ roomID })
+                    .sort({ savedAt: 1 })
+                    .limit(limit)
+                    .toArray();
+                return msgs.map(m => { const { _id, savedAt, ...rest } = m; return rest; });
+            } catch (err) {
+                console.error("MongoDB getMessages error:", err.message);
+            }
+        }
+
+        // Fallback: JSON file
+        const data = readJSON();
+        if (!data.messages || !data.messages[roomID]) return [];
+        const msgs = data.messages[roomID].slice(-limit);
+        return msgs.map(m => { const { savedAt, ...rest } = m; return rest; });
     }
 };
 
