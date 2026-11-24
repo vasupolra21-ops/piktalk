@@ -57,6 +57,92 @@ app.get('/ping', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date() });
 });
 
+// ── HTTP File Upload Store ──────────────────────────────────────────────────
+// Files are uploaded via HTTP POST (not WebSocket) to avoid Render proxy limits.
+// Stored in-memory with a 60-minute TTL, max 100 files kept at once.
+const fileStore = {};          // fileId → { buffer, name, type, size, expires }
+const FILE_TTL_MS = 60 * 60 * 1000;    // 60 minutes
+const MAX_STORED_FILES = 100;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+function cleanExpiredFiles() {
+    const now = Date.now();
+    for (const id of Object.keys(fileStore)) {
+        if (fileStore[id].expires <= now) delete fileStore[id];
+    }
+}
+
+// Upload endpoint — receives raw binary body, stores it, returns a download URL
+app.post('/upload', (req, res) => {
+    const name = decodeURIComponent(req.query.name || 'file');
+    const contentType = req.headers['content-type'] || 'application/octet-stream';
+    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+
+    if (contentLength > MAX_FILE_SIZE) {
+        return res.status(413).json({ error: 'File too large (max 50 MB)' });
+    }
+
+    const chunks = [];
+    let totalBytes = 0;
+
+    req.on('data', (chunk) => {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_FILE_SIZE) {
+            req.destroy();
+            return res.status(413).json({ error: 'File too large (max 50 MB)' });
+        }
+        chunks.push(chunk);
+    });
+
+    req.on('end', () => {
+        cleanExpiredFiles();
+        // Trim store if over limit
+        const ids = Object.keys(fileStore);
+        if (ids.length >= MAX_STORED_FILES) {
+            // Delete oldest entry
+            const oldest = ids.sort((a, b) => fileStore[a].expires - fileStore[b].expires)[0];
+            delete fileStore[oldest];
+        }
+
+        const fileId = uuidv4();
+        fileStore[fileId] = {
+            buffer: Buffer.concat(chunks),
+            name,
+            type: contentType,
+            size: totalBytes,
+            expires: Date.now() + FILE_TTL_MS
+        };
+        setTimeout(() => { delete fileStore[fileId]; }, FILE_TTL_MS);
+
+        res.json({
+            fileId,
+            url: `/file/${fileId}`,
+            name,
+            size: totalBytes,
+            type: contentType
+        });
+    });
+
+    req.on('error', () => {
+        res.status(500).json({ error: 'Upload failed' });
+    });
+});
+
+// Download endpoint — serves the stored file by ID
+app.get('/file/:id', (req, res) => {
+    const f = fileStore[req.params.id];
+    if (!f || Date.now() > f.expires) {
+        return res.status(404).json({ error: 'File not found or expired' });
+    }
+    const safeName = encodeURIComponent(f.name).replace(/'/g, '%27');
+    res.setHeader('Content-Type', f.type);
+    res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${safeName}`);
+    res.setHeader('Content-Length', f.size);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(f.buffer);
+});
+// ────────────────────────────────────────────────────────────────────────────
+
 const https = require('https');
 
 function sendTwilioSMS(accountSid, authToken, from, to, body) {

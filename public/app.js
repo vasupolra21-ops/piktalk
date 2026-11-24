@@ -3375,53 +3375,85 @@ function _formatFileSize(bytes) {
 
 function sendFileAttachment(file) {
     if (!socket || !currentRoomID) { alert('Not connected to chat room.'); return; }
-    if (file.size > 50000000) { alert('File too large (Max 50MB)'); return; }
+    if (file.size > 50 * 1024 * 1024) { alert('File too large (Max 50MB)'); return; }
 
     const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
+    const optMsgId = '_opt_file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const dataUrl = e.target.result;
-        const optMsgId = '_opt_file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-        const optimisticData = {
-            msgId: optMsgId,
-            id: socket.id,
-            nickname: myNickname || 'Me',
-            message: '',
-            file: {
-                name: file.name,
-                size: file.size,
-                type: file.type || 'application/octet-stream',
-                data: dataUrl
-            },
-            profilePic: myProfilePic || null,
-            replyTo: replyingTo || null
-        };
-        appendMessage(optimisticData, true);
-        markOptimisticMsg(optMsgId);
-        emitMyStopTyping();
+    // Show optimistic "uploading…" message immediately so sender sees feedback
+    const optimisticData = {
+        msgId: optMsgId,
+        id: socket.id,
+        nickname: myNickname || 'Me',
+        message: '',
+        file: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', url: null, uploading: true },
+        profilePic: myProfilePic || null,
+        replyTo: replyingTo || null
+    };
+    appendMessage(optimisticData, true);
+    markOptimisticMsg(optMsgId);
+    emitMyStopTyping();
+    clearReply();
+    if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
 
-        socket.emit('send-message', {
-            roomID: currentRoomID,
-            nickname: currentName,
-            profilePic: myProfilePic || null,
-            message: '',
-            file: {
-                name: file.name,
-                size: file.size,
-                type: file.type || 'application/octet-stream',
-                data: dataUrl
-            },
-            replyTo: replyingTo || null,
-            msgId: optMsgId
-        });
-        clearReply();
-        if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
+    // ── Upload file via HTTP POST (avoids WebSocket payload size limits on Render) ──
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/upload?name=' + encodeURIComponent(file.name), true);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    // Show upload progress on the optimistic bubble
+    xhr.upload.onprogress = (e) => {
+        if (!e.lengthComputable) return;
+        const pct = Math.round((e.loaded / e.total) * 100);
+        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
+        if (optEl) {
+            const bar = optEl.querySelector('.file-upload-progress-bar');
+            const lbl = optEl.querySelector('.file-upload-pct');
+            if (bar) bar.style.width = pct + '%';
+            if (lbl) lbl.textContent = pct + '%';
+        }
     };
-    reader.onerror = () => {
-        alert('Could not read file. Please try again.');
+
+    xhr.onload = () => {
+        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
+        if (xhr.status === 200) {
+            let result;
+            try { result = JSON.parse(xhr.responseText); } catch(e) { result = {}; }
+            const fileUrl = result.url || '';
+
+            // Update optimistic bubble: hide progress, enable download/open links
+            if (optEl) {
+                const progWrap = optEl.querySelector('.file-upload-progress-wrap');
+                if (progWrap) progWrap.style.display = 'none';
+                const uploadingLbl = optEl.querySelector('.file-uploading-label');
+                if (uploadingLbl) uploadingLbl.style.display = 'none';
+                optEl.querySelectorAll('a[data-fileurl]').forEach(a => { a.href = fileUrl; a.removeAttribute('data-fileurl'); });
+                optEl.querySelectorAll('audio[data-fileurl]').forEach(a => { a.src = fileUrl; a.removeAttribute('data-fileurl'); });
+            }
+
+            // Broadcast to room via socket — only metadata + URL (tiny payload, no base64)
+            socket.emit('send-message', {
+                roomID: currentRoomID,
+                nickname: currentName,
+                profilePic: myProfilePic || null,
+                message: '',
+                file: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', url: fileUrl },
+                replyTo: replyingTo || null,
+                msgId: optMsgId
+            });
+        } else {
+            alert('File upload failed (server error). Please try again.');
+            if (optEl) optEl.remove();
+        }
     };
-    reader.readAsDataURL(file);
+
+    xhr.onerror = () => {
+        alert('File upload failed. Please check your connection and try again.');
+        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
+        if (optEl) optEl.remove();
+    };
+
+    xhr.send(file);
 }
 
 // ── Poll Creation & Voting Engine ──
@@ -4345,6 +4377,16 @@ function appendMessage(data, isSentByMe) {
         const isAudioFile = (f.type && f.type.startsWith('audio/')) || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name || '');
         const isPdfFile = (f.type === 'application/pdf') || /\.pdf$/i.test(f.name || '');
         const icon = _getFileIcon(f.type || '', f.name || '');
+        // Resolve the file href — prefer server URL, fall back to base64 data (legacy)
+        const fileHref = f.url || f.data || '#';
+        // Upload progress markup (shown only when f.uploading === true)
+        const uploadingMarkup = f.uploading ? `
+            <div class="file-uploading-label" style="font-size:0.72rem;color:var(--primary);margin-top:4px;display:flex;align-items:center;gap:5px;">
+                <i class="fas fa-spinner fa-spin" style="font-size:0.7rem;"></i> Uploading… <span class="file-upload-pct">0%</span>
+            </div>
+            <div class="file-upload-progress-wrap" style="height:3px;background:rgba(0,0,0,0.1);border-radius:4px;margin-top:4px;overflow:hidden;">
+                <div class="file-upload-progress-bar" style="height:100%;width:0%;background:var(--primary);border-radius:4px;transition:width 0.2s;"></div>
+            </div>` : '';
 
         if (isAudioFile) {
             bubble.innerHTML = `
@@ -4353,9 +4395,10 @@ function appendMessage(data, isSentByMe) {
                     <div class="file-attach-info" style="width:100%;">
                         <div class="file-attach-name">${escapeHtml(f.name || 'Audio')}</div>
                         <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
-                        <audio controls src="${f.data}" preload="metadata" style="width:100%;height:32px;margin-top:6px;border-radius:16px;outline:none;"></audio>
+                        <audio controls ${fileHref !== '#' ? `src="${fileHref}"` : ''} ${f.uploading ? `data-fileurl="1"` : ''} preload="metadata" style="width:100%;height:32px;margin-top:6px;border-radius:16px;outline:none;"></audio>
+                        ${uploadingMarkup}
                     </div>
-                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'audio')}" title="Download">
+                    <a class="file-attach-dl" href="${fileHref}" ${f.uploading ? `data-fileurl="1"` : ''} download="${escapeHtml(f.name || 'audio')}" title="Download">
                         <i class="fas fa-arrow-down"></i>
                     </a>
                 </div>`;
@@ -4366,11 +4409,12 @@ function appendMessage(data, isSentByMe) {
                     <div class="file-attach-info">
                         <div class="file-attach-name">${escapeHtml(f.name || 'Document.pdf')}</div>
                         <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
-                        <a class="pdf-preview-link" href="${f.data}" target="_blank" rel="noopener noreferrer" style="font-size:0.75rem;color:var(--primary);display:inline-flex;align-items:center;gap:4px;margin-top:4px;text-decoration:none;font-weight:600;">
+                        ${!f.uploading ? `<a class="pdf-preview-link" href="${fileHref}" target="_blank" rel="noopener noreferrer" ${f.uploading ? `data-fileurl="1"` : ''} style="font-size:0.75rem;color:var(--primary);display:inline-flex;align-items:center;gap:4px;margin-top:4px;text-decoration:none;font-weight:600;">
                             <i class="fas fa-eye"></i> Open PDF
-                        </a>
+                        </a>` : ''}
+                        ${uploadingMarkup}
                     </div>
-                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'document.pdf')}" title="Download">
+                    <a class="file-attach-dl" href="${fileHref}" ${f.uploading ? `data-fileurl="1"` : ''} download="${escapeHtml(f.name || 'document.pdf')}" title="Download">
                         <i class="fas fa-arrow-down"></i>
                     </a>
                 </div>`;
@@ -4381,8 +4425,9 @@ function appendMessage(data, isSentByMe) {
                     <div class="file-attach-info">
                         <div class="file-attach-name">${escapeHtml(f.name || 'file')}</div>
                         <div class="file-attach-size">${_formatFileSize(f.size || 0)}</div>
+                        ${uploadingMarkup}
                     </div>
-                    <a class="file-attach-dl" href="${f.data}" download="${escapeHtml(f.name || 'file')}" title="Download">
+                    <a class="file-attach-dl" href="${fileHref}" ${f.uploading ? `data-fileurl="1"` : ''} download="${escapeHtml(f.name || 'file')}" title="Download">
                         <i class="fas fa-arrow-down"></i>
                     </a>
                 </div>`;
