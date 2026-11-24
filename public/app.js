@@ -3399,6 +3399,7 @@ function sendFileAttachment(file) {
     // ── Upload file via HTTP POST (avoids WebSocket payload size limits on Render) ──
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/upload?name=' + encodeURIComponent(file.name), true);
+    xhr.timeout = 60000;
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
 
     // Show upload progress on the optimistic bubble
@@ -3442,12 +3443,21 @@ function sendFileAttachment(file) {
                 msgId: optMsgId
             });
         } else {
-            alert('File upload failed (server error). Please try again.');
+            console.error('Upload response status:', xhr.status, xhr.responseText);
+            alert('File upload failed (' + xhr.status + '). Please try again.');
             if (optEl) optEl.remove();
         }
     };
 
+    xhr.ontimeout = () => {
+        console.error('Upload timed out after 60s');
+        alert('File upload timed out. Please check your network and try again.');
+        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
+        if (optEl) optEl.remove();
+    };
+
     xhr.onerror = () => {
+        console.error('Upload network error occurred');
         alert('File upload failed. Please check your connection and try again.');
         const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
         if (optEl) optEl.remove();

@@ -43,12 +43,18 @@ const PORT = process.env.PORT || 3000;
 // Enable gzip compression for faster load times
 app.use(compression());
 
-// Security and caching-friendly headers
+// Security, CORS, and caching-friendly headers
 app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Content-Length, Authorization');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Vary', 'Accept-Encoding');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
     next();
 });
 
@@ -84,6 +90,9 @@ app.post('/upload', (req, res) => {
 
     const chunks = [];
     let totalBytes = 0;
+
+    // Set 60-second timeout for slow mobile uploads
+    req.setTimeout(60000);
 
     req.on('data', (chunk) => {
         totalBytes += chunk.length;
@@ -123,8 +132,11 @@ app.post('/upload', (req, res) => {
         });
     });
 
-    req.on('error', () => {
-        res.status(500).json({ error: 'Upload failed' });
+    req.on('error', (err) => {
+        console.error('Upload stream error:', err);
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Upload failed' });
+        }
     });
 });
 
