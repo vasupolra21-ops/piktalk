@@ -5888,426 +5888,509 @@ function updateMembersList(usersList) {
 }
 
 
-// ── Context-Aware AI Smart Reply Generator ──
+// ── Context-Aware AI Smart Reply Engine (v2) ──
+// Reads last 5 messages, detects intent/topic/tone, generates natural contextual replies.
 function generateAISmartReplies() {
-    if (chatHistory.length === 0) {
+    // ── Helpers ──
+    const recentMsgs = chatHistory.slice(-5);
+    const lastMsg    = chatHistory[chatHistory.length - 1];
+    const prevMsg    = chatHistory[chatHistory.length - 2];
+
+    // Build a context string from recent messages (excluding my own last message)
+    const contextTexts = recentMsgs
+        .filter(m => !m.isSentByMe)
+        .map(m => (m.message || '').toLowerCase().trim());
+    const ctxFull = contextTexts.join(' ');
+
+    const t  = lastMsg ? (lastMsg.message || '').toLowerCase().trim() : '';
+    const ct = ctxFull; // combined recent context
+    const has = (re) => re.test(t);
+    const ctxHas = (re) => re.test(ct);
+
+    // ── Empty chat ──
+    if (!lastMsg || chatHistory.length === 0) {
         return [
             "Hey! 👋 How's it going?",
-            "Hello! Hope you're doing great 😊",
+            "Hello! What's new? 😊",
             "Hi there! What's up?",
-            "Hey! What's new with you?",
-            "Hello! Good to hear from you 🙌",
-            "Yo! How's your day going?",
+            "Yo! What brings you here?",
             "Hey hey! Long time no chat 😄",
-            "Heyy! How have you been?",
             "Oh hey! What's the plan today?",
-            "Hi! Hope your day is going well 🌟",
-            "Hello there! What brings you here? 😄",
-            "Hey! Always great to hear from you 🙌"
+            "Hi! Hope your day is going well 🌟"
         ];
     }
 
-    const lastMsg = chatHistory[chatHistory.length - 1];
+    // ── Last message was sent by ME → show follow-up prompts ──
     if (lastMsg.isSentByMe) {
+        // If I asked a question, show waiting replies
+        if (t.includes('?')) {
+            return [
+                "Just checking if you saw this 👀",
+                "Let me know when you're free! 😊",
+                "No rush, reply whenever 😊",
+                "You there? 👀",
+                "Catch you later then!",
+                "Take your time! 🙌",
+                "Ping me when you're back!"
+            ];
+        }
         return [
-            "Let me know when you're free! 😊",
+            "Let me know what you think! 😊",
             "Talk to you soon!",
-            "Hope you're doing well! 🌟",
-            "No rush, reply when you can.",
-            "You there? 👀",
-            "Let me know what you think!",
-            "Catch you later!",
-            "Just checking in 😊",
-            "Have a great day!",
-            "Talk to you later! 👋",
             "Whenever you get a chance 👍",
-            "Let's catch up soon!"
+            "No rush, reply when you can.",
+            "Have a great day! 🌟",
+            "Let's catch up soon!",
+            "Catch you later! 👋"
         ];
     }
 
-    const text = (lastMsg.message || '').toLowerCase().trim();
+    // ── DETECT INTENT (ordered from most specific to most general) ──
 
-    // Helper: checks if text STARTS WITH or IS one of the given words (ignores extra words like "bro", "man", "dude" etc.)
-    const startsWith = (pattern) => pattern.test(text);
-    const has = (pattern) => pattern.test(text);
-
-    // ── 1. Greetings ──
-    // Matches: "hii", "hii bro", "hey man", "hello there", "yo", "wassup dude" etc.
-    // Uses \b word boundary — NOT ^...$, so extra words after greeting are fine
-    if (!text ||
-        /^\s*(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|greetings|good\s*morning|good\s*evening|good\s*afternoon|namaste|howdy|hola|salut|salam|valakkam|vanakkam|heyya|heyyy|hiii|ahoy)\b/.test(text) ||
-        /^(hi|hey|hello|yo|sup)\s+(bro|man|dude|buddy|guys|yaar|yar|jaan|bhai|sir|sis|there|all)/.test(text)
+    // 1. GREETINGS
+    if (!t ||
+        /^(hi+|hey+|hello+|hlo+|yo+|sup+|wassup|wsp|howdy|hola|salam|namaste|heyya|ahoy|good\s*(morning|evening|afternoon|day))\b/.test(t) ||
+        /^(hi|hey|hello|yo)\s+(bro|man|dude|buddy|guys|yaar|bhai|sir|sis|there|all)\b/.test(t)
     ) {
+        const otherName = lastMsg.nickname ? lastMsg.nickname.split(' ')[0] : '';
         return [
-            "Hey! 👋 How's it going?",
+            `Hey${otherName ? ' ' + otherName : ''}! 👋 How's it going?`,
             "Hello! Hope you're doing great 😊",
-            "Hi there! What's up?",
-            "Hey! What's new with you?",
-            "Hello! Good to hear from you 🙌",
-            "Yo! How's your day going?",
-            "Hey hey! Long time no chat 😄",
-            "Heyy! How have you been?",
+            "Hi there! What's up? 😄",
+            "Heyyy! What's new with you?",
+            "Yo! How's your day been? 🙌",
+            "Hey! Great to hear from you! 😊",
             "Oh hey! What's the plan today?",
-            "Hi! Hope your day is going well 🌟",
-            "Hello there! What brings you here? 😄",
-            "Hey! Always great to hear from you 🙌"
+            "Heyy! How have you been lately?"
         ];
     }
 
-    // ── 2. What are you doing / wyd / up to ──
-    if (/\b(wyd|wdyd|wud|wut\s+doing)\b/.test(text) ||
-        /what.*(r\s+u|are\s+you|u\s+)(doing|up\s+to|upto)/.test(text) ||
-        /watcha\s*doing|what\s+u\s+doing|what\s+r\s+u\s+doing/.test(text) ||
-        /kya\s*(kar|kr|chal|krta|krti)/.test(text) ||
-        /\b(kar\s*rha|kr\s*rha|kar\s*rahi|kr\s*rahi|kar\s*rhe|kr\s*rhe|chal\s*raha|chal\s*rha)\b/.test(text)
+    // 2. WHAT ARE YOU DOING
+    if (/\b(wyd|wdyd|watcha\s*doing|what\s+(r\s+u|are\s+you|u)\s+(doing|up\s+to))\b/.test(t) ||
+        /kya\s*(kar|kr|chal)\s*(rh|ra|ri|rhe)?/.test(t)
     ) {
         return [
-            "Just chilling 😌 how about you?",
-            "Nothing much, just chatting. You?",
-            "Reading messages, what are you up to?",
+            "Just chilling 😌 you?",
+            "Nothing much, just chatting! You?",
             "Getting some work done. You?",
-            "Just relaxing at home 🏠",
-            "Surfing the web, how about you?",
-            "Working on something, you?",
-            "Just watching some videos 📺 you?",
+            "Relaxing at home 🏠 hbu?",
+            "Just watching something 📺 you?",
             "Listening to music 🎵 what about you?",
             "Just about to eat, hbu?",
-            "Taking a break from work. You?",
-            "Not much! Just hanging 😄"
+            "Working on a few things. You?"
         ];
     }
 
-    // ── 3. How are you ──
-    if (/how\s+(are\s+you|r\s+u|u\s+doing|have\s+you\s+been|is\s+life|is\s+everything)/.test(text) ||
-        /how'?s?\s+(it\s+going|life|things|everything|\bu\b)/.test(text) ||
-        /\b(you|u)\s+ok\??/.test(text) ||
-        /\b(kaisa|kaise|kese)\s*(hai|ho|hain|h)?\b/.test(text) ||
-        /\b(kya\s+haal|haal\s+kya)\b/.test(text) ||
-        /\b(hru|hows\s+u|how'?s\s+u)\b/.test(text) ||
-        /\bhow\s+are\s+(u|ya)\b/.test(text)
+    // 3. HOW ARE YOU
+    if (/how\s+(are\s+you|r\s+u|u\s+doing|have\s+you\s+been|is\s+life)/.test(t) ||
+        /how'?s?\s+(it\s+going|life|things|everything|\bu\b)/.test(t) ||
+        /\b(hru|kaisa|kaise|kese)\b/.test(t) ||
+        /\byou\s+ok\b/.test(t)
     ) {
         return [
-            "I'm doing great, thank you! 😊 How about you?",
+            "Doing great, thanks! 😊 How about you?",
             "All good here! What's new with you?",
-            "Pretty busy but doing well. You?",
+            "Pretty busy but managing well! You?",
             "Can't complain! How have you been?",
-            "Doing great! What are you up to?",
-            "Everything is perfect, thank you!",
             "Feeling awesome today! 🌟 You?",
-            "A bit tired but managing. You?",
-            "Super! How are you doing?",
-            "Could be better, but still good 😊",
-            "Honestly, feeling fantastic! 🎉",
-            "Good thanks! Just staying busy 💪"
+            "A bit tired but doing fine. You?",
+            "Super! How are things with you?",
+            "Honestly, feeling great! 🎉 You?"
         ];
     }
 
-    // ── 4. Where are you ──
-    if (/\bwhere\b.*(are\s+you|r\s+u|\bu\b|ya)/.test(text) ||
-        /\b(kahan|kaha\s+ho|location|reached|arrived)\b/.test(text)
+    // 4. WHERE ARE YOU / LOCATION
+    if (/\bwhere\b.*(are\s+you|r\s+u|\bu\b)/.test(t) ||
+        /\b(kahan|reached|arrived|your\s+location)\b/.test(t)
     ) {
         return [
             "I'm at home right now 🏠",
-            "On my way there!",
-            "Just heading out, you?",
-            "I'm at work/school 📚",
-            "Still at the usual place.",
-            "I'll let you know when I arrive!",
-            "Just reached! 🎉",
+            "On my way! Almost there.",
+            "Still at work/school 📚",
             "Stuck in traffic 😩",
-            "Almost there, 5 minutes!",
+            "Just reached! 🎉",
+            "Almost there, give me 5 mins!",
             "At a café right now ☕",
-            "Still haven't left yet 😅",
             "Just got back home actually!"
         ];
     }
 
-    // ── 5. When / time ──
-    if (/\bwhen\b.*(are\s+you|r\s+u|\bu\b|coming|free)/.test(text) ||
-        /\b(what\s+time|how\s+long|\beta\b|be\s+there|till\s+when|\bkab\b)\b/.test(text)
+    // 5. WHEN / TIME
+    if (/\bwhen\b.*(are\s+you|r\s+u|\bu\b|coming|free)/.test(t) ||
+        /\b(what\s+time|how\s+long|be\s+there|till\s+when|kab)\b/.test(t)
     ) {
         return [
             "In a few minutes!",
-            "Let's do it in an hour.",
-            "Whenever works best for you.",
+            "Give me about an hour.",
+            "Whenever works best for you 😊",
             "I'm free after 6 PM.",
-            "Let's decide tomorrow.",
             "Right now, if you're ready!",
-            "Give me 10 minutes!",
-            "I'll be there by evening.",
-            "How about this weekend?",
-            "After I finish this task!",
-            "Should be there by 5 PM.",
+            "Give me 10–15 minutes!",
+            "How about this weekend? 😊",
             "Soon! Just finishing something up."
         ];
     }
 
-    // ── 6. Free / Busy / Available ──
-    if (/\b(free|busy|available|occupied|khali)\b/.test(text)) {
+    // 6. FREE / BUSY
+    if (/\b(are\s+you\s+free|r\s+u\s+free|you\s+free|free\s+tonight|free\s+today|busy\s+now|are\s+you\s+busy|khali)\b/.test(t)) {
         return [
-            "Yes, I'm free right now! 😊",
-            "A bit busy, can we chat later?",
+            "Yes, totally free! What's up? 😊",
+            "A bit busy right now, can we talk later?",
             "Yeah, what's on your mind?",
-            "I'll be free in 10 minutes.",
-            "Unfortunately quite busy right now.",
-            "Let me check my schedule.",
-            "Totally free! What's up?",
-            "Half-busy, but go ahead!",
-            "Just finishing up, gimme 5 mins.",
-            "Free after lunch, works?",
-            "Mostly free today! Let's chat.",
-            "Busy till evening, sorry!"
+            "Free in about 10 minutes!",
+            "Unfortunately pretty busy right now 😅",
+            "Free all evening! What's the plan?",
+            "Half-busy, but go ahead! 😊",
+            "Just finishing up, give me 5 mins."
         ];
     }
 
-    // ── 7. Thanks / Thank you ──
-    if (/\b(thanks?|thank\s+you|ty|thx|thnx|tq|cheers|shukriya|dhanyawad)\b/.test(text)) {
+    // 7. THANK YOU
+    if (/\b(thanks?|thank\s+you|ty|thx|thnx|tq|shukriya|dhanyawad|cheers)\b/.test(t)) {
         return [
-            "You're very welcome! 😊",
-            "Anytime!",
+            "You're welcome! 😊",
+            "Anytime! Happy to help 🙌",
             "No problem at all!",
-            "My pleasure!",
-            "Glad I could help!",
+            "My pleasure! 😄",
+            "Of course! Let me know if you need more.",
             "Don't mention it! 😊",
-            "Always happy to help 🙌",
-            "That's what I'm here for!",
-            "Of course, any time!",
-            "Happy to! Let me know if you need anything else.",
-            "Sure thing! 😄",
-            "It was nothing, really!"
+            "Sure thing! Glad I could help.",
+            "Always here for you! 💪"
         ];
     }
 
-    // ── 8. Sorry / Apology ──
-    if (/\b(sorry|apologi|my\s+bad|oops|excuse\s+me|forgive|maaf|pardon)\b/.test(text)) {
+    // 8. SORRY / APOLOGY
+    if (/\b(sorry|my\s+bad|oops|excuse\s+me|forgive|maaf|pardon|apologi)\b/.test(t)) {
         return [
             "No worries! 😊",
-            "It's totally fine, don't stress.",
-            "All good, happens to everyone!",
-            "Don't worry about it!",
-            "That's okay, I understand.",
-            "No problem at all!",
-            "It's all good, forget it! 😊",
-            "Hey, mistakes happen!",
-            "No hard feelings at all 🙌",
-            "You're forgiven! 😄",
-            "We all slip up sometimes!",
-            "It's fine, honestly!"
+            "It's totally fine, don't stress about it.",
+            "All good! Happens to the best of us 😄",
+            "Don't worry about it at all!",
+            "It's okay, I understand 😊",
+            "No hard feelings! 🙌",
+            "It's fine, seriously!",
+            "We all make mistakes — no biggie! 😄"
         ];
     }
 
-    // ── 9. Agreement / OK / Yes ──
-    // Fixed: uses \b word boundaries, NOT ^...$, so "ok bro", "yeah sure", "cool man" all match
-    if (/^\s*(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|alright|aight|bet|yup|yass|absolutely|haan|haa|ji|bilkul|okey|okies|k|kk)\b/.test(text) ||
-        /\b(sounds good|noted|got it)\b/.test(text)
+    // 9. LAUGHING / FUNNY
+    if (/\b(haha|hehe|lol|lmao|lmfao|rofl|xd|ikr|bruh)\b/.test(t) ||
+        t.includes('😂') || t.includes('🤣') || t.includes('💀')
     ) {
+        return [
+            "😂 That's actually hilarious!",
+            "Haha! Right?! 😄",
+            "Lol, I can't 😂",
+            "I'm literally crying 🤣",
+            "Okay that sent me 💀",
+            "Haha made my day! 😂",
+            "Lmao classic 😂",
+            "Stop it I can't breathe 🤣"
+        ];
+    }
+
+    // 10. AGREEMENT / YES / OK
+    if (/^(ok|okay|fine|sure|yes|yeah|yep|cool|awesome|great|perfect|alright|aight|bet|yup|absolutely|haan|ji|bilkul|k|kk)\b/.test(t) ||
+        /\b(sounds good|noted|got it|deal|agreed)\b/.test(t)
+    ) {
+        // Check what topic was discussed earlier to generate a contextual follow-up
+        const prevText = prevMsg ? (prevMsg.message || '').toLowerCase() : '';
+        if (/plan|meet|hang|trip|party/.test(prevText) || /plan|meet|hang|trip|party/.test(ct)) {
+            return [
+                "Perfect! Can't wait 🎉",
+                "Great, let's lock it in! 🗓️",
+                "Awesome, it's a plan then! 🙌",
+                "Let's go! So excited 🚀",
+                "Love it! See you then 😄",
+                "Deal! Count me in 🤝",
+                "Yes!! This is going to be fun 🎉"
+            ];
+        }
         return [
             "Awesome, sounds like a plan! 🎉",
-            "Great! Talk to you then.",
-            "Perfect. Let's do it.",
-            "Cool, works for me!",
-            "Alright, noted. 👍",
-            "Sounds wonderful!",
+            "Great! Talk to you then 😊",
+            "Perfect. Let's do it! 🙌",
+            "Cool, works for me! 👍",
+            "Alright, noted 👍",
             "Brilliant! Let's go 🚀",
-            "That settles it then!",
-            "Love it, let's make it happen!",
             "Deal! 🤝",
-            "We're on the same page then!",
-            "Looking forward to it! 😄"
+            "We're on the same page then!"
         ];
     }
 
-    // ── 10. No / Disagree ──
-    // Fixed: uses flexible matching, NOT ^...$
-    if (/^\s*(no|nope|nah|nay|never|nahi|na)\b/.test(text) ||
-        /\bnot\s+really\b/.test(text)
+    // 11. NO / DISAGREE
+    if (/^(no|nope|nah|nay|never|nahi|na)\b/.test(t) ||
+        /\bnot\s+really\b/.test(t) ||
+        /\bcan'?t\s+(make|come|join)\b/.test(t)
     ) {
         return [
-            "Oh okay, no problem.",
+            "Oh okay, no worries at all 😊",
             "Got it, maybe next time!",
-            "Alright, understood.",
-            "No worries at all!",
-            "Sure, that's fine 😊",
-            "Okay, let me know if you change your mind.",
-            "Fair enough!",
-            "That's okay! We'll figure it out.",
-            "No pressure at all 😊",
-            "Alright, respect that!",
-            "Cool, no biggie!",
-            "Okay, maybe another time then?"
+            "Alright, understood 👍",
+            "No pressure! Let me know if you change your mind.",
+            "Fair enough! 😊",
+            "That's completely fine!",
+            "No biggie, we'll figure something else out.",
+            "Okay, maybe another time then? 😊"
         ];
     }
 
-    // ── 11. Laughing ──
-    if (/\b(haha|hehe|lol|lmao|lmfao|rofl|ikr|xd)\b/.test(text) ||
-        text.includes('😂') || text.includes('🤣')
-    ) {
-        return [
-            "😂 Absolutely hilarious!",
-            "Haha, right?! 😄",
-            "Lol, too funny!",
-            "I can't stop laughing! 🤣",
-            "Lmao, classic!",
-            "Haha, made my day! 😂",
-            "Okay that was actually hilarious 💀",
-            "I'm deceased 😂🤣",
-            "Stop it, I'm crying laughing 😂",
-            "This is too much lmao!",
-            "Haha you're killing me 💀",
-            "Lol literally can't 😂"
-        ];
-    }
-
-    // ── 12. Farewell / Bye ──
-    if (/\b(bye|goodbye|see\s+ya|see\s+you|talk\s+later|gn|goodnight|good\s+night|ttyl|take\s+care|cya|peace\s+out|alvida|ciao|tc|byee)\b/.test(text)) {
-        return [
-            "Goodbye! Take care 👋",
-            "Talk to you later!",
-            "Good night! Sweet dreams 😴",
-            "See you tomorrow!",
-            "Have a great rest of your day!",
-            "Bye! Let's chat soon 😊",
-            "Take care! Stay safe 🙌",
+    // 12. FAREWELL / BYE
+    if (/\b(bye|goodbye|see\s+ya|see\s+you|talk\s+later|gn|goodnight|good\s+night|ttyl|take\s+care|cya|alvida|ciao|tc|byee)\b/.test(t)) {
+        const isNight = /gn|goodnight|good\s+night|sleep/.test(t);
+        return isNight ? [
+            "Good night! Sleep well 😴🌙",
+            "Sweet dreams! 🌙",
+            "Good night! Talk tomorrow 😊",
+            "Night night! Take care 🌙",
+            "Sleep tight! 😴",
+            "Good night! Rest well 🌙💤",
+            "Night! Catch you tomorrow 👋"
+        ] : [
+            "Take care! 👋😊",
+            "Bye! Talk soon 😊",
+            "See you! Have a great day 🌟",
             "Until next time! 👋",
-            "Miss you already! 😄",
-            "Bye bye! 👋😊",
-            "Catch you later!",
-            "Adios! Have a wonderful day 🌟"
+            "Catch you later! 😄",
+            "Bye bye! Stay safe 🙌",
+            "Talk to you later! 👋"
         ];
     }
 
-    // ── 13. Love / Affection ──
-    if (/\b(love|miss\s+you|cute|sweet|beautiful|amazing|wonderful|fantastic|gorgeous|adorable)\b/.test(text) ||
-        text.includes('❤') || text.includes('🥰') || text.includes('💕')
+    // 13. LOVE / AFFECTION / COMPLIMENTS
+    if (/\b(love\s+you|miss\s+you|i\s+love|you'?re\s+(cute|sweet|beautiful|amazing|the\s+best)|i\s+miss)\b/.test(t) ||
+        t.includes('❤') || t.includes('🥰') || t.includes('💕') || t.includes('😍')
     ) {
         return [
             "Aww, that's so sweet! 🥰",
-            "Thank you, that means a lot! ❤️",
+            "That means so much, thank you! ❤️",
             "You're amazing too! 😊",
-            "That's really kind of you!",
             "Aww, I feel the same way! 💕",
-            "That's so lovely to hear! 😊",
-            "You always know what to say 🥹",
-            "Aw stop it, you're making me blush! 😊",
+            "Stop, you're making me smile! 😊",
             "Right back at you! ❤️",
-            "That just made my day! 🌟",
-            "You're too sweet! 🥰",
-            "Honestly, same! 💕"
+            "You just made my day! 🌟",
+            "You're too sweet! 🥰"
         ];
     }
 
-    // ── 14. Food / Eating ──
-    if (/\b(food|eating|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana|biryani|noodles|sushi)\b/.test(text)) {
+    // 14. FOOD / EATING
+    if (/\b(food|eating|lunch|dinner|breakfast|hungry|snack|restaurant|cook|meal|pizza|burger|chai|coffee|tea|khana|biryani|noodles|sushi|ordering)\b/.test(t)) {
         return [
             "Ooh, that sounds delicious! 😋",
-            "I'm hungry now just thinking about it!",
-            "Let's grab food sometime! 🍕",
+            "Now I'm hungry just thinking about it!",
+            "Let's grab food together sometime! 🍕",
             "Yes! What are you having?",
-            "I could go for some food right now! 😄",
-            "That sounds amazing, where from?",
             "Send me some! 😂",
-            "Okay now I'm starving 😩",
-            "Is it good? Review please! 😄",
-            "Wish I was there to eat with you!",
-            "Save me some! 🍕",
+            "Now I'm starving 😩",
+            "Is it good? Give me a review! 😄",
             "Yum! What's cooking? 👨‍🍳"
         ];
     }
 
-    // ── 15. Help / Support ──
-    if (/\b(help|assist|stuck|problem|issue|trouble|error|fix|solution|guide|suggest)\b/.test(text) ||
-        /\bhow\s+(do\s+i|to)\b/.test(text)
-    ) {
+    // 15. WORK / STUDY / EXAMS
+    if (/\b(work|office|job|meeting|deadline|exam|study|assignment|project|college|school|class|homework)\b/.test(t)) {
         return [
-            "Sure! What do you need help with?",
-            "I'll do my best to help! 😊",
-            "Tell me more, I'll figure it out.",
-            "Let's solve this together!",
-            "I've got you! What's the issue?",
-            "No problem, what's going on?",
-            "What's the problem? Let me know.",
-            "Happy to help! Explain the issue.",
-            "Sure thing, walk me through it.",
-            "Let me look into that for you!",
-            "We'll sort it out, don't worry! 💪",
-            "Explain the situation and I'll help!"
+            "That sounds hectic! You got this 💪",
+            "Wow, busy day! How's it going?",
+            "Good luck with that! 🌟",
+            "Need any help? Let me know!",
+            "You'll crush it! 💪",
+            "Take a break if you need one 😊",
+            "Almost there, keep going! 🚀",
+            "Let me know how it goes! 🤞"
         ];
     }
 
-    // ── 16. Plans / Meeting ──
-    if (/\b(plan|meet|hang\s*out|catch\s*up|party|event|trip|outing|visit|come\s*over|wanna|shall\s+we)\b/.test(text) ||
-        /\blet'?s\s+go\b/.test(text)
+    // 16. HEALTH / SICK / TIRED
+    if (/\b(sick|fever|cold|headache|tired|exhausted|not\s+well|ill|hospital|doctor|medicine|rest|sleep)\b/.test(t)) {
+        return [
+            "Oh no! Get well soon 🌸",
+            "Take care of yourself! Rest up 💙",
+            "Hope you feel better real soon! 🌟",
+            "Sending good vibes your way 💙",
+            "Make sure to drink plenty of water! 💧",
+            "Rest up, you'll be fine soon 💪",
+            "Take it easy today, okay? 🌸",
+            "Feel better! I'm here if you need anything 💙"
+        ];
+    }
+
+    // 17. SAD / STRUGGLING / VENTING
+    if (/\b(sad|upset|depressed|crying|stressed|anxious|lonely|heartbroken|bored|rough|low|down|overwhelmed)\b/.test(t) ||
+        /\b(bad\s+day|not\s+okay|not\s+good|feeling\s+low|going\s+through)\b/.test(t)
     ) {
+        return [
+            "Aww, I'm really sorry to hear that 😢",
+            "I'm here for you, talk to me 💙",
+            "That sounds really tough. Sending hugs! 🤗",
+            "You've got this, I believe in you! 💪",
+            "Things will get better, I promise 🌟",
+            "Always here if you need to vent 💙",
+            "You're stronger than you know! 💪",
+            "Hang in there, sending positive vibes 🌟"
+        ];
+    }
+
+    // 18. HELP / SUPPORT / TECHNICAL
+    if (/\b(help|stuck|problem|issue|trouble|error|fix|how\s+do\s+i|how\s+to|can\s+you\s+help|need\s+help)\b/.test(t)) {
+        return [
+            "Of course! What do you need help with?",
+            "Tell me more and I'll help you out 😊",
+            "Let's solve this together! 💪",
+            "I've got you! What's the issue?",
+            "Walk me through it and we'll figure it out.",
+            "Happy to help! What's going on?",
+            "Let me look into that for you!",
+            "We'll sort it out, don't worry! 🙌"
+        ];
+    }
+
+    // 19. PLANS / EVENTS / MEETING
+    if (/\b(plan|meet|hang\s*out|catch\s*up|party|event|trip|outing|come\s*over|wanna\s+go|shall\s+we|let'?s\s+go)\b/.test(t)) {
         return [
             "Sounds like a plan! 🎉",
             "I'm in! When and where?",
             "Let's do it! 🙌",
-            "Would love to! Count me in.",
+            "Would love to! Count me in 😄",
             "Oh yes, let's make it happen!",
-            "I'm totally down for that! 😄",
-            "Yes! Can't wait 🎉",
-            "When are we thinking?",
-            "Love the idea! Let's plan it.",
-            "I'll clear my schedule! 😄",
-            "Definitely! What's the plan?",
-            "100% in! Let's go 🚀"
+            "I'm totally down for that!",
+            "Yes!! Can't wait 🎉",
+            "Love the idea! What's the plan?"
         ];
     }
 
-    // ── 17. Sad / Not feeling well ──
-    if (/\b(sad|upset|depressed|crying|tired|exhausted|stressed|anxious|lonely|heartbroken|bored|rough)\b/.test(text) ||
-        /\b(not\s+good|not\s+okay|bad\s+day|not\s+well|feeling\s+low)\b/.test(text)
+    // 20. COMPLAINING / FRUSTRATED
+    if (/\b(ugh|argh|so\s+annoying|so\s+frustrating|hate\s+this|can'?t\s+believe|this\s+is\s+(bad|terrible|awful|stupid)|pathetic)\b/.test(t) ||
+        t.includes('😤') || t.includes('😡') || t.includes('🤬')
     ) {
         return [
-            "Aww, I'm sorry to hear that 😢",
-            "I'm here for you! Talk to me 💙",
-            "That sounds really tough. Sending hugs! 🤗",
-            "You've got this, I believe in you! 💪",
-            "Things will get better, I promise 🌟",
-            "I'm always here if you need to talk 💙",
-            "Hope you feel better soon! 🌸",
-            "Take it easy, rest up 💙",
-            "That's rough, I'm sorry 😞",
-            "You're stronger than you think! 💪",
-            "Hang in there, it gets better!",
-            "Sending positive vibes your way 🌟"
+            "Ugh, that's so frustrating! I feel you 😤",
+            "That's really annoying, sorry to hear 😞",
+            "Wow, that must be tough to deal with.",
+            "That's honestly ridiculous 😤",
+            "I'd be frustrated too! You okay?",
+            "Take a deep breath, you've got this 💪",
+            "That sucks, I'm sorry 😞",
+            "Let me know if I can help at all!"
         ];
     }
 
-    // ── 18. General questions ──
-    if (text.endsWith('?') ||
-        /\b(why|what|when|where|who|how|can you|will you|do you|should we|did you|have you)\b/.test(text)
+    // 21. SHARING NEWS / EXCITED
+    if (/\b(guess\s+what|you\s+won'?t\s+believe|omg|oh\s+my|no\s+way|wow|amazing|incredible|just\s+(found|heard|got|won))\b/.test(t) ||
+        t.includes('🎉') || t.includes('🥳') || t.includes('😱')
     ) {
+        return [
+            "No way!! Tell me everything 😱",
+            "Oh wow, what happened?! 🎉",
+            "What?? Spill the details! 😮",
+            "Omg seriously?! Tell me more! 😱",
+            "That's amazing!! What's going on? 🎉",
+            "Wait, what?? I need to know! 😮",
+            "Wow, that's incredible! 🌟",
+            "I'm all ears! What's up? 😄"
+        ];
+    }
+
+    // 22. QUESTIONS (generic)
+    if (t.endsWith('?') ||
+        /\b(why|what|when|where|who|how|can you|will you|do you|should we|did you|have you)\b/.test(t)
+    ) {
+        // Try to infer topic from full context for a smarter answer
+        if (ctxHas(/food|eat|lunch|dinner|hungry/)) {
+            return [
+                "Yes! That sounds great 😄",
+                "Hmm, I'd go for something spicy! 🌶️",
+                "Honestly, I could eat anything right now 😂",
+                "Let's get food together sometime!",
+                "Yes, I'm literally starving 😩",
+                "Hard to pick, everything sounds good!",
+                "What are you thinking? Give me options! 😄"
+            ];
+        }
+        if (ctxHas(/plan|meet|trip|hang/)) {
+            return [
+                "Yes, I'm totally in! 🙌",
+                "I'd love to! When are you thinking?",
+                "Definitely, let's make it happen!",
+                "Count me in! What's the plan?",
+                "Sounds fun, I'm in! 🎉",
+                "Yes! Can't wait to see you 😄",
+                "Let me check my schedule and get back!"
+            ];
+        }
         return [
             "Yes, absolutely! 😊",
-            "I'm not quite sure, let me check.",
-            "No, I don't think so.",
+            "Hmm, let me think about that 🤔",
+            "I'm not 100% sure, let me check.",
             "Definitely, count me in!",
-            "I'll think about it and let you know.",
-            "That's a great point, let me think...",
-            "Good question! I'll get back to you.",
-            "Hmm, not sure honestly 🤔",
-            "Yeah, probably!",
-            "Let me find out for you.",
-            "I think so, but let me confirm.",
-            "Most likely yes! 😊"
+            "I'll get back to you on that 😊",
+            "Good question! I'll find out.",
+            "Yeah, most likely! 😊",
+            "I think so — let me confirm first."
         ];
     }
 
-    // ── 19. Default fallback ──
+    // 23. SHORT EXPRESSIONS (single words / emoji-only)
+    if (t.length < 15 && !t.includes(' ')) {
+        if (t.includes('😊') || t.includes('🙂') || t.includes('😁')) {
+            return ["😊 Right?!", "😄 Exactly!", "Love that energy! 🌟", "Same! 😄", "😊 Always!"];
+        }
+        return [
+            "Haha, right! 😄",
+            "Agreed! 👍",
+            "Tell me more! 😊",
+            "Oh wow! 😮",
+            "Facts! 💯",
+            "Lol seriously 😂",
+            "Same honestly 😅"
+        ];
+    }
+
+    // 24. DEFAULT FALLBACK — topic-aware
+    // Look at context to pick a smart fallback
+    if (ctxHas(/love|relationship|crush|dating/)) {
+        return [
+            "Aww, that's cute! 🥰",
+            "Tell me more, I'm invested! 😄",
+            "Omg, what happened?!",
+            "That's so sweet! 💕",
+            "And then what?? 😮",
+            "Honestly goals 🥰",
+            "I love this for you! 🌟"
+        ];
+    }
+    if (ctxHas(/movie|show|series|netflix|film|watch/)) {
+        return [
+            "Ooh, is it good? 🎬",
+            "I need to watch that too!",
+            "What's it about?",
+            "10/10 recommend it?",
+            "I've heard great things about it!",
+            "Adding it to my watchlist! 🎬",
+            "Let's watch together sometime! 🍿"
+        ];
+    }
+    if (ctxHas(/music|song|album|artist|singer|playlist/)) {
+        return [
+            "Ooh, good taste! 🎵",
+            "That's literally on repeat for me too!",
+            "Yes!! That song is 🔥",
+            "Have you heard their latest? 🎵",
+            "Send me the playlist! 🎧",
+            "Same! That album is incredible.",
+            "Great vibes! 🎵"
+        ];
+    }
+
     return [
-        "Sounds good to me! 😊",
-        "Alright, got it! 👍",
+        "Sounds good! 😊",
+        "Oh nice, tell me more! 😄",
+        "Interesting! What happened?",
+        "I see, that makes sense 👍",
         "Could you tell me more about that?",
-        "No problem!",
-        "Oh, really? Tell me more!",
-        "That's interesting, go on...",
-        "I see, makes sense!",
+        "Oh really? Go on... 😮",
         "For sure! 😊",
-        "Interesting, keep going...",
-        "Okay, noted! What next?",
-        "Got it, what else? 😄",
-        "Makes total sense to me!"
+        "Got it! What else? 😄"
     ];
 }
 
