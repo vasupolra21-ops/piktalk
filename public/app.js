@@ -3373,14 +3373,17 @@ function _formatFileSize(bytes) {
     return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
-function sendFileAttachment(file) {
+// ── Chunked file upload — 5 MB chunks via fetch(), streams to disk on server ──
+const _FILE_CHUNK_SIZE = 5 * 1024 * 1024; // 5 MB per chunk
+
+async function sendFileAttachment(file) {
     if (!socket || !currentRoomID) { alert('Not connected to chat room.'); return; }
-    if (file.size > 50 * 1024 * 1024) { alert('File too large (Max 50MB)'); return; }
+    // Max 1 GB — Render /tmp has ~10 GB free
+    if (file.size > 1 * 1024 * 1024 * 1024) { alert('File too large (Max 1 GB)'); return; }
 
     const currentName = myNickname || (localStorage.getItem('piktalk_saved_profile') ? JSON.parse(localStorage.getItem('piktalk_saved_profile')).nickname : '') || 'Someone';
     const optMsgId = '_opt_file_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
 
-    // Show optimistic "uploading…" message immediately so sender sees feedback
     const optimisticData = {
         msgId: optMsgId,
         id: socket.id,
@@ -3396,16 +3399,7 @@ function sendFileAttachment(file) {
     clearReply();
     if (aiRepliesBar) aiRepliesBar.classList.add('hidden');
 
-    // ── Upload file via HTTP POST (avoids WebSocket payload size limits on Render) ──
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/upload?name=' + encodeURIComponent(file.name), true);
-    xhr.timeout = 60000;
-    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
-
-    // Show upload progress on the optimistic bubble
-    xhr.upload.onprogress = (e) => {
-        if (!e.lengthComputable) return;
-        const pct = Math.round((e.loaded / e.total) * 100);
+    const updateProgress = (pct) => {
         const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
         if (optEl) {
             const bar = optEl.querySelector('.file-upload-progress-bar');
@@ -3415,55 +3409,86 @@ function sendFileAttachment(file) {
         }
     };
 
-    xhr.onload = () => {
+    const removeOptimistic = () => {
         const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
-        if (xhr.status === 200) {
-            let result;
-            try { result = JSON.parse(xhr.responseText); } catch(e) { result = {}; }
-            const fileUrl = result.url || '';
+        if (optEl) optEl.remove();
+    };
 
-            // Update optimistic bubble: hide progress, enable download/open links
-            if (optEl) {
-                const progWrap = optEl.querySelector('.file-upload-progress-wrap');
-                if (progWrap) progWrap.style.display = 'none';
-                const uploadingLbl = optEl.querySelector('.file-uploading-label');
-                if (uploadingLbl) uploadingLbl.style.display = 'none';
-                optEl.querySelectorAll('a[data-fileurl]').forEach(a => { a.href = fileUrl; a.removeAttribute('data-fileurl'); });
-                optEl.querySelectorAll('audio[data-fileurl]').forEach(a => { a.src = fileUrl; a.removeAttribute('data-fileurl'); });
-            }
-
-            // Broadcast to room via socket — only metadata + URL (tiny payload, no base64)
-            socket.emit('send-message', {
-                roomID: currentRoomID,
-                nickname: currentName,
-                profilePic: myProfilePic || null,
-                message: '',
-                file: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', url: fileUrl },
-                replyTo: replyingTo || null,
-                msgId: optMsgId
-            });
-        } else {
-            console.error('Upload response status:', xhr.status, xhr.responseText);
-            alert('File upload failed (' + xhr.status + '). Please try again.');
-            if (optEl) optEl.remove();
+    const finalizeOptimistic = (fileUrl) => {
+        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
+        if (optEl) {
+            const progWrap = optEl.querySelector('.file-upload-progress-wrap');
+            if (progWrap) progWrap.style.display = 'none';
+            const uploadingLbl = optEl.querySelector('.file-uploading-label');
+            if (uploadingLbl) uploadingLbl.style.display = 'none';
+            optEl.querySelectorAll('a[data-fileurl]').forEach(a => { a.href = fileUrl; a.removeAttribute('data-fileurl'); });
+            optEl.querySelectorAll('audio[data-fileurl]').forEach(a => { a.src = fileUrl; a.removeAttribute('data-fileurl'); });
         }
     };
 
-    xhr.ontimeout = () => {
-        console.error('Upload timed out after 60s');
-        alert('File upload timed out. Please check your network and try again.');
-        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
-        if (optEl) optEl.remove();
-    };
+    try {
+        const totalChunks = Math.max(1, Math.ceil(file.size / _FILE_CHUNK_SIZE));
+        updateProgress(0);
 
-    xhr.onerror = () => {
-        console.error('Upload network error occurred');
-        alert('File upload failed. Please check your connection and try again.');
-        const optEl = messagesContainer && messagesContainer.querySelector(`.message[data-msg-id="${CSS.escape(optMsgId)}"]`);
-        if (optEl) optEl.remove();
-    };
+        // 1. Init session
+        const initRes = await fetch(
+            '/upload/init?name=' + encodeURIComponent(file.name) +
+            '&type=' + encodeURIComponent(file.type || 'application/octet-stream') +
+            '&size=' + file.size +
+            '&chunks=' + totalChunks,
+            { method: 'POST' }
+        );
+        if (!initRes.ok) throw new Error('Failed to init upload (' + initRes.status + ')');
+        const { sessionId } = await initRes.json();
 
-    xhr.send(file);
+        // 2. Upload chunks with retry (up to 3 attempts per chunk)
+        for (let i = 0; i < totalChunks; i++) {
+            const start = i * _FILE_CHUNK_SIZE;
+            const end = Math.min(start + _FILE_CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+
+            let uploaded = false;
+            for (let attempt = 0; attempt < 3 && !uploaded; attempt++) {
+                try {
+                    const chunkRes = await fetch('/upload/chunk?sessionId=' + sessionId + '&i=' + i, {
+                        method: 'POST',
+                        body: chunk
+                    });
+                    if (!chunkRes.ok) throw new Error('Chunk ' + i + ' failed (' + chunkRes.status + ')');
+                    uploaded = true;
+                } catch(e) {
+                    if (attempt === 2) throw e;
+                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                }
+            }
+            updateProgress(Math.round(((i + 1) / totalChunks) * 100));
+        }
+
+        // 3. Finalize — assemble chunks into final file
+        const finalRes = await fetch('/upload/finalize?sessionId=' + sessionId, { method: 'POST' });
+        if (!finalRes.ok) {
+            const errBody = await finalRes.text();
+            throw new Error('Finalize failed (' + finalRes.status + '): ' + errBody);
+        }
+        const result = await finalRes.json();
+
+        // 4. Update UI and broadcast URL via socket
+        finalizeOptimistic(result.url);
+        socket.emit('send-message', {
+            roomID: currentRoomID,
+            nickname: currentName,
+            profilePic: myProfilePic || null,
+            message: '',
+            file: { name: file.name, size: file.size, type: file.type || 'application/octet-stream', url: result.url },
+            replyTo: replyingTo || null,
+            msgId: optMsgId
+        });
+
+    } catch(err) {
+        console.error('File upload error:', err);
+        alert('File upload failed: ' + (err.message || 'Network error') + '\nPlease try again.');
+        removeOptimistic();
+    }
 }
 
 // ── Poll Creation & Voting Engine ──

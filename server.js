@@ -63,97 +63,118 @@ app.get('/ping', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date() });
 });
 
-// ── HTTP File Upload Store ──────────────────────────────────────────────────
-// Files are uploaded via HTTP POST (not WebSocket) to avoid Render proxy limits.
-// Stored in-memory with a 60-minute TTL, max 100 files kept at once.
-const fileStore = {};          // fileId → { buffer, name, type, size, expires }
-const FILE_TTL_MS = 60 * 60 * 1000;    // 60 minutes
-const MAX_STORED_FILES = 100;
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+// ── Disk-based Chunked File Upload System ────────────────────────────────────
+// Each file is split into 5 MB chunks by the client and POSTed individually.
+// Chunks are streamed to /tmp/piktalk_files on disk — no memory buffering.
+// After all chunks arrive, the server concatenates them into the final file.
+// This bypasses Render's HTTP proxy body-size limits and the 512 MB RAM cap.
+const _fs = require('fs');
+const _path = require('path');
+
+const UPLOAD_DIR = '/tmp/piktalk_files';
+try { _fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch(e) {}
+
+const FILE_META = {};        // fileId → { name, type, size, filePath, expires }
+const UPLOAD_SESSIONS = {};  // sessionId → { name, type, totalChunks, receivedChunks, expires }
+const FILE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
 function cleanExpiredFiles() {
     const now = Date.now();
-    for (const id of Object.keys(fileStore)) {
-        if (fileStore[id].expires <= now) delete fileStore[id];
+    for (const id of Object.keys(FILE_META)) {
+        if (FILE_META[id].expires <= now) {
+            try { _fs.unlinkSync(FILE_META[id].filePath); } catch(e) {}
+            delete FILE_META[id];
+        }
     }
 }
 
-// Upload endpoint — receives raw binary body, stores it, returns a download URL
-app.post('/upload', (req, res) => {
+// 1. Init upload session — client calls this first to get a sessionId
+app.post('/upload/init', (req, res) => {
     const name = decodeURIComponent(req.query.name || 'file');
-    const contentType = req.headers['content-type'] || 'application/octet-stream';
-    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+    const type = decodeURIComponent(req.query.type || 'application/octet-stream');
+    const size = parseInt(req.query.size || '0', 10);
+    const totalChunks = parseInt(req.query.chunks || '1', 10);
+    const sessionId = uuidv4();
+    UPLOAD_SESSIONS[sessionId] = { name, type, size, totalChunks, receivedChunks: 0, expires: Date.now() + FILE_TTL };
+    setTimeout(() => { delete UPLOAD_SESSIONS[sessionId]; }, FILE_TTL);
+    console.log(`[upload] init session=${sessionId} name=${name} chunks=${totalChunks} size=${size}`);
+    res.json({ sessionId });
+});
 
-    if (contentLength > MAX_FILE_SIZE) {
-        return res.status(413).json({ error: 'File too large (max 50 MB)' });
-    }
-
-    const chunks = [];
-    let totalBytes = 0;
-
-    // Set 60-second timeout for slow mobile uploads
-    req.setTimeout(60000);
-
-    req.on('data', (chunk) => {
-        totalBytes += chunk.length;
-        if (totalBytes > MAX_FILE_SIZE) {
-            req.destroy();
-            return res.status(413).json({ error: 'File too large (max 50 MB)' });
-        }
-        chunks.push(chunk);
+// 2. Receive a chunk — streams directly to disk, no memory buffering
+app.post('/upload/chunk', (req, res) => {
+    const sessionId = req.query.sessionId;
+    const chunkIndex = parseInt(req.query.i || '0', 10);
+    const session = UPLOAD_SESSIONS[sessionId];
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const chunkPath = _path.join(UPLOAD_DIR, `${sessionId}_${chunkIndex}`);
+    const ws = _fs.createWriteStream(chunkPath);
+    req.setTimeout(300000); // 5 min per chunk
+    req.pipe(ws);
+    ws.on('finish', () => {
+        session.receivedChunks++;
+        console.log(`[upload] chunk ${chunkIndex}/${session.totalChunks - 1} session=${sessionId}`);
+        res.json({ ok: true, received: session.receivedChunks });
     });
-
-    req.on('end', () => {
-        cleanExpiredFiles();
-        // Trim store if over limit
-        const ids = Object.keys(fileStore);
-        if (ids.length >= MAX_STORED_FILES) {
-            // Delete oldest entry
-            const oldest = ids.sort((a, b) => fileStore[a].expires - fileStore[b].expires)[0];
-            delete fileStore[oldest];
-        }
-
-        const fileId = uuidv4();
-        fileStore[fileId] = {
-            buffer: Buffer.concat(chunks),
-            name,
-            type: contentType,
-            size: totalBytes,
-            expires: Date.now() + FILE_TTL_MS
-        };
-        setTimeout(() => { delete fileStore[fileId]; }, FILE_TTL_MS);
-
-        res.json({
-            fileId,
-            url: `/file/${fileId}`,
-            name,
-            size: totalBytes,
-            type: contentType
-        });
+    ws.on('error', (e) => {
+        console.error('Chunk write error:', e);
+        if (!res.headersSent) res.status(500).json({ error: 'Write failed' });
     });
-
-    req.on('error', (err) => {
-        console.error('Upload stream error:', err);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Upload failed' });
-        }
+    req.on('error', (e) => {
+        console.error('Chunk req error:', e);
+        ws.destroy();
     });
 });
 
-// Download endpoint — serves the stored file by ID
+// 3. Finalize — concatenate chunks into final file on disk
+app.post('/upload/finalize', async (req, res) => {
+    const sessionId = req.query.sessionId;
+    const session = UPLOAD_SESSIONS[sessionId];
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (session.receivedChunks < session.totalChunks) {
+        return res.status(400).json({ error: 'Missing chunks', expected: session.totalChunks, got: session.receivedChunks });
+    }
+    cleanExpiredFiles();
+    const fileId = uuidv4();
+    const finalPath = _path.join(UPLOAD_DIR, fileId);
+    const ws = _fs.createWriteStream(finalPath);
+    try {
+        for (let i = 0; i < session.totalChunks; i++) {
+            const chunkPath = _path.join(UPLOAD_DIR, `${sessionId}_${i}`);
+            await new Promise((resolve, reject) => {
+                const rs = _fs.createReadStream(chunkPath);
+                rs.on('error', reject);
+                rs.on('end', resolve);
+                rs.pipe(ws, { end: false });
+            });
+            try { _fs.unlinkSync(chunkPath); } catch(e) {}
+        }
+        ws.end();
+        await new Promise((resolve, reject) => { ws.on('finish', resolve); ws.on('error', reject); });
+        FILE_META[fileId] = { name: session.name, type: session.type, size: session.size, filePath: finalPath, expires: Date.now() + FILE_TTL };
+        setTimeout(() => { delete FILE_META[fileId]; try { _fs.unlinkSync(finalPath); } catch(e) {} }, FILE_TTL);
+        delete UPLOAD_SESSIONS[sessionId];
+        console.log(`[upload] finalized fileId=${fileId} name=${session.name} size=${session.size}`);
+        res.json({ fileId, url: `/file/${fileId}`, name: session.name, size: session.size, type: session.type });
+    } catch(e) {
+        console.error('Finalize error:', e);
+        try { ws.destroy(); _fs.unlinkSync(finalPath); } catch(ex) {}
+        res.status(500).json({ error: 'Assembly failed: ' + e.message });
+    }
+});
+
+// 4. Serve file from disk — streams to client
 app.get('/file/:id', (req, res) => {
-    const f = fileStore[req.params.id];
-    if (!f || Date.now() > f.expires) {
-        return res.status(404).json({ error: 'File not found or expired' });
-    }
-    const safeName = encodeURIComponent(f.name).replace(/'/g, '%27');
-    res.setHeader('Content-Type', f.type);
+    const meta = FILE_META[req.params.id];
+    if (!meta || Date.now() > meta.expires) return res.status(404).json({ error: 'File not found or expired' });
+    if (!_fs.existsSync(meta.filePath)) return res.status(404).json({ error: 'File not on disk' });
+    const safeName = encodeURIComponent(meta.name).replace(/'/g, '%27');
+    res.setHeader('Content-Type', meta.type);
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${safeName}`);
-    res.setHeader('Content-Length', f.size);
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.send(f.buffer);
+    res.sendFile(meta.filePath);
 });
-// ────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 
 const https = require('https');
 
