@@ -2434,6 +2434,43 @@ body.light-mode .waveform-bar {
     color: rgba(255, 255, 255, 0.85);
 }
 
+/* ── Voice Message Button (VM) ── */
+.btn-vm {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: var(--primary);
+}
+.btn-vm:hover {
+    background: rgba(99, 102, 241, 0.25);
+    color: var(--primary);
+    transform: scale(1.08);
+}
+.btn-vm.recording {
+    background: var(--danger);
+    color: #fff;
+    border-color: var(--danger);
+    animation: micPulse 1s ease-in-out infinite;
+}
+
+/* Stop button in recording bar */
+.vm-stop-btn {
+    background: rgba(99, 102, 241, 0.15) !important;
+    border-color: rgba(99, 102, 241, 0.3) !important;
+    color: var(--primary) !important;
+}
+.vm-stop-btn:hover {
+    background: var(--primary) !important;
+    color: #fff !important;
+}
+
+/* Send button in preview bar */
+.vm-send-btn {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    flex-shrink: 0;
+}
+
 .author-name {
     font-weight: 700;
     margin-left: 6px;
@@ -2801,7 +2838,8 @@ body.light-mode .waveform-bar {
 
     .btn-mic,
     .btn-send,
-    .btn-ai {
+    .btn-ai,
+    .btn-vm {
         width: 36px !important;
         height: 36px !important;
         min-width: 36px !important;

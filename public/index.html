@@ -43,13 +43,13 @@
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 
     <!-- Preload Critical CSS and JS Assets -->
-    <link rel="preload" href="/style.css?v=364" as="style">
+    <link rel="preload" href="/style.css?v=365" as="style">
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" crossorigin>
     <link rel="preload" href="/socket.io/socket.io.js" as="script">
-    <link rel="preload" href="/app.js?v=364" as="script">
+    <link rel="preload" href="/app.js?v=365" as="script">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="/style.css?v=364">
+    <link rel="stylesheet" href="/style.css?v=365">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <!-- Face Recognition Library (loaded with defer so it never blocks page load) -->
@@ -293,6 +293,39 @@
                     </div>
                 </div>
 
+                <!-- Voice Message: Recording Bar -->
+                <div id="vm-recording-bar" class="voice-recording-bar hidden">
+                    <button type="button" id="vm-cancel-btn" class="voice-cancel-btn" title="Cancel Recording">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <div class="voice-waveform" id="vm-live-waveform">
+                        <span></span><span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <div class="recording-dot"></div>
+                    <span class="recording-timer" id="vm-recording-timer">0:00</span>
+                    <button type="button" id="vm-stop-btn" class="voice-cancel-btn vm-stop-btn" title="Stop Recording">
+                        <i class="fas fa-square"></i>
+                    </button>
+                </div>
+
+                <!-- Voice Message: Preview Bar -->
+                <div id="vm-preview-bar" class="audio-preview-bar hidden">
+                    <button type="button" id="vm-preview-cancel-btn" class="voice-cancel-btn" title="Delete">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button type="button" id="vm-preview-play-btn" class="voice-play-btn" title="Preview">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <div class="audio-progress-wrap" id="vm-progress-wrap">
+                        <div class="audio-progress-bar" id="vm-progress-bar"></div>
+                    </div>
+                    <span class="audio-preview-duration" id="vm-preview-duration">0:00</span>
+                    <button type="button" id="vm-send-btn" class="btn btn-send vm-send-btn" title="Send Voice Message">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+
                 <div class="chat-input-row">
                     <div class="input-wrapper-chat">
                         <button type="button" id="attach-btn" class="btn-icon-small left attach-plus-btn" aria-label="Attachments" title="Attach">
@@ -308,6 +341,9 @@
                     </button>
                     <button id="v2t-mic-btn" class="btn btn-mic" title="Voice to Text" aria-label="Voice to Text">
                         <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="vm-btn" class="btn btn-mic btn-vm" title="Record Voice Message" aria-label="Voice Message">
+                        <i class="fas fa-microphone-lines"></i>
                     </button>
                     <button id="send-btn" class="btn btn-send">
                         <i class="fas fa-paper-plane"></i>
@@ -698,7 +734,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js?v=364" defer></script>
+    <script src="/app.js?v=365" defer></script>
 </body>
 </html>
 

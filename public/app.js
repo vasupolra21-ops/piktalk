@@ -212,6 +212,24 @@ let globalFullEmojiPanel = null;
 let currentReactionMsgId = null;
 let currentRoomUsersCount = 0;
 
+// Voice Message (VM) DOM handles – assigned in initDOMElements()
+let vmBtn, vmRecordingBar, vmCancelBtn, vmStopBtn, vmRecordingTimer;
+let vmPreviewBar, vmPreviewCancelBtn, vmPreviewPlayBtn, vmProgressBar;
+let vmPreviewDuration, vmSendBtn;
+
+// Voice Message (VM) runtime state
+let _vmMediaRecorder = null;
+let _vmAudioChunks   = [];
+let _vmTimerInterval = null;
+let _vmSeconds       = 0;
+let _vmRecordedBlob  = null;
+let _vmPreviewAudio  = null;
+let _vmPreviewPlaying = false;
+let _vmAnalyser      = null;
+let _vmAudioCtx      = null;
+let _vmAnimFrame     = null;
+let _vmStream        = null;
+
 function safeCssEscape(str) {
     if (!str) return '';
     if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
@@ -311,6 +329,19 @@ function initDOMElements() {
     v2tToggleRecBtn = document.getElementById('v2t-toggle-rec-btn');
     v2tToggleText = document.getElementById('v2t-toggle-text');
     v2tSendBtn = document.getElementById('v2t-send-btn');
+
+    // Voice Message (VM) Elements
+    vmBtn               = document.getElementById('vm-btn');
+    vmRecordingBar      = document.getElementById('vm-recording-bar');
+    vmCancelBtn         = document.getElementById('vm-cancel-btn');
+    vmStopBtn           = document.getElementById('vm-stop-btn');
+    vmRecordingTimer    = document.getElementById('vm-recording-timer');
+    vmPreviewBar        = document.getElementById('vm-preview-bar');
+    vmPreviewCancelBtn  = document.getElementById('vm-preview-cancel-btn');
+    vmPreviewPlayBtn    = document.getElementById('vm-preview-play-btn');
+    vmProgressBar       = document.getElementById('vm-progress-bar');
+    vmPreviewDuration   = document.getElementById('vm-preview-duration');
+    vmSendBtn           = document.getElementById('vm-send-btn');
 
     // AI smart reply element initializations
     aiBtn = document.getElementById('ai-btn');
@@ -2419,6 +2450,9 @@ function setupEventListeners() {
     voiceToTextEngine = new VoiceToTextEngine();
     voiceToTextEngine.init();
 
+    // ── WhatsApp-style Voice Message Initialization ──
+    initVoiceMessage();
+
     // Close any open menus when tapping elsewhere (optimized: defined once globally)
     document.addEventListener('click', (e) => {
         if (!e.target.closest('#active-photo-dl-menu') && !e.target.closest('.photo-action-dl-btn')) {
@@ -2443,6 +2477,295 @@ function formatSeconds(s) {
     const sec = s % 60;
     return `${m}:${sec.toString().padStart(2, '0')}`;
 }
+
+// ══════════════════════════════════════════════════════════════
+//  WhatsApp-style Voice Message Feature
+// ══════════════════════════════════════════════════════════════
+
+function initVoiceMessage() {
+    if (!vmBtn) return;
+
+    // Click to start; click again to stop (shows preview)
+    addFastClickListener(vmBtn, () => {
+        if (_vmMediaRecorder && _vmMediaRecorder.state === 'recording') {
+            _vmStopRecording();
+        } else {
+            _vmStartRecording();
+        }
+    });
+
+    if (vmCancelBtn)        addFastClickListener(vmCancelBtn,       _vmCancelRecording);
+    if (vmStopBtn)          addFastClickListener(vmStopBtn,         _vmStopRecording);
+    if (vmPreviewCancelBtn) addFastClickListener(vmPreviewCancelBtn, _vmDiscardPreview);
+    if (vmPreviewPlayBtn)   addFastClickListener(vmPreviewPlayBtn,  _vmTogglePreview);
+    if (vmSendBtn)          addFastClickListener(vmSendBtn,         _vmSendVoice);
+
+    // Seek on progress bar
+    const progressWrap = document.getElementById('vm-progress-wrap');
+    if (progressWrap) {
+        progressWrap.addEventListener('click', (e) => {
+            if (!_vmPreviewAudio || !_vmPreviewAudio.duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            _vmPreviewAudio.currentTime = ratio * _vmPreviewAudio.duration;
+        });
+    }
+}
+
+async function _vmStartRecording() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Microphone not supported in this browser.');
+        return;
+    }
+    try {
+        _vmStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1, sampleRate: 16000 }
+        });
+    } catch (e) {
+        alert('Microphone access denied. Please allow microphone access and try again.');
+        return;
+    }
+
+    _vmAudioChunks  = [];
+    _vmSeconds      = 0;
+    _vmRecordedBlob = null;
+
+    // Pick the best supported codec
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : '';
+
+    const opts = { audioBitsPerSecond: 32000 };
+    if (mimeType) opts.mimeType = mimeType;
+
+    try {
+        _vmMediaRecorder = new MediaRecorder(_vmStream, opts);
+    } catch (e) {
+        _vmMediaRecorder = new MediaRecorder(_vmStream);
+    }
+
+    _vmMediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) _vmAudioChunks.push(e.data);
+    };
+    _vmMediaRecorder.onstop = _vmOnRecordingStop;
+    _vmMediaRecorder.start(250);
+
+    // Show recording bar, hide preview bar
+    if (vmRecordingBar)  vmRecordingBar.classList.remove('hidden');
+    if (vmPreviewBar)    vmPreviewBar.classList.add('hidden');
+    if (vmBtn)           vmBtn.classList.add('recording');
+    if (vmRecordingTimer) vmRecordingTimer.textContent = '0:00';
+
+    // Notify room (typing indicator style)
+    if (socket && currentRoomID) {
+        socket.emit('voice-recording-start', { roomID: currentRoomID, nickname: myNickname, profilePic: myProfilePic || null });
+    }
+
+    // Timer
+    _vmTimerInterval = setInterval(() => {
+        _vmSeconds++;
+        if (vmRecordingTimer) vmRecordingTimer.textContent = formatSeconds(_vmSeconds);
+        // Refresh recording indicator every 3s
+        if (_vmSeconds % 3 === 0 && socket && currentRoomID) {
+            socket.emit('voice-recording-start', { roomID: currentRoomID, nickname: myNickname, profilePic: myProfilePic || null });
+        }
+        if (_vmSeconds >= 120) _vmStopRecording(); // max 2 min
+    }, 1000);
+
+    // Live waveform visualizer
+    _vmStartLiveWaveform(_vmStream);
+}
+
+function _vmStartLiveWaveform(stream) {
+    try {
+        _vmAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        _vmAnalyser = _vmAudioCtx.createAnalyser();
+        _vmAnalyser.fftSize = 32;
+        const src = _vmAudioCtx.createMediaStreamSource(stream);
+        src.connect(_vmAnalyser);
+        const waveformEl = document.getElementById('vm-live-waveform');
+        const bars = waveformEl ? Array.from(waveformEl.querySelectorAll('span')) : [];
+        const data = new Uint8Array(_vmAnalyser.frequencyBinCount);
+        const draw = () => {
+            if (!_vmMediaRecorder || _vmMediaRecorder.state !== 'recording') return;
+            _vmAnimFrame = requestAnimationFrame(draw);
+            _vmAnalyser.getByteFrequencyData(data);
+            bars.forEach((bar, i) => {
+                const val = data[i % data.length] || 0;
+                bar.style.height = Math.max(4, (val / 255) * 24) + 'px';
+            });
+        };
+        draw();
+    } catch (e) { /* visualizer is non-critical */ }
+}
+
+function _vmStopRecording() {
+    if (!_vmMediaRecorder || _vmMediaRecorder.state === 'inactive') return;
+    clearInterval(_vmTimerInterval);
+    if (_vmAnimFrame) { cancelAnimationFrame(_vmAnimFrame); _vmAnimFrame = null; }
+    _vmMediaRecorder.stop();   // triggers onstop → _vmOnRecordingStop
+    if (vmBtn) vmBtn.classList.remove('recording');
+    if (socket && currentRoomID) {
+        socket.emit('voice-recording-stop', { roomID: currentRoomID });
+    }
+}
+
+function _vmOnRecordingStop() {
+    // Release mic
+    if (_vmStream)   { _vmStream.getTracks().forEach(t => t.stop()); _vmStream = null; }
+    if (_vmAudioCtx) { try { _vmAudioCtx.close(); } catch (e) {} _vmAudioCtx = null; }
+
+    if (_vmAudioChunks.length === 0) { _vmReset(); return; }
+
+    const recordedMime = (_vmMediaRecorder && _vmMediaRecorder.mimeType) ? _vmMediaRecorder.mimeType : 'audio/webm';
+    _vmRecordedBlob = new Blob(_vmAudioChunks, { type: recordedMime });
+
+    if (!_vmRecordedBlob || _vmRecordedBlob.size < 500) { _vmReset(); return; }
+
+    // Hide recording bar, show preview bar
+    if (vmRecordingBar) vmRecordingBar.classList.add('hidden');
+    if (vmPreviewBar)   vmPreviewBar.classList.remove('hidden');
+
+    // Load audio for preview
+    const url = URL.createObjectURL(_vmRecordedBlob);
+    _vmPreviewAudio = new Audio(url);
+    _vmPreviewAudio.ontimeupdate = () => {
+        if (_vmPreviewAudio && _vmPreviewAudio.duration) {
+            const pct = (_vmPreviewAudio.currentTime / _vmPreviewAudio.duration) * 100;
+            if (vmProgressBar) vmProgressBar.style.width = pct + '%';
+            if (vmPreviewDuration) vmPreviewDuration.textContent = formatSeconds(Math.floor(_vmPreviewAudio.currentTime));
+        }
+    };
+    _vmPreviewAudio.onended = () => {
+        _vmPreviewPlaying = false;
+        if (vmPreviewPlayBtn) vmPreviewPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+        if (vmProgressBar)    vmProgressBar.style.width = '0%';
+        if (vmPreviewDuration) vmPreviewDuration.textContent = formatSeconds(_vmSeconds);
+    };
+    _vmPreviewAudio.onloadedmetadata = () => {
+        const dur = isFinite(_vmPreviewAudio.duration) ? Math.round(_vmPreviewAudio.duration) : _vmSeconds;
+        if (vmPreviewDuration) vmPreviewDuration.textContent = formatSeconds(dur);
+    };
+
+    // Initial state
+    if (vmPreviewDuration) vmPreviewDuration.textContent = formatSeconds(_vmSeconds);
+    if (vmPreviewPlayBtn)  vmPreviewPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+    if (vmProgressBar)     vmProgressBar.style.width = '0%';
+}
+
+function _vmTogglePreview() {
+    if (!_vmPreviewAudio) return;
+    if (_vmPreviewPlaying) {
+        _vmPreviewAudio.pause();
+        _vmPreviewPlaying = false;
+        if (vmPreviewPlayBtn) vmPreviewPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+    } else {
+        _vmPreviewAudio.play().catch(() => {});
+        _vmPreviewPlaying = true;
+        if (vmPreviewPlayBtn) vmPreviewPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    }
+}
+
+function _vmCancelRecording() {
+    if (_vmMediaRecorder && _vmMediaRecorder.state === 'recording') {
+        _vmMediaRecorder.onstop = null;  // prevent _vmOnRecordingStop from firing
+        _vmMediaRecorder.stop();
+    }
+    clearInterval(_vmTimerInterval);
+    if (_vmAnimFrame) { cancelAnimationFrame(_vmAnimFrame); _vmAnimFrame = null; }
+    if (_vmStream)   { _vmStream.getTracks().forEach(t => t.stop()); _vmStream = null; }
+    if (_vmAudioCtx) { try { _vmAudioCtx.close(); } catch (e) {} _vmAudioCtx = null; }
+    if (socket && currentRoomID) {
+        socket.emit('voice-recording-stop', { roomID: currentRoomID });
+    }
+    _vmReset();
+}
+
+function _vmDiscardPreview() {
+    if (_vmPreviewAudio) { _vmPreviewAudio.pause(); _vmPreviewAudio = null; }
+    _vmReset();
+}
+
+function _vmReset() {
+    _vmMediaRecorder  = null;
+    _vmAudioChunks    = [];
+    _vmRecordedBlob   = null;
+    _vmPreviewPlaying = false;
+    _vmSeconds        = 0;
+    clearInterval(_vmTimerInterval);
+    if (vmBtn)            vmBtn.classList.remove('recording');
+    if (vmRecordingBar)   vmRecordingBar.classList.add('hidden');
+    if (vmPreviewBar)     vmPreviewBar.classList.add('hidden');
+    if (vmProgressBar)    vmProgressBar.style.width = '0%';
+    if (vmRecordingTimer) vmRecordingTimer.textContent = '0:00';
+    // Reset live waveform bars to CSS-animated defaults
+    document.querySelectorAll('#vm-live-waveform span').forEach(b => b.style.height = '');
+}
+
+function _vmSendVoice() {
+    if (!_vmRecordedBlob || !socket || !currentRoomID) return;
+    if (_vmPreviewAudio) { _vmPreviewAudio.pause(); }
+
+    // Disable send to prevent double-send
+    if (vmSendBtn) vmSendBtn.disabled = true;
+
+    const duration = (_vmPreviewAudio && _vmPreviewAudio.duration && isFinite(_vmPreviewAudio.duration))
+        ? Math.round(_vmPreviewAudio.duration)
+        : _vmSeconds;
+
+    const blobToConvert = _vmRecordedBlob;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const base64Audio = ev.target.result; // data:audio/webm;base64,...
+        const clientMsgId = 'msg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+
+        // Optimistic UI for sender
+        const optimisticData = {
+            msgId:         clientMsgId,
+            messageId:     clientMsgId,
+            id:            socket.id,
+            nickname:      myNickname || 'Me',
+            message:       '',
+            audio:         base64Audio,
+            audioDuration: duration,
+            profilePic:    myProfilePic || null,
+            replyTo:       replyingTo  || null
+        };
+        appendMessage(optimisticData, true);
+        markOptimisticMsg(clientMsgId);
+        clearReply();
+
+        // Send to server → broadcast to all room members
+        socket.emit('send-message', {
+            msgId:         clientMsgId,
+            messageId:     clientMsgId,
+            roomID:        currentRoomID,
+            nickname:      myNickname   || 'Anonymous',
+            profilePic:    myProfilePic || null,
+            message:       '',
+            audio:         base64Audio,
+            audioDuration: duration,
+            replyTo:       replyingTo  || null
+        });
+
+        if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        _vmReset();
+        if (vmSendBtn) vmSendBtn.disabled = false;
+    };
+    reader.onerror = () => {
+        if (vmSendBtn) vmSendBtn.disabled = false;
+        alert('Failed to process audio. Please try again.');
+    };
+    reader.readAsDataURL(blobToConvert);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  End of Voice Message Feature
+// ══════════════════════════════════════════════════════════════
 
 class VoiceToTextEngine {
     constructor() {
